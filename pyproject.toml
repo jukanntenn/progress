@@ -1,0 +1,18 @@
+[project]
+name = "progress-tracker"
+version = "0.1.0"
+description = "GitHub repository code change tracker with Claude analysis"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.3.1",
+    "peewee>=3.18.3",
+    "requests>=2.32.5",
+    "toml>=0.10.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+progress = "progress_tracker.cli:main"

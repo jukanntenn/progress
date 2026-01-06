@@ -1,0 +1,56 @@
+# Progress Tracker 配置文件示例
+
+[general]
+# 数据库文件路径（可选，默认：./data/progress.db）
+database_path = "./data/progress.db"
+
+[markpost]
+# Markpost API 配置
+base_url = "https://markpost.example.com"
+post_key = "your-post-key-here"
+
+[feishu]
+# 飞书 webhook 配置
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+
+[github]
+# GitHub CLI token（可选，如果已通过 gh auth登录 则无需配置）
+gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
+
+[schedule]
+# 调度配置（可选）
+# 是否启用调度模式
+enabled = false
+# crontab 格式的调度时间（例如：每 6 小时执行一次）
+# 格式：分 时 日 月 周
+# 示例：
+#   "0 */6 * * *"     - 每 6 小时执行一次
+#   "0 0 * * *"       - 每天凌晨 0 点执行
+#   "0 */2 * * *"     - 每 2 小时执行一次
+#   "*/30 * * * *"    - 每 30 分钟执行一次
+crontab = "0 */6 * * *"
+# 验证模式：开启后每次运行都对比最新和次新提交，方便测试调度功能
+# 生产环境建议设置为 false
+verify_mode = false
+
+# 仓库配置列表
+[[repos.list]]
+# 仓库名称（用于日志和显示）
+name = "vite"
+# GitHub 仓库格式: owner/repo
+url = "vitejs/vite"
+# 监控的分支（可选，默认 main）
+branch = "main"
+# 是否启用（可选，默认 true）
+enabled = true
+
+[[repos.list]]
+name = "react"
+url = "facebook/react"
+# 未指定分支，默认使用 main
+
+[[repos.list]]
+name = "example-private-repo"
+url = "mycompany/private-repo"
+branch = "develop"
+enabled = false  # 暂时禁用

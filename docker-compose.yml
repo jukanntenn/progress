@@ -1,0 +1,47 @@
+services:
+  progress:
+    # 使用本地构建或拉取的镜像
+    image: progress:latest
+    # 如果从 Docker Hub 拉取，使用下面的配置:
+    # image: your-registry/progress:latest
+
+    # 如果想本地构建镜像，取消注释下面的 build 配置
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+
+    container_name: progress
+
+    # 挂载配置文件和数据目录
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./data:/app/data  # 数据库文件会保存在这里
+      # 如果需要使用 Claude Code，挂载配置
+      # - ~/.claude:/root/.claude:ro
+
+    # 环境变量
+    environment:
+      - PYTHONUNBUFFERED=1
+      # 可以通过环境变量覆盖配置中的部分设置
+      # - GH_TOKEN=${GH_TOKEN:-}
+
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # 重启策略
+    restart: unless-stopped
+
+    # 执行命令 (可以根据需要修改)
+    # 示例: 检查所有仓库
+    command: ["--config", "/app/config.toml", "--verbose"]
+
+    # 示例: 只检查特定仓库
+    # command: ["--config", "/app/config.toml", "--repo", "django"]
+
+    # 如果需要定时执行，可以结合宿主机的 cron 或使用其他调度工具
+    # 例如，使用 crontab:
+    # 0 */6 * * * cd /path/to/progress && docker-compose up

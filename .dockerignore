@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# 数据库和数据文件
+*.db
+*.db-journal
+data/
+/tmp/
+
+# 日志
+*.log
+
+# 测试和覆盖率
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# 文档
+README.md
+*.md
+
+# 配置文件示例（用户应提供自己的配置）
+config.toml.example
+
+# 其他
+.DS_Store
