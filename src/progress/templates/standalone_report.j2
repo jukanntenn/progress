@@ -1,0 +1,77 @@
+### 📦 {{ repo_name }}
+
+**Repository**: [{{ repo_url }}](https://github.com/{{ repo_url }})
+**Branch**: `{{ branch }}`
+**Commit**: `{{ previous_commit[:8] if previous_commit else 'Initial' }} → {{ current_commit[:8] }}`
+**Count**: {{ commit_count }} commit(s)
+
+**📝 Summary**: {{ analysis.summary if analysis.summary else 'No detailed summary available' }}
+
+{% if analysis.truncated %}
+**⚠️ Note**: Diff length is {{ analysis.original_diff_length }} characters, truncated to first {{ analysis.analyzed_diff_length }} characters for analysis. Complete diff may contain more changes.
+
+{% endif %}
+{% if commit_messages %}
+**💬 Commit Messages**:
+{% for msg in commit_messages %}
+  - {{ msg }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.added_structures or analysis.removed_structures or analysis.added_functions or analysis.modified_functions or analysis.removed_functions or analysis.api_changes or analysis.important_changes %}
+<details>
+<summary>🔍 View Detailed Changes</summary>
+
+{% if analysis.added_structures %}
+**➕ Added Data Structures**:
+{% for item in analysis.added_structures %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.removed_structures %}
+**➖ Removed Data Structures**:
+{% for item in analysis.removed_structures %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.added_functions %}
+**✨ Added Functions/Methods**:
+{% for item in analysis.added_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.modified_functions %}
+**🔄 Modified Functions/Methods**:
+{% for item in analysis.modified_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.removed_functions %}
+**❌ Removed Functions/Methods**:
+{% for item in analysis.removed_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.api_changes %}
+**🔌 API Changes**:
+{% for item in analysis.api_changes %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.important_changes %}
+**⚠️ Important Changes**:
+{% for item in analysis.important_changes %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+</details>
+{% endif %}
+
+---

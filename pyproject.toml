@@ -1,0 +1,23 @@
+[project]
+name = "progress"
+version = "0.0.1"
+description = "Progress is a GitHub project tracking tool that traces multi-repo code changes, runs AI analysis, and generates reports to help users track open-source project progress."
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.3.1",
+    "jinja2>=3.1.0",
+    "peewee>=3.18.3",
+    "requests>=2.32.5",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=9.0.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+progress = "progress.cli:main"

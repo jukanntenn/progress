@@ -1,0 +1,57 @@
+Language requirement: The user-configured output language is "{{ language }}". Please use this language for all analysis results.
+
+CRITICAL INSTRUCTION: You must analyze the diff content provided via STANDARD INPUT (stdin). The code diff is being piped to you through stdin using a command like: `cat diff.patch | claude -p "your prompt"`. You MUST analyze the content from stdin, NOT any files in the current working directory. The current directory is unrelated to the repository being analyzed.
+
+Repository to analyze: {{ repo_name }}
+Branch: {{ branch }}
+
+## Commit Messages from this repository:
+{% for msg in commit_messages %}
+{{ msg }}
+
+{% endfor %}
+{% if truncated %}
+
+**⚠️ WARNING**: The diff was truncated due to size limitations (original: {{ original_diff_length }} chars, analyzed: {{ analyzed_diff_length }} chars). Analysis is based on partial diff.
+{% endif %}
+
+Your task: Analyze the code diff from stdin and generate a Markdown report.
+
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST start your report with "## {{ repo_name }}" (exact heading level 2 with ##)
+2. DO NOT change the heading levels - use exactly "##" for the repository name, "###" for sections below
+3. Include the repository metadata exactly as shown below
+4. List all commit messages provided above
+5. If there is a truncation warning, include it in your output
+6. Do NOT add any introductory text before "## {{ repo_name }}"
+
+Required output structure (follow exactly):
+
+## {{ repo_name }}
+
+**Repository**: {{ repo_name }}
+**Branch**: {{ branch }}
+
+### Commit Messages
+{% for msg in commit_messages %}
+{{ msg }}
+
+{% endfor %}
+{% if truncated %}
+
+**⚠️ WARNING**: The diff was truncated due to size limitations (original: {{ original_diff_length }} chars, analyzed: {{ analyzed_diff_length }} chars). Analysis is based on partial diff.
+{% endif %}
+
+### Summary
+[Provide a brief 1-2 paragraph summary of the main changes from the stdin diff]
+
+### Detailed Analysis
+[Provide detailed analysis of the code changes from stdin, including:
+- Breaking changes
+- Added public APIs
+- Removed public APIs
+- Important feature modifications
+- Performance-related changes
+- Any other significant changes]
+
+Remember: Analyze ONLY the diff content from stdin for repository "{{ repo_name }}". Start your output immediately with "## {{ repo_name }}" - no preamble, no introductory text.

@@ -1,0 +1,13 @@
+services:
+  progress:
+    image: jukanntenn/progress:latest
+    container_name: progress
+    volumes:
+      - ./config.toml:/app/config.toml
+      - ./claude_settings.json:/root/.claude/settings.json
+      - ./data:/app/data
+
+    environment:
+      - PROGRESS_SCHEDULE_CRON=0 8 * * * # Daily at 8 AM
+
+    restart: always

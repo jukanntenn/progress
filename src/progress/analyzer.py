@@ -1,0 +1,195 @@
+"""Claude Code analyzer."""
+
+import logging
+import subprocess
+import tempfile
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from .consts import (
+    CMD_CLAUDE,
+    TEMPLATE_ANALYSIS_PROMPT,
+    TIMEOUT_CLAUDE_ANALYSIS,
+)
+from .errors import AnalysisException
+
+logger = logging.getLogger(__name__)
+
+
+class ClaudeCodeAnalyzer:
+    """Claude Code CLI analyzer for code changes."""
+
+    def __init__(
+        self,
+        max_diff_length: int = 100000,
+        timeout: int = TIMEOUT_CLAUDE_ANALYSIS,
+        language: str = "zh",
+    ):
+        self.claude_code_path = CMD_CLAUDE
+        self.max_diff_length = max_diff_length
+        self.timeout = timeout
+        self.language = language
+        template_dir = Path(__file__).parent / "templates"
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+
+    def analyze_diff(
+        self,
+        repo_name: str,
+        branch: str,
+        diff: str,
+        commit_messages: list[str],
+    ) -> tuple[str, bool, int, int]:
+        """Analyze code diff and return Markdown report.
+
+        Args:
+            repo_name: Repository name
+            branch: Branch name
+            diff: Code diff content
+            commit_messages: List of commit messages
+
+        Returns:
+            (markdown_report, truncated, original_diff_length, analyzed_diff_length)
+        """
+        original_length = len(diff)
+        truncated = False
+
+        if original_length > self.max_diff_length:
+            truncated = True
+            diff = diff[: self.max_diff_length]
+            logger.warning(
+                f"Repository {repo_name} diff length ({original_length} chars) exceeds "
+                f"limit ({self.max_diff_length} chars), truncated to first {self.max_diff_length} chars"
+            )
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=f"{repo_name}_{branch}_diff.patch",
+        ) as temp_file:
+            temp_file.write(diff)
+            diff_file = Path(temp_file.name)
+            logger.debug(f"Created temporary diff file: {diff_file}")
+
+            prompt = self._build_analysis_prompt(
+                repo_name,
+                branch,
+                commit_messages,
+                truncated,
+                original_length,
+                len(diff),
+            )
+            logger.info(f"Analyzing code changes for {repo_name}...")
+            markdown_report = self._run_claude_analysis(diff, prompt)
+
+            return markdown_report, truncated, original_length, len(diff)
+
+    def generate_title_and_summary(self, aggregated_report: str) -> tuple[str, str]:
+        """Generate title and summary from aggregated report.
+
+        Args:
+            aggregated_report: Complete aggregated markdown report
+
+        Returns:
+            (title, summary) tuple
+        """
+        prompt = f"""Please analyze this aggregated code change report and generate:
+
+1. A concise title (maximum 10 words) that summarizes the overall changes
+2. A one-paragraph summary (3-5 sentences) that highlights the most important changes across all repositories
+
+Output in the following format:
+TITLE: <your title>
+SUMMARY: <your summary>
+
+Here is the report:
+
+{aggregated_report}
+"""
+
+        try:
+            logger.info("Generating title and summary with Claude...")
+            result = subprocess.run(
+                [self.claude_code_path, "-p", prompt],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+
+            output = result.stdout.strip()
+
+            title = "Open Source Project Code Changes Summary"
+            summary = "Aggregated report of code changes across monitored repositories."
+
+            for line in output.split("\n"):
+                if line.startswith("TITLE:"):
+                    title = line[6:].strip()
+                elif line.startswith("SUMMARY:"):
+                    summary = line[8:].strip()
+
+            logger.info(f"Generated title: {title}")
+            return title, summary
+
+        except subprocess.TimeoutExpired:
+            logger.error("Claude Code analysis timeout for title generation")
+            raise AnalysisException("Claude Code analysis timeout") from None
+        except Exception as e:
+            logger.error(f"Failed to generate title and summary: {e}")
+            raise AnalysisException(
+                f"Failed to generate title and summary: {e}"
+            ) from None
+
+    def _build_analysis_prompt(
+        self,
+        repo_name: str,
+        branch: str,
+        commit_messages: list[str],
+        truncated: bool,
+        original_length: int,
+        analyzed_length: int,
+    ) -> str:
+        """Build analysis prompt."""
+        template = self.jinja_env.get_template(TEMPLATE_ANALYSIS_PROMPT)
+        return template.render(
+            repo_name=repo_name,
+            branch=branch,
+            commit_messages=commit_messages,
+            language=self.language,
+            truncated=truncated,
+            original_diff_length=original_length,
+            analyzed_diff_length=analyzed_length,
+        )
+
+    def _run_claude_analysis(self, diff: str, prompt: str) -> str:
+        """Execute claude-code CLI analysis."""
+        cmd_claude = [self.claude_code_path, "-p", prompt]
+
+        try:
+            result = subprocess.run(
+                cmd_claude,
+                input=diff,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+
+            logger.debug(f"Claude output length: {len(result.stdout)}")
+
+            if result.stderr:
+                logger.warning(f"Claude stderr: {result.stderr}")
+
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Claude Code analysis failed: {e.stderr}")
+            raise AnalysisException(f"Claude Code analysis failed: {e.stderr}") from e
+        except subprocess.TimeoutExpired:
+            logger.error("Claude Code analysis timeout")
+            raise AnalysisException("Claude Code analysis timeout") from None
+        except FileNotFoundError as e:
+            logger.error(f"File not found: {e}")
+            raise AnalysisException(f"File not found: {e}") from None

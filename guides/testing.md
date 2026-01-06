@@ -1,0 +1,2 @@
+- Unit test code is placed in the tests/ directory.
+- Naming convention for test files: test + the name of the tested module. For example, to test config.py, the test file name should be test_config.py.

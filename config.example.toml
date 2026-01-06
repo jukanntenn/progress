@@ -1,0 +1,109 @@
+# Progress Tracker Configuration Example
+
+# ========== Top-level Configuration ==========
+# Timezone configuration (optional, default: UTC)
+# Supports all IANA timezone identifiers, for example:
+# - "UTC" - Coordinated Universal Time
+# - "Asia/Shanghai" - China Standard Time (CST)
+# - "America/New_York" - Eastern Time
+# - "Europe/London" - UK Time
+# - "Asia/Tokyo" - Japan Time
+timezone = "UTC"
+
+# ========== Markpost Configuration ==========
+[markpost]
+# Markpost publish URL (including base_url and post_key)
+# Example: https://markpost.example.com/p/your-post-key
+url = "https://markpost.example.com/p/your-post-key"
+# HTTP request timeout (seconds), default: 30
+timeout = 30
+
+# ========== Notification Configuration ==========
+[notification]
+
+[notification.feishu]
+# Feishu webhook configuration
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+# HTTP request timeout (seconds), default: 30
+timeout = 30
+
+[notification.email]
+# Email notification configuration (optional)
+# SMTP server configuration
+host = "smtp.163.com"
+port = 465
+user = "user@163.com"
+password = "xxxx"
+# Sender address (optional, default: progress@example.com)
+from_addr = "user@163.com"
+# Recipient address list (can be multiple)
+recipient = ["user@foxmail.com"]
+# STARTTLS (port 587)
+starttls = false
+# SSL (port 465)
+ssl = false
+
+# ========== GitHub Configuration ==========
+[github]
+# GitHub CLI token (required)
+gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
+# Global protocol configuration (optional, default: https)
+# Supported values: "https" or "ssh"
+protocol = "https"
+# Global proxy configuration (optional)
+# Supports HTTP/HTTPS/SOCKS5 proxies, for example:
+# proxy = "http://127.0.0.1:7890"
+# proxy = "socks5://127.0.0.1:1080"
+proxy = ""
+# Git command timeout (seconds), default: 300 (5 minutes)
+git_timeout = 300
+# GitHub CLI command timeout (seconds), default: 300 (5 minutes)
+gh_timeout = 300
+
+# ========== AI Analysis Configuration ==========
+[analysis]
+# Maximum diff length (characters), diffs exceeding this length will be truncated
+# Default: 100000
+max_diff_length = 100000
+# Concurrency (optional, default: 1 for serial)
+# Set to a value greater than 1 to enable concurrent analysis
+concurrency = 1
+# Claude Code analysis timeout (seconds), default: 600 (10 minutes)
+timeout = 600
+# Analysis result language (optional, default: zh)
+# Supports any language code (e.g., zh, en, ja, ko, fr, de, es, pt, ru, ar, etc.)
+# If the language code is not recognized, English will be used by default
+language = "zh"
+
+# ========== Repository Configuration ==========
+[[repos]]
+# GitHub repository format: owner/repo
+url = "vitejs/vite"
+# Branch to monitor (optional, default: main)
+branch = "main"
+# Enable or disable (optional, default: true)
+enabled = true
+# Repository-level protocol configuration (optional, overrides global config)
+# protocol = "ssh"
+
+[[repos]]
+url = "facebook/react"
+# Branch not specified, defaults to main
+
+[[repos]]
+# Supports full URL format
+url = "https://github.com/vitejs/vite.git"
+
+[[repos]]
+# Supports SSH URL format
+url = "git@github.com:vitejs/vite.git"
+
+[[repos]]
+url = "vue/core"
+# Repository-level protocol configuration, overrides global config
+protocol = "ssh"
+
+[[repos]]
+url = "mycompany/private-repo"
+branch = "develop"
+enabled = false                # Temporarily disabled
