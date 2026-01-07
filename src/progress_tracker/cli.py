@@ -4,6 +4,8 @@ import logging
 import click
 import requests
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 from .config import Config
 from .db import (
@@ -60,18 +62,25 @@ def main(config: str, verbose: bool, repo: str):
         repo_reports = []
         total_commits = 0
 
-        for repo_obj in repos:
-            try:
-                result = _check_repository(
-                    repo_obj, github_client, analyzer,
-                    reporter, cfg
-                )
-                if result:
-                    repo_reports.append(result)
-                    total_commits += result['commit_count']
-            except Exception as e:
-                logger.error(f"检查仓库 {repo_obj.name} 失败: {e}", exc_info=True)
-                continue
+        if cfg.concurrent.enabled:
+            logger.info(f"使用并发模式检查仓库 (线程数: {cfg.concurrent.max_workers})")
+            repo_reports, total_commits = _check_repositories_concurrent(
+                repos, github_client, analyzer, reporter, cfg
+            )
+        else:
+            logger.info("使用串行模式检查仓库")
+            for repo_obj in repos:
+                try:
+                    result = _check_repository(
+                        repo_obj, github_client, analyzer,
+                        reporter, cfg
+                    )
+                    if result:
+                        repo_reports.append(result)
+                        total_commits += result['commit_count']
+                except Exception as e:
+                    logger.error(f"检查仓库 {repo_obj.name} 失败: {e}", exc_info=True)
+                    continue
 
         # 7. 生成汇总报告
         if repo_reports:
@@ -220,6 +229,69 @@ def _upload_to_markpost(content: str, title: str, markpost_config) -> str:
     except requests.RequestException as e:
         logger.error(f"上传到 Markpost 失败: {e}")
         raise RuntimeError(f"上传到 Markpost 失败: {e}") from e
+
+
+def _check_repositories_concurrent(
+    repos: list,
+    github_client: GitHubClient,
+    analyzer: ClaudeCodeAnalyzer,
+    reporter: MarkdownReporter,
+    cfg: Config
+) -> tuple[list, int]:
+    """并发检查多个仓库
+
+    Args:
+        repos: 仓库列表
+        github_client: GitHub 客户端
+        analyzer: Claude 分析器
+        reporter: 报告生成器
+        cfg: 配置对象
+
+    Returns:
+        (repo_reports, total_commits)
+    """
+    repo_reports = []
+    total_commits = 0
+    lock = threading.Lock()
+
+    def process_repository(repo_obj):
+        """处理单个仓库的线程函数"""
+        try:
+            logger.info(f"[线程 {threading.current_thread().name}] 开始检查仓库: {repo_obj.name}")
+            result = _check_repository(
+                repo_obj, github_client, analyzer,
+                reporter, cfg
+            )
+            if result:
+                with lock:
+                    repo_reports.append(result)
+                    return result['commit_count']
+            return 0
+        except Exception as e:
+            logger.error(f"检查仓库 {repo_obj.name} 失败: {e}", exc_info=True)
+            return 0
+
+    # 使用线程池并发处理
+    with ThreadPoolExecutor(
+        max_workers=cfg.concurrent.max_workers,
+        thread_name_prefix="repo_checker"
+    ) as executor:
+        # 提交所有任务
+        future_to_repo = {
+            executor.submit(process_repository, repo): repo
+            for repo in repos
+        }
+
+        # 收集结果
+        for future in as_completed(future_to_repo, timeout=cfg.concurrent.timeout):
+            repo = future_to_repo[future]
+            try:
+                commit_count = future.result()
+                total_commits += commit_count
+            except Exception as e:
+                logger.error(f"处理仓库 {repo.name} 时发生异常: {e}", exc_info=True)
+
+    return repo_reports, total_commits
 
 
 if __name__ == '__main__':

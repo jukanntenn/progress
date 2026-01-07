@@ -37,6 +37,14 @@ class ScheduleConfig:
 
 
 @dataclass
+class ConcurrentConfig:
+    """并发配置"""
+    enabled: bool = False  # 是否启用并发
+    max_workers: int = 3  # 最大线程数
+    timeout: int = 3600  # 单个仓库超时时间(秒)
+
+
+@dataclass
 class Config:
     """应用配置"""
     database_path: str
@@ -44,6 +52,7 @@ class Config:
     feishu: FeishuConfig
     github: GitHubConfig
     schedule: ScheduleConfig
+    concurrent: ConcurrentConfig
     repos: List[dict]
 
     @classmethod
@@ -94,6 +103,14 @@ class Config:
             verify_mode=schedule_data.get('verify_mode', False)
         )
 
+        # 解析并发配置
+        concurrent_data = data.get('concurrent', {})
+        concurrent = ConcurrentConfig(
+            enabled=concurrent_data.get('enabled', False),
+            max_workers=concurrent_data.get('max_workers', 3),
+            timeout=concurrent_data.get('timeout', 3600)
+        )
+
         # 解析仓库配置
         repos_data = data.get('repos', {})
         repos_list = repos_data.get('list', [])
@@ -122,5 +139,6 @@ class Config:
             feishu=feishu,
             github=github,
             schedule=schedule,
+            concurrent=concurrent,
             repos=repos
         )

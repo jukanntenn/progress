@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from peewee import SqliteDatabase
 from .models import database_proxy, Repository, Report
 
@@ -14,11 +15,25 @@ database = None
 def init_db(db_path: str):
     """初始化数据库连接"""
     global database
+
+    # 确保数据库目录存在
+    db_file = Path(db_path)
+    db_dir = db_file.parent
+    if db_dir and not db_dir.exists():
+        db_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"创建数据库目录: {db_dir}")
+
     database = SqliteDatabase(db_path)
     database.connect()
+
+    # 配置 WAL 模式以支持并发写入
+    database.execute_sql("PRAGMA journal_mode=WAL;")
+    database.execute_sql("PRAGMA synchronous=NORMAL;")
+    database.execute_sql("PRAGMA busy_timeout=5000;")
+
     # 绑定数据库到模型的 proxy
     database_proxy.initialize(database)
-    logger.info(f"数据库已连接: {db_path}")
+    logger.info(f"数据库已连接(WAL模式): {db_path}")
 
 
 def create_tables():
