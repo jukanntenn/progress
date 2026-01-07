@@ -1,0 +1,73 @@
+### 📦 {{ repo_name }}
+
+**仓库**: [{{ repo_url }}](https://github.com/{{ repo_url }})
+**分支**: `{{ branch }}`
+**提交**: `{{ previous_commit[:8] if previous_commit else '初始' }} → {{ current_commit[:8] }}`
+**数量**: {{ commit_count }} 个提交
+
+**📝 变更摘要**: {{ analysis.summary if analysis.summary else '暂无详细摘要' }}
+
+{% if commit_messages %}
+**💬 提交消息**:
+{% for msg in commit_messages %}
+  - {{ msg }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.added_structures or analysis.removed_structures or analysis.added_functions or analysis.modified_functions or analysis.removed_functions or analysis.api_changes or analysis.important_changes %}
+<details>
+<summary>🔍 查看详细变更</summary>
+
+{% if analysis.added_structures %}
+**➕ 新增数据结构**:
+{% for item in analysis.added_structures %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.removed_structures %}
+**➖ 删除数据结构**:
+{% for item in analysis.removed_structures %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.added_functions %}
+**✨ 新增函数/方法**:
+{% for item in analysis.added_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.modified_functions %}
+**🔄 修改的函数/方法**:
+{% for item in analysis.modified_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.removed_functions %}
+**❌ 删除的函数/方法**:
+{% for item in analysis.removed_functions %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.api_changes %}
+**🔌 API 变更**:
+{% for item in analysis.api_changes %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+{% if analysis.important_changes %}
+**⚠️ 重要变更**:
+{% for item in analysis.important_changes %}
+  - {{ item }}
+{% endfor %}
+
+{% endif %}
+</details>
+{% endif %}
+
+---
