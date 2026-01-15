@@ -33,7 +33,6 @@ GH_RETRY_DELAY = 5  # seconds
 TEMPLATE_ANALYSIS_PROMPT = "analysis_prompt.j2"
 TEMPLATE_REPOSITORY_REPORT = "repository_report.j2"
 TEMPLATE_AGGREGATED_REPORT = "aggregated_report.j2"
-TEMPLATE_STANDALONE_REPORT = "standalone_report.j2"
 TEMPLATE_EMAIL_NOTIFICATION = "email_notification.j2"
 
 # ==================== URL Patterns ====================
@@ -62,16 +61,41 @@ DB_PRAGMAS = {
 
 
 def parse_repo_name(url: str) -> str:
-    """Extract repository name from URL.
+    """Extract repository slug (owner/repo) from URL.
 
     Args:
-        url: Repository URL in any supported format (owner/repo, https://, git@)
+        url: Repository URL in any supported format:
+             - owner/repo
+             - https://github.com/owner/repo(.git)
+             - git@github.com:owner/repo(.git)
 
     Returns:
-        Repository name (e.g., "vite" from "vitejs/vite")
+        Repository slug in "owner/repo" format
+
+    Examples:
+        >>> parse_repo_name("vitejs/vite")
+        'vitejs/vite'
+        >>> parse_repo_name("https://github.com/vitejs/vite.git")
+        'vitejs/vite'
+        >>> parse_repo_name("git@github.com:vitejs/vite")
+        'vitejs/vite'
     """
-    if "/" not in url:
+    import re
+
+    if re.match(r"^[\w-]+/[\w-]+$", url):
         return url
 
-    # Remove .git suffix and take the last part
-    return url.rstrip(GIT_SUFFIX).split("/")[-1]
+    https_match = re.match(r"^https?://github\.com/([^/]+)/([^/.]+)", url)
+    if https_match:
+        return f"{https_match.group(1)}/{https_match.group(2)}"
+
+    ssh_match = re.match(r"^git@github\.com:([^/]+)/([^/.]+)", url)
+    if ssh_match:
+        return f"{ssh_match.group(1)}/{ssh_match.group(2)}"
+
+    if "/" in url:
+        parts = url.rstrip(GIT_SUFFIX).split("/")
+        if len(parts) >= 2:
+            return f"{parts[-2]}/{parts[-1]}"
+
+    return url

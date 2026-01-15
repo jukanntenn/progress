@@ -1,9 +1,13 @@
 """GitHub module unit tests"""
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 from progress.github import sanitize_repo_name, GitClient, GitHubClient
 from progress.enums import Protocol
+from progress.repository import RepositoryManager
 
 
 # ========== Test Cases ==========
@@ -85,6 +89,10 @@ def test_github_client_has_git_client_methods():
     assert hasattr(client, "get_commit_messages")
     assert hasattr(client, "get_commit_count")
     assert hasattr(client, "get_nth_commit_from_head")
+    assert hasattr(client, "get_total_commit_count")
+    assert hasattr(client, "get_recent_commit_hashes")
+    assert hasattr(client, "get_recent_commit_messages")
+    assert hasattr(client, "get_recent_commit_patches")
 
 
 def test_github_client_without_proxy():
@@ -134,3 +142,182 @@ def test_resolve_repo_url_invalid_format():
     """Test: Invalid repository URL format raises exception"""
     with pytest.raises(ValueError, match="Invalid repository URL format"):
         GitHubClient._resolve_repo_url("invalid-url-format", "https")
+
+
+def test_git_client_recent_commit_helpers(monkeypatch):
+    """Test: GitClient recent commit helper parsing"""
+    client = GitClient("/tmp/test_workspace")
+
+    def fake_run_git_command(args, repo_path):
+        if args[:3] == ["rev-list", "--count", "HEAD"]:
+            return "4\n"
+        if args[:2] == ["log", "-3"] and "--format=%H" in args:
+            return "h1\nh2\nh3\n"
+        if args[:2] == ["log", "-2"] and "--pretty=format:%B%n%x00" in args:
+            return "m1\n\x00m2\n\x00"
+        if args[:2] == ["log", "-2"] and "-p" in args:
+            return "diff --git a/a b/a\n"
+        raise AssertionError(f"Unexpected args: {args}")
+
+    monkeypatch.setattr(client, "_run_git_command", fake_run_git_command)
+    repo_path = Path("/tmp/repo")
+
+    assert client.get_total_commit_count(repo_path) == 4
+    assert client.get_recent_commit_hashes(repo_path, 3) == ["h1", "h2", "h3"]
+    assert client.get_recent_commit_messages(repo_path, 2) == ["m1", "m2"]
+    assert client.get_recent_commit_patches(repo_path, 2) == "diff --git a/a b/a\n"
+
+
+def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
+    """Test: First check skips when repo has <= 1 commit"""
+
+    class FakeGitHubClient:
+        def clone_or_update(self, url, branch, is_first_time):
+            return Path("/tmp/repo")
+
+        def get_current_commit(self, repo_path):
+            return "c" * 40
+
+        def get_total_commit_count(self, repo_path):
+            return 1
+
+    class FakeAnalyzer:
+        def analyze_diff(self, repo_name, branch, diff, commit_messages):
+            raise AssertionError("Should not analyze when total commits <= 1")
+
+    repo = SimpleNamespace(
+        id=1,
+        name="test",
+        url="owner/repo",
+        branch="main",
+        last_commit_hash=None,
+    )
+    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
+    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+
+    updated = []
+
+    def fake_update_commit(repo_id, commit_hash):
+        updated.append((repo_id, commit_hash))
+
+    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
+    assert manager.check(repo) is None
+    assert updated == [(1, "c" * 40)]
+
+
+def test_repository_manager_first_check_uses_range_when_history_sufficient(monkeypatch):
+    """Test: First check uses old..new range when total commits > lookback"""
+
+    class FakeGitHubClient:
+        def clone_or_update(self, url, branch, is_first_time):
+            return Path("/tmp/repo")
+
+        def get_current_commit(self, repo_path):
+            return "n" * 40
+
+        def get_total_commit_count(self, repo_path):
+            return 10
+
+        def get_nth_commit_from_head(self, repo_path, n):
+            assert n == 3
+            return "b" * 40
+
+        def get_previous_commit(self, repo_path):
+            raise AssertionError("Should not fallback when base is available")
+
+        def get_commit_messages(self, repo_path, old_commit, new_commit):
+            assert old_commit == "b" * 40
+            assert new_commit == "n" * 40
+            return ["m"]
+
+        def get_commit_count(self, repo_path, old_commit, new_commit):
+            return 3
+
+        def get_commit_diff(self, repo_path, old_commit, new_commit):
+            return "diff"
+
+    class FakeAnalyzer:
+        def analyze_diff(self, repo_name, branch, diff, commit_messages):
+            assert diff == "diff"
+            assert commit_messages == ["m"]
+            return ("report", False, 4, 4)
+
+    repo = SimpleNamespace(
+        id=1,
+        name="test",
+        url="owner/repo",
+        branch="main",
+        last_commit_hash=None,
+    )
+    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
+    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+
+    updated = []
+
+    def fake_update_commit(repo_id, commit_hash):
+        updated.append((repo_id, commit_hash))
+
+    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
+    report = manager.check(repo)
+    assert report is not None
+    assert report.previous_commit == "b" * 40
+    assert report.current_commit == "n" * 40
+    assert report.commit_count == 3
+    assert updated == [(1, "n" * 40)]
+
+
+def test_repository_manager_first_check_uses_recent_commits_when_history_insufficient(
+    monkeypatch,
+):
+    """Test: First check analyzes all existing commits when total <= lookback"""
+
+    class FakeGitHubClient:
+        def clone_or_update(self, url, branch, is_first_time):
+            return Path("/tmp/repo")
+
+        def get_current_commit(self, repo_path):
+            return "n" * 40
+
+        def get_total_commit_count(self, repo_path):
+            return 2
+
+        def get_recent_commit_hashes(self, repo_path, max_count):
+            assert max_count == 2
+            return ["n" * 40, "o" * 40]
+
+        def get_recent_commit_messages(self, repo_path, max_count):
+            assert max_count == 2
+            return ["m1", "m2"]
+
+        def get_recent_commit_patches(self, repo_path, max_count):
+            assert max_count == 2
+            return "patches"
+
+    class FakeAnalyzer:
+        def analyze_diff(self, repo_name, branch, diff, commit_messages):
+            assert diff == "patches"
+            assert commit_messages == ["m1", "m2"]
+            return ("report", False, 7, 7)
+
+    repo = SimpleNamespace(
+        id=1,
+        name="test",
+        url="owner/repo",
+        branch="main",
+        last_commit_hash=None,
+    )
+    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
+    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+
+    updated = []
+
+    def fake_update_commit(repo_id, commit_hash):
+        updated.append((repo_id, commit_hash))
+
+    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
+    report = manager.check(repo)
+    assert report is not None
+    assert report.previous_commit == "o" * 40
+    assert report.current_commit == "n" * 40
+    assert report.commit_count == 2
+    assert updated == [(1, "n" * 40)]

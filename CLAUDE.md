@@ -26,7 +26,6 @@ src/progress/
 └── templates/          # Jinja2 template files
     ├── repository_report.j2
     ├── aggregated_report.j2
-    ├── standalone_report.j2
     ├── analysis_prompt.j2
     └── email_notification.j2
 ```
@@ -58,3 +57,4 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 - English shall be used for comments, documentation, log messages and exception information in code
 - For adding or modifying configuration items, refer to `guides/config.md`
 - For writing test code, refer to `guides/testing.md`
+- For i18n, refer to `guides/i18n.md`

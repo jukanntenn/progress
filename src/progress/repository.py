@@ -44,13 +44,42 @@ class RepositoryReport:
     """Repository check report."""
 
     repo_name: str
-    content: str
+    repo_slug: str
+    repo_web_url: str
+    branch: str
     commit_count: int
     current_commit: str
     previous_commit: str | None
+    commit_messages: list[str]
+    analysis_markdown: str
     truncated: bool
     original_diff_length: int
     analyzed_diff_length: int
+
+    @property
+    def content(self) -> str:
+        if hasattr(self, "_content"):
+            return self._content
+        return self.analysis_markdown
+
+    @content.setter
+    def content(self, value: str):
+        self._content = value
+
+
+@dataclass
+class CheckAllResult:
+    """Check all repositories result."""
+
+    reports: list[RepositoryReport]
+    total_commits: int
+    repo_statuses: dict[str, str]
+
+    def get_status_count(self) -> tuple[int, int, int]:
+        success = sum(1 for s in self.repo_statuses.values() if s == "success")
+        failed = sum(1 for s in self.repo_statuses.values() if s == "failed")
+        skipped = sum(1 for s in self.repo_statuses.values() if s == "skipped")
+        return success, failed, skipped
 
 
 class RepositoryManager:
@@ -206,28 +235,75 @@ class RepositoryManager:
         previous_commit = repo.last_commit_hash
 
         if not previous_commit:
-            self.logger.info("First check, comparing latest and second-latest commits")
-            previous_commit = self.github_client.get_previous_commit(repo_path)
-            if not previous_commit:
+            lookback_commits = self.config.analysis.first_run_lookback_commits
+            total_commits = self.github_client.get_total_commit_count(repo_path)
+
+            if total_commits <= 1:
                 self.logger.warning(
                     "Repository has only one commit, cannot compare, skipping"
                 )
                 self.update_commit(repo.id, current_commit)
                 return None
-            self.logger.debug(f"Second-latest commit: {previous_commit[:8]}")
 
-        commit_messages = self.github_client.get_commit_messages(
-            repo_path, previous_commit, current_commit
-        )
-        commit_count = self.github_client.get_commit_count(
-            repo_path, previous_commit, current_commit
-        )
+            effective_lookback = min(lookback_commits, total_commits)
+            self.logger.info(
+                f"First check, looking back {effective_lookback} commits (configured: {lookback_commits})"
+            )
+
+            if total_commits > effective_lookback:
+                previous_commit = self.github_client.get_nth_commit_from_head(
+                    repo_path, effective_lookback
+                )
+                if not previous_commit:
+                    self.logger.warning(
+                        "Failed to resolve base commit for first check, falling back to second-latest commit"
+                    )
+                    previous_commit = self.github_client.get_previous_commit(repo_path)
+                if not previous_commit:
+                    self.logger.warning(
+                        "Failed to resolve base commit for first check, skipping"
+                    )
+                    self.update_commit(repo.id, current_commit)
+                    return None
+                self.logger.debug(f"Base commit: {previous_commit[:8]}")
+
+                commit_messages = self.github_client.get_commit_messages(
+                    repo_path, previous_commit, current_commit
+                )
+                commit_count = self.github_client.get_commit_count(
+                    repo_path, previous_commit, current_commit
+                )
+                diff = self.github_client.get_commit_diff(
+                    repo_path, previous_commit, current_commit
+                )
+            else:
+                recent_hashes = self.github_client.get_recent_commit_hashes(
+                    repo_path, effective_lookback
+                )
+                previous_commit = recent_hashes[-1] if recent_hashes else None
+                if previous_commit:
+                    self.logger.debug(f"Oldest selected commit: {previous_commit[:8]}")
+
+                commit_messages = self.github_client.get_recent_commit_messages(
+                    repo_path, effective_lookback
+                )
+                commit_count = len(recent_hashes)
+                diff = self.github_client.get_recent_commit_patches(
+                    repo_path, effective_lookback
+                )
+        else:
+            commit_messages = self.github_client.get_commit_messages(
+                repo_path, previous_commit, current_commit
+            )
+            commit_count = self.github_client.get_commit_count(
+                repo_path, previous_commit, current_commit
+            )
+
+            diff = self.github_client.get_commit_diff(
+                repo_path, previous_commit, current_commit
+            )
 
         self.logger.info(f"Found {commit_count} new commits")
-
-        diff = self.github_client.get_commit_diff(
-            repo_path, previous_commit, current_commit
-        )
 
         if not diff.strip():
             self.logger.warning("Diff is empty, skipping analysis")
@@ -235,7 +311,7 @@ class RepositoryManager:
             return None
 
         self.logger.info("Analyzing code changes...")
-        content, truncated, original_length, analyzed_length = (
+        analysis_markdown, truncated, original_length, analyzed_length = (
             self.analyzer.analyze_diff(repo.name, repo.branch, diff, commit_messages)
         )
 
@@ -243,12 +319,19 @@ class RepositoryManager:
 
         self.logger.info(f"Repository {repo.name} check completed")
 
+        repo_slug = parse_repo_name(repo.url)
+        repo_web_url = f"https://github.com/{repo_slug}"
+
         return RepositoryReport(
             repo_name=repo.name,
-            content=content,
+            repo_slug=repo_slug,
+            repo_web_url=repo_web_url,
+            branch=repo.branch,
             commit_count=commit_count,
             current_commit=current_commit,
             previous_commit=previous_commit,
+            commit_messages=commit_messages,
+            analysis_markdown=analysis_markdown,
             truncated=truncated,
             original_diff_length=original_length,
             analyzed_diff_length=analyzed_length,
@@ -256,7 +339,7 @@ class RepositoryManager:
 
     def check_all(
         self, repos: list[Repository] | None = None, concurrency: int = 1
-    ) -> tuple[list[RepositoryReport], int]:
+    ) -> CheckAllResult:
         """Check all repositories (supports concurrency, skip on failure).
 
         Args:
@@ -264,24 +347,27 @@ class RepositoryManager:
             concurrency: Concurrency level (1 for serial)
 
         Returns:
-            (List of reports, total commit count)
+            CheckAllResult with reports, total commits, and status mapping
         """
         if repos is None:
             repos = self.list_enabled()
 
         reports = []
         total_commits = 0
+        repo_statuses = {}
 
-        def process(repo_obj: Repository) -> RepositoryReport | None:
-            """Process single repository."""
+        def process(repo_obj: Repository) -> tuple[RepositoryReport | None, str]:
+            """Process single repository, return (report, status)."""
             try:
                 result = self.check(repo_obj)
-                return result
+                if result:
+                    return result, "success"
+                return None, "skipped"
             except Exception as e:
                 self.logger.error(
                     f"Failed to check repository {repo_obj.name}: {e}", exc_info=True
                 )
-            return None
+                return None, "failed"
 
         if concurrency > 1:
             self.logger.info(
@@ -289,12 +375,13 @@ class RepositoryManager:
             )
             lock = threading.Lock()
 
-            def process_with_lock(repo_obj: Repository) -> RepositoryReport | None:
-                result = process(repo_obj)
-                if result:
-                    with lock:
-                        reports.append(result)
-                return result
+            def process_with_lock(
+                repo_obj: Repository,
+            ) -> tuple[RepositoryReport | None, str]:
+                result, status = process(repo_obj)
+                with lock:
+                    repo_statuses[repo_obj.name] = status
+                return result, status
 
             with ThreadPoolExecutor(
                 max_workers=concurrency, thread_name_prefix="repo_checker"
@@ -304,22 +391,30 @@ class RepositoryManager:
                 }
                 for future in as_completed(futures):
                     try:
-                        result = future.result()
+                        result, status = future.result()
                         if result:
-                            total_commits += result.commit_count
+                            with lock:
+                                reports.append(result)
+                                total_commits += result.commit_count
                     except Exception as e:
+                        repo = futures[future]
                         self.logger.error(
-                            f"Exception while processing repository {futures[future].name}: {e}"
+                            f"Exception while processing repository {repo.name}: {e}"
                         )
+                        with lock:
+                            repo_statuses[repo.name] = "failed"
         else:
             self.logger.info("Using serial mode to check repositories")
             for repo_obj in repos:
-                result = process(repo_obj)
+                result, status = process(repo_obj)
+                repo_statuses[repo_obj.name] = status
                 if result:
                     reports.append(result)
                     total_commits += result.commit_count
 
-        return reports, total_commits
+        return CheckAllResult(
+            reports=reports, total_commits=total_commits, repo_statuses=repo_statuses
+        )
 
     @staticmethod
     def _extract_repo_config(repo_config):

@@ -3,15 +3,16 @@
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
+from zoneinfo import ZoneInfo, available_timezones
 
 from pydantic import (
     BaseModel,
     Field,
     HttpUrl,
+    ValidationError,
     field_validator,
     model_validator,
-    ValidationError,
 )
 from pydantic_settings import (
     BaseSettings,
@@ -19,7 +20,6 @@ from pydantic_settings import (
     SettingsConfigDict,
     TomlConfigSettingsSource,
 )
-from zoneinfo import ZoneInfo, available_timezones
 
 from .consts import REPO_URL_PATTERNS
 from .enums import Protocol
@@ -114,7 +114,8 @@ class AnalysisConfig(BaseModel):
     max_diff_length: int = Field(default=100000, gt=0)
     concurrency: int = Field(default=1, ge=1)
     timeout: int = Field(default=600, ge=1)
-    language: str = Field(default="zh")
+    language: str = Field(default="en")
+    first_run_lookback_commits: int = Field(default=3, ge=1)
 
 
 class RepositoryConfig(BaseModel):
@@ -154,6 +155,7 @@ class RepositoryConfig(BaseModel):
 class Config(BaseSettings):
     """Application configuration."""
 
+    language: str = Field(default="zh-hans")
     timezone: str = Field(default="UTC")
 
     markpost: MarkpostConfig

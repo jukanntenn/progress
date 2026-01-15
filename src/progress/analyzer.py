@@ -13,6 +13,7 @@ from .consts import (
     TIMEOUT_CLAUDE_ANALYSIS,
 )
 from .errors import AnalysisException
+from .i18n import get_translation
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,8 @@ class ClaudeCodeAnalyzer:
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        self.translation = get_translation(language)
+        self._ = self.translation.gettext
 
     def analyze_diff(
         self,
@@ -67,10 +70,11 @@ class ClaudeCodeAnalyzer:
                 f"limit ({self.max_diff_length} chars), truncated to first {self.max_diff_length} chars"
             )
 
+        safe_name = repo_name.replace("/", "_")
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
-            suffix=f"{repo_name}_{branch}_diff.patch",
+            suffix=f"{safe_name}_{branch}_diff.patch",
         ) as temp_file:
             temp_file.write(diff)
             diff_file = Path(temp_file.name)
@@ -98,16 +102,22 @@ class ClaudeCodeAnalyzer:
         Returns:
             (title, summary) tuple
         """
-        prompt = f"""Please analyze this aggregated code change report and generate:
+        prompt = f"""Your task: Analyze the aggregated code change report below and generate a title and summary.
 
-1. A concise title (maximum 10 words) that summarizes the overall changes
-2. A one-paragraph summary (3-5 sentences) that highlights the most important changes across all repositories
+Language requirement: The user-configured output language is "{self.language}". Use this language for ALL your output.
+For example, if you determine the language is Chinese, the title and summary MUST be in Chinese, not English.
 
-Output in the following format:
-TITLE: <your title>
-SUMMARY: <your summary>
+CRITICAL FORMAT REQUIREMENTS:
+1. Output EXACTLY two lines
+2. Line 1 MUST start with "TITLE:" followed by the title
+3. Line 2 MUST start with "SUMMARY:" followed by the summary
+4. Do NOT output any other text (no explanations, no markdown, no code blocks)
 
-Here is the report:
+Content requirements:
+1. The title must be concise (maximum 10 words or equivalent length)
+2. The summary must be a single paragraph (3-5 sentences) highlighting the most important changes across all repositories
+
+Here is the aggregated report:
 
 {aggregated_report}
 """
@@ -123,8 +133,9 @@ Here is the report:
 
             output = result.stdout.strip()
 
-            title = "Open Source Project Code Changes Summary"
-            summary = "Aggregated report of code changes across monitored repositories."
+            _ = self._
+            title = _("Progress Report for Open Source Projects")
+            summary = _("A progress report for open source projects.")
 
             for line in output.split("\n"):
                 if line.startswith("TITLE:"):

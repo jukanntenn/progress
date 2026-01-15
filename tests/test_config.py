@@ -51,6 +51,7 @@ gh_token = "ghp_test_token_12345"
     assert config.timezone == "UTC"
     assert config.analysis.max_diff_length == 100000
     assert config.analysis.concurrency == 1
+    assert config.analysis.first_run_lookback_commits == 3
     assert config.github.protocol == Protocol.HTTPS
     assert config.github.proxy == ""
     assert config.repos == []
@@ -85,6 +86,7 @@ def test_load_from_env_with_only_required_fields(temp_config_file, monkeypatch):
     assert config.timezone == "UTC"
     assert config.analysis.max_diff_length == 100000
     assert config.analysis.concurrency == 1
+    assert config.analysis.first_run_lookback_commits == 3
 
 
 def test_env_overrides_file_config(temp_config_file, monkeypatch):
@@ -272,6 +274,27 @@ def test_concurrency_must_be_at_least_1(temp_config_file):
     content = """
 [analysis]
 concurrency = 0
+
+[markpost]
+url = "https://markpost.example.com/p/test"
+
+[notification.feishu]
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+
+[github]
+gh_token = "ghp_test"
+"""
+    Path(temp_config_file).write_text(content)
+
+    with pytest.raises(ConfigException):
+        Config.load_from_file(temp_config_file)
+
+
+def test_first_run_lookback_commits_must_be_at_least_1(temp_config_file):
+    """Test: first_run_lookback_commits must be >= 1"""
+    content = """
+[analysis]
+first_run_lookback_commits = 0
 
 [markpost]
 url = "https://markpost.example.com/p/test"

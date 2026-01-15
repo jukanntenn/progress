@@ -7,6 +7,7 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
@@ -20,6 +21,18 @@ COPY src/ ./src/
 
 ENV PATH="/root/.local/bin:$PATH"
 RUN uv pip install --system -e .
+
+# Compile i18n translation files
+RUN if [ -d "/app/src/progress/locales" ]; then \
+        find /app/src/progress/locales -name "*.po" | while read po_file; do \
+            mo_file="${po_file%.po}.mo"; \
+            mkdir -p "$(dirname "$mo_file")"; \
+            msgfmt -o "$mo_file" "$po_file" || echo "Failed to compile $po_file"; \
+        done; \
+        echo "i18n files compiled"; \
+    else \
+        echo "No locales directory found, skipping i18n compilation"; \
+    fi
 
 FROM python:3.13-slim
 
@@ -51,6 +64,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /root/.local/bin /root/.local/bin
+COPY --from=builder /app/src/progress/locales /app/src/progress/locales
 
 WORKDIR /app
 

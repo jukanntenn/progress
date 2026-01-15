@@ -244,6 +244,40 @@ class GitClient:
         except RuntimeError:
             return None
 
+    def get_total_commit_count(self, repo_path: Path) -> int:
+        """Get total commit count of current branch."""
+        try:
+            result = self._run_git_command(["rev-list", "--count", "HEAD"], repo_path)
+            return int(result.strip())
+        except RuntimeError:
+            return 0
+
+    def get_recent_commit_hashes(self, repo_path: Path, max_count: int) -> list[str]:
+        """Get recent commit hashes (newest first)."""
+        result = self._run_git_command(
+            ["log", f"-{max_count}", "--format=%H"], repo_path
+        )
+        return [line.strip() for line in result.splitlines() if line.strip()]
+
+    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> List[str]:
+        """Get recent commit messages (full messages including body)."""
+        result = self._run_git_command(
+            ["log", f"-{max_count}", "--pretty=format:%B%n%x00"], repo_path
+        )
+
+        if not result.strip():
+            return []
+
+        messages = [msg.strip() for msg in result.split("\x00") if msg.strip()]
+        return messages
+
+    def get_recent_commit_patches(self, repo_path: Path, max_count: int) -> str:
+        """Get concatenated patches for recent commits (newest first)."""
+        return self._run_git_command(
+            ["log", f"-{max_count}", "-p", "--no-color", "--pretty=format:"],
+            repo_path,
+        )
+
     def fetch_and_reset(self, repo_path: Path, branch: str) -> None:
         """Fetch remote updates and force reset to remote branch.
 
@@ -580,3 +614,19 @@ class GitHubClient:
     def get_nth_commit_from_head(self, repo_path: Path, n: int) -> Optional[str]:
         """Get nth commit from HEAD (proxy to GitClient)."""
         return self.git.get_nth_commit_from_head(repo_path, n)
+
+    def get_total_commit_count(self, repo_path: Path) -> int:
+        """Get total commit count (proxy to GitClient)."""
+        return self.git.get_total_commit_count(repo_path)
+
+    def get_recent_commit_hashes(self, repo_path: Path, max_count: int) -> list[str]:
+        """Get recent commit hashes (proxy to GitClient)."""
+        return self.git.get_recent_commit_hashes(repo_path, max_count)
+
+    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> List[str]:
+        """Get recent commit messages (proxy to GitClient)."""
+        return self.git.get_recent_commit_messages(repo_path, max_count)
+
+    def get_recent_commit_patches(self, repo_path: Path, max_count: int) -> str:
+        """Get recent commit patches (proxy to GitClient)."""
+        return self.git.get_recent_commit_patches(repo_path, max_count)

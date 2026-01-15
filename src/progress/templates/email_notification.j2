@@ -7,11 +7,13 @@
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: #1890ff; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
         .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #e0e0e0; }
+        .metrics { display: flex; justify-content: space-between; margin: 20px 0; }
+        .metric { flex: 1; text-align: center; }
+        .metric-label { font-weight: bold; color: #666; }
+        .metric-value { font-size: 24px; color: #1890ff; margin-top: 5px; }
         .summary { margin: 20px 0; padding: 15px; background-color: #fff; border-left: 4px solid #1890ff; }
-        .fields { display: flex; justify-content: space-between; margin: 20px 0; }
-        .field { flex: 1; text-align: center; }
-        .field-label { font-weight: bold; color: #666; }
-        .field-value { font-size: 24px; color: #1890ff; margin-top: 5px; }
+        .status-list { margin: 20px 0; padding: 15px; }
+        .status-title { font-weight: bold; margin-bottom: 10px; }
         .button { text-align: center; margin: 20px 0; }
         .btn { display: inline-block; padding: 12px 24px; background-color: #1890ff; color: white; text-decoration: none; border-radius: 5px; }
         .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
@@ -23,28 +25,62 @@
             <h2>{{ subject }}</h2>
         </div>
         <div class="content">
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">{{ _("Total Repositories") }}</div>
+                    <div class="metric-value">{{ total_repos }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">{{ _("Total Commits") }}</div>
+                    <div class="metric-value">{{ total_commits }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">{{ _("Successful") }}</div>
+                    <div class="metric-value">{{ success_count }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">{{ _("Failed") }}</div>
+                    <div class="metric-value">{{ failed_count }}</div>
+                </div>
+            </div>
+
             <div class="summary">
-                <strong>Change Summary</strong>
+                <strong>{{ _("Report Summary") }}</strong>
                 <p>{{ summary }}</p>
             </div>
-            <div class="fields">
-                <div class="field">
-                    <div class="field-label">Commits</div>
-                    <div class="field-value">{{ commit_count }}</div>
-                </div>
-                <div class="field">
-                    <div class="field-label">Repository</div>
-                    <div class="field-value">{{ repo_name }}</div>
-                </div>
+
+            {% if failed_repos %}
+            <div class="status-list" style="background-color: #fff2f0; border-left: 4px solid #ff4d4f;">
+                <div class="status-title">{{ _("Failed Repositories") }}</div>
+                {% for repo in failed_repos[:5] %}
+                <div>❌ {{ repo }}</div>
+                {% endfor %}
+                {% if failed_repos|length > 5 %}
+                <div>... and {{ failed_repos|length - 5 }} more</div>
+                {% endif %}
             </div>
+            {% endif %}
+
+            {% if skipped_repos %}
+            <div class="status-list" style="background-color: #f6ffed; border-left: 4px solid #52c41a;">
+                <div class="status-title">{{ _("Skipped Repositories") }}</div>
+                {% for repo in skipped_repos[:5] %}
+                <div>➖ {{ repo }}</div>
+                {% endfor %}
+                {% if skipped_repos|length > 5 %}
+                <div>... and {{ skipped_repos|length - 5 }} more</div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if markpost_url %}
             <div class="button">
-                <a href="{{ markpost_url }}" class="btn">View Detailed Report</a>
+                <a href="{{ markpost_url }}" class="btn">{{ _("View Detailed Report") }}</a>
             </div>
             {% endif %}
         </div>
         <div class="footer">
-            <p>This email was sent automatically by Progress, please do not reply.</p>
+            <p>{{ _("This email was sent automatically by Progress, please do not reply.") }}</p>
         </div>
     </div>
 </body>
