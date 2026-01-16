@@ -21,3 +21,6 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 progress = "progress.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
