@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .consts import TEMPLATE_EMAIL_NOTIFICATION
 from .errors import ProgressException
-from .i18n import get_translation
+from .i18n import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,9 @@ logger = logging.getLogger(__name__)
 class FeishuNotifier:
     """Send Feishu webhook notifications."""
 
-    def __init__(self, webhook_url: str, timeout: int = 30, language: str = "zh"):
+    def __init__(self, webhook_url: str, timeout: int = 30):
         self.webhook_url = webhook_url
         self.timeout = timeout
-        self.translation = get_translation(language)
-        self._ = self.translation.gettext
 
     def send_notification(
         self,
@@ -59,7 +57,6 @@ class FeishuNotifier:
             if status == "skipped"
         ]
 
-        _ = self._
         overview_title = _("Overview")
         failed = _("Failed")
         elements = [
@@ -193,7 +190,6 @@ class EmailNotifier:
         recipient: list[str],
         starttls: bool = True,
         ssl: bool = False,
-        language: str = "zh",
     ):
         self.host = host
         self.port = port
@@ -203,7 +199,6 @@ class EmailNotifier:
         self.recipient = recipient
         self.starttls = starttls
         self.ssl = ssl
-        self.translation = get_translation(language)
 
         template_dir = Path(__file__).parent / "templates"
         self.jinja_env = Environment(

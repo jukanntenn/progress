@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
-from .consts import TEMPLATE_REPOSITORY_REPORT, TEMPLATE_AGGREGATED_REPORT
-from .i18n import get_translation
+from .consts import TEMPLATE_AGGREGATED_REPORT, TEMPLATE_REPOSITORY_REPORT
+from .i18n import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +16,8 @@ logger = logging.getLogger(__name__)
 class MarkdownReporter:
     """Generate Markdown format reports with Jinja2 templates and i18n."""
 
-    def __init__(self, language: str = "zh"):
-        """Initialize reporter with i18n support.
-
-        Args:
-            language: Language code for translations
-        """
-        self.language = language
-        self.translation = get_translation(language)
+    def __init__(self):
+        """Initialize reporter with i18n support."""
 
         template_dir = Path(__file__).parent / "templates"
         self.jinja_env = Environment(
@@ -49,7 +43,7 @@ class MarkdownReporter:
         return template.render(
             report=report,
             timezone=timezone,
-            _=self.translation.gettext,
+            _=_,
         )
 
     def generate_aggregated_report(
@@ -86,6 +80,5 @@ class MarkdownReporter:
             timezone=timezone,
             generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
             iso_time=now.isoformat(),
-            _=self.translation.gettext,
-            gettext=self.translation.gettext,
+            _=_,
         )

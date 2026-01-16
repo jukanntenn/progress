@@ -90,6 +90,7 @@ branch = "main"
 # Enable or disable (optional, default: true)
 enabled = true
 # Repository-level protocol configuration (optional, overrides global config)
+# Default: https (if not specified)
 # protocol = "ssh"
 
 [[repos]]

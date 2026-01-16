@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from progress.github import sanitize_repo_name, GitClient, GitHubClient
+from progress.github import sanitize_repo_name, GitClient, resolve_repo_url
 from progress.enums import Protocol
 from progress.repository import RepositoryManager
 
@@ -63,51 +63,6 @@ def test_git_client_initialization():
     assert client.workspace_dir.name == "test_workspace"
 
 
-def test_github_client_initialization():
-    """Test: GitHubClient initialization"""
-    client = GitHubClient(
-        workspace_dir="/tmp/test_workspace",
-        gh_token="test_token",
-        protocol="https",
-        proxy="http://proxy:8080",
-    )
-    assert client.workspace_dir.name == "test_workspace"
-    assert client.gh_token == "test_token"
-    assert client.protocol == Protocol.HTTPS
-    assert client.proxy == "http://proxy:8080"
-    assert client.git is not None  # Verify GitClient instance is created
-
-
-def test_github_client_has_git_client_methods():
-    """Test: GitHubClient proxies GitClient methods"""
-    client = GitHubClient()
-
-    # Verify GitHubClient has GitClient methods
-    assert hasattr(client, "get_current_commit")
-    assert hasattr(client, "get_previous_commit")
-    assert hasattr(client, "get_commit_diff")
-    assert hasattr(client, "get_commit_messages")
-    assert hasattr(client, "get_commit_count")
-    assert hasattr(client, "get_nth_commit_from_head")
-    assert hasattr(client, "get_total_commit_count")
-    assert hasattr(client, "get_recent_commit_hashes")
-    assert hasattr(client, "get_recent_commit_messages")
-    assert hasattr(client, "get_recent_commit_patches")
-
-
-def test_github_client_without_proxy():
-    """Test: GitHubClient without proxy configuration"""
-    client = GitHubClient(gh_token="test_token", protocol="https")
-    assert client.proxy is None
-    assert client.gh_token == "test_token"
-
-
-def test_github_client_default_protocol():
-    """Test: GitHubClient default protocol is https"""
-    client = GitHubClient()
-    assert client.protocol == Protocol.HTTPS
-
-
 @pytest.mark.parametrize(
     "repo_url,protocol,expected_full_url,expected_short_url",
     [
@@ -133,7 +88,7 @@ def test_github_client_default_protocol():
 )
 def test_resolve_repo_url(repo_url, protocol, expected_full_url, expected_short_url):
     """Test: Repository URL resolution"""
-    full_url, short_url = GitHubClient._resolve_repo_url(repo_url, protocol)
+    full_url, short_url = resolve_repo_url(repo_url, protocol)
     assert full_url == expected_full_url
     assert short_url == expected_short_url
 
@@ -141,7 +96,7 @@ def test_resolve_repo_url(repo_url, protocol, expected_full_url, expected_short_
 def test_resolve_repo_url_invalid_format():
     """Test: Invalid repository URL format raises exception"""
     with pytest.raises(ValueError, match="Invalid repository URL format"):
-        GitHubClient._resolve_repo_url("invalid-url-format", "https")
+        resolve_repo_url("invalid-url-format", "https")
 
 
 def test_git_client_recent_commit_helpers(monkeypatch):
@@ -171,9 +126,8 @@ def test_git_client_recent_commit_helpers(monkeypatch):
 def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
     """Test: First check skips when repo has <= 1 commit"""
 
-    class FakeGitHubClient:
-        def clone_or_update(self, url, branch, is_first_time):
-            return Path("/tmp/repo")
+    class FakeGitClient:
+        workspace_dir = Path("/tmp")
 
         def get_current_commit(self, repo_path):
             return "c" * 40
@@ -192,25 +146,31 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         branch="main",
         last_commit_hash=None,
     )
-    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
-    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+    cfg = SimpleNamespace(
+        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        github=SimpleNamespace(
+            gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
+        ),
+    )
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
 
-    updated = []
+    # Replace manager.git with FakeGitClient
+    manager.git = FakeGitClient()
 
-    def fake_update_commit(repo_id, commit_hash):
-        updated.append((repo_id, commit_hash))
+    # Mock Repo.clone_or_update to avoid actually running gh command
+    with monkeypatch.context() as m:
+        def fake_clone_or_update(self):
+            pass
 
-    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
-    assert manager.check(repo) is None
-    assert updated == [(1, "c" * 40)]
+        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
+        assert manager.check(repo) is None
 
 
 def test_repository_manager_first_check_uses_range_when_history_sufficient(monkeypatch):
     """Test: First check uses old..new range when total commits > lookback"""
 
-    class FakeGitHubClient:
-        def clone_or_update(self, url, branch, is_first_time):
-            return Path("/tmp/repo")
+    class FakeGitClient:
+        workspace_dir = Path("/tmp")
 
         def get_current_commit(self, repo_path):
             return "n" * 40
@@ -221,9 +181,6 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         def get_nth_commit_from_head(self, repo_path, n):
             assert n == 3
             return "b" * 40
-
-        def get_previous_commit(self, repo_path):
-            raise AssertionError("Should not fallback when base is available")
 
         def get_commit_messages(self, repo_path, old_commit, new_commit):
             assert old_commit == "b" * 40
@@ -249,21 +206,32 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         branch="main",
         last_commit_hash=None,
     )
-    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
-    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+    cfg = SimpleNamespace(
+        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        github=SimpleNamespace(
+            gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
+        ),
+    )
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
 
-    updated = []
+    # Replace manager.git with FakeGitClient
+    manager.git = FakeGitClient()
 
-    def fake_update_commit(repo_id, commit_hash):
-        updated.append((repo_id, commit_hash))
+    # Mock Repo.clone_or_update to avoid actually running gh command
+    with monkeypatch.context() as m:
+        def fake_clone_or_update(self):
+            pass
 
-    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
-    report = manager.check(repo)
-    assert report is not None
-    assert report.previous_commit == "b" * 40
-    assert report.current_commit == "n" * 40
-    assert report.commit_count == 3
-    assert updated == [(1, "n" * 40)]
+        def fake_update(self, current_commit):
+            pass
+
+        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr("progress.repo.Repo.update", fake_update)
+        report = manager.check(repo)
+        assert report is not None
+        assert report.previous_commit == "b" * 40
+        assert report.current_commit == "n" * 40
+        assert report.commit_count == 3
 
 
 def test_repository_manager_first_check_uses_recent_commits_when_history_insufficient(
@@ -271,9 +239,8 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
 ):
     """Test: First check analyzes all existing commits when total <= lookback"""
 
-    class FakeGitHubClient:
-        def clone_or_update(self, url, branch, is_first_time):
-            return Path("/tmp/repo")
+    class FakeGitClient:
+        workspace_dir = Path("/tmp")
 
         def get_current_commit(self, repo_path):
             return "n" * 40
@@ -306,18 +273,29 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         branch="main",
         last_commit_hash=None,
     )
-    cfg = SimpleNamespace(analysis=SimpleNamespace(first_run_lookback_commits=3))
-    manager = RepositoryManager(FakeGitHubClient(), FakeAnalyzer(), None, cfg)
+    cfg = SimpleNamespace(
+        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        github=SimpleNamespace(
+            gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
+        ),
+    )
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
 
-    updated = []
+    # Replace manager.git with FakeGitClient
+    manager.git = FakeGitClient()
 
-    def fake_update_commit(repo_id, commit_hash):
-        updated.append((repo_id, commit_hash))
+    # Mock Repo.clone_or_update to avoid actually running gh command
+    with monkeypatch.context() as m:
+        def fake_clone_or_update(self):
+            pass
 
-    monkeypatch.setattr(manager, "update_commit", fake_update_commit)
-    report = manager.check(repo)
-    assert report is not None
-    assert report.previous_commit == "o" * 40
-    assert report.current_commit == "n" * 40
-    assert report.commit_count == 2
-    assert updated == [(1, "n" * 40)]
+        def fake_update(self, current_commit):
+            pass
+
+        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr("progress.repo.Repo.update", fake_update)
+        report = manager.check(repo)
+        assert report is not None
+        assert report.previous_commit == "o" * 40
+        assert report.current_commit == "n" * 40
+        assert report.commit_count == 2

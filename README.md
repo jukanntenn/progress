@@ -245,6 +245,7 @@ branch = "main"
 # Whether enabled (optional, default: true)
 enabled = true
 # Repository-level protocol configuration (optional, overrides global configuration)
+# Default: https
 # protocol = "ssh"
 
 [[repos]]
@@ -296,7 +297,7 @@ enabled = false  # Temporarily disabled
 - `analysis.language` - AI analysis output language, default en
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
-- `repos[].protocol` - Repository-level protocol configuration
+- `repos[].protocol` - Repository-level protocol configuration, default https
 
 ### Environment Variables
 

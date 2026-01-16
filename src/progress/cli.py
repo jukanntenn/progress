@@ -10,8 +10,7 @@ from .config import Config
 from .consts import DATABASE_PATH, TIMEOUT_HTTP_REQUEST
 from .db import close_db, create_tables, init_db, save_report
 from .errors import ProgressException
-from .github import GitHubClient
-from .i18n import get_translation
+from .i18n import initialize, gettext as _
 from .log import setup as setup_log
 from .models import Repository
 from .notifier import EmailNotifier, FeishuNotifier
@@ -33,9 +32,7 @@ def main(config: str):
         logger.info(f"Loading configuration file: {config}")
         cfg = Config.load_from_file(config)
 
-        language = cfg.language
-        translation = get_translation(language)
-        _ = translation.gettext
+        initialize(ui_language=cfg.language)
 
         init_db(DATABASE_PATH)
         create_tables()
@@ -43,25 +40,17 @@ def main(config: str):
         notifier = FeishuNotifier(
             cfg.notification.feishu.webhook_url,
             timeout=cfg.notification.feishu.timeout,
-            language=language,
         )
-        email_notifier = _create_email_notifier(cfg.notification.email, language)
+        email_notifier = _create_email_notifier(cfg.notification.email)
 
-        github_client = GitHubClient(
-            gh_token=cfg.github.gh_token,
-            protocol=cfg.github.protocol,
-            proxy=cfg.github.proxy,
-            git_timeout=cfg.github.git_timeout,
-            gh_timeout=cfg.github.gh_timeout,
-        )
         analyzer = ClaudeCodeAnalyzer(
             max_diff_length=cfg.analysis.max_diff_length,
             timeout=cfg.analysis.timeout,
             language=cfg.analysis.language,
         )
-        reporter = MarkdownReporter(language=language)
+        reporter = MarkdownReporter()
 
-        repo_manager = RepositoryManager(github_client, analyzer, reporter, cfg)
+        repo_manager = RepositoryManager(analyzer, reporter, cfg)
 
         sync_result = repo_manager.sync(cfg.repos)
         logger.info(f"Sync completed: {sync_result}")
@@ -172,12 +161,11 @@ def main(config: str):
         close_db()
 
 
-def _create_email_notifier(email_config, language: str = "zh") -> EmailNotifier | None:
+def _create_email_notifier(email_config) -> EmailNotifier | None:
     """Create email notifier.
 
     Args:
         email_config: Email configuration object (may be None)
-        language: Language code for i18n
 
     Returns:
         EmailNotifier instance or None
@@ -193,7 +181,6 @@ def _create_email_notifier(email_config, language: str = "zh") -> EmailNotifier 
         recipient=email_config.recipient,
         starttls=email_config.starttls,
         ssl=email_config.ssl,
-        language=language,
     )
 
 

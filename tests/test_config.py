@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from progress.config import Config
+from progress.config import Config, RepositoryConfig
 from progress.enums import Protocol
 from progress.errors import ConfigException
 
@@ -496,4 +496,35 @@ url = "facebook/react"
     config = Config.load_from_file(temp_config_file)
 
     assert config.repos[0].protocol == Protocol.SSH
-    assert config.repos[1].protocol is None
+    assert config.repos[1].protocol == Protocol.HTTPS
+
+
+@pytest.mark.parametrize(
+    "protocol_input,expected_protocol",
+    [
+        ("ssh", Protocol.SSH),
+        ("https", Protocol.HTTPS),
+        (Protocol.SSH, Protocol.SSH),
+        (Protocol.HTTPS, Protocol.HTTPS),
+    ],
+)
+def test_repository_config_protocol_accepts_valid_values(
+    protocol_input, expected_protocol
+):
+    """Test that protocol field accepts valid string and enum values."""
+    config = RepositoryConfig(url="vitejs/vite", protocol=protocol_input)
+    assert config.protocol == expected_protocol
+
+
+def test_repository_config_protocol_defaults_to_https():
+    """Test that protocol field defaults to HTTPS when not specified."""
+    config = RepositoryConfig(url="vitejs/vite")
+    assert config.protocol == Protocol.HTTPS
+
+
+def test_repository_config_protocol_rejects_invalid_string():
+    """Test that protocol field rejects invalid string values."""
+    with pytest.raises(ValueError) as exc_info:
+        RepositoryConfig(url="vitejs/vite", protocol="ftp")
+    assert "protocol" in str(exc_info.value).lower()
+

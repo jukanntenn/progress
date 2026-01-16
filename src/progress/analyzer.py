@@ -13,7 +13,7 @@ from .consts import (
     TIMEOUT_CLAUDE_ANALYSIS,
 )
 from .errors import AnalysisException
-from .i18n import get_translation
+from .i18n import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,6 @@ class ClaudeCodeAnalyzer:
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        self.translation = get_translation(language)
-        self._ = self.translation.gettext
 
     def analyze_diff(
         self,
@@ -133,7 +131,6 @@ Here is the aggregated report:
 
             output = result.stdout.strip()
 
-            _ = self._
             title = _("Progress Report for Open Source Projects")
             summary = _("A progress report for open source projects.")
 

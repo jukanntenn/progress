@@ -97,16 +97,6 @@ class GitHubConfig(BaseModel):
     git_timeout: int = Field(default=300, ge=1)
     gh_timeout: int = Field(default=300, ge=1)
 
-    @field_validator("protocol", mode="before")
-    @classmethod
-    def validate_protocol(cls, v: str | Protocol) -> Protocol:
-        if isinstance(v, Protocol):
-            return v
-        try:
-            return Protocol(v)
-        except ValueError:
-            raise ValueError("protocol must be 'https' or 'ssh'") from None
-
 
 class AnalysisConfig(BaseModel):
     """Claude Code analysis configuration."""
@@ -124,7 +114,7 @@ class RepositoryConfig(BaseModel):
     url: str
     branch: str = "main"
     enabled: bool = True
-    protocol: Optional[Protocol] = None
+    protocol: Protocol = Field(default=Protocol.HTTPS)
 
     @field_validator("url")
     @classmethod
@@ -138,18 +128,6 @@ class RepositoryConfig(BaseModel):
                 "Supported formats: owner/repo, https://..., git@..."
             )
         return v
-
-    @field_validator("protocol", mode="before")
-    @classmethod
-    def validate_protocol(cls, v: Optional[str | Protocol]) -> Optional[Protocol]:
-        if v is None:
-            return None
-        if isinstance(v, Protocol):
-            return v
-        try:
-            return Protocol(v)
-        except ValueError:
-            raise ValueError("protocol must be 'https' or 'ssh'") from None
 
 
 class Config(BaseSettings):

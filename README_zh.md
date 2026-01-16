@@ -245,6 +245,7 @@ branch = "main"
 # 是否启用（可选，默认：true）
 enabled = true
 # 仓库级协议配置（可选，覆盖全局配置）
+# 默认值：https
 # protocol = "ssh"
 
 [[repos]]
@@ -296,7 +297,7 @@ enabled = false  # 暂时禁用
 - `analysis.language` - AI 分析输出语言，默认 en
 - `repos[].branch` - 仓库分支，默认 main
 - `repos[].enabled` - 是否启用，默认 true
-- `repos[].protocol` - 仓库级协议配置
+- `repos[].protocol` - 仓库级协议配置，默认 https
 
 ### 环境变量
 

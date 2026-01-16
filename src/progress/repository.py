@@ -7,12 +7,13 @@ from dataclasses import dataclass
 
 from .analyzer import ClaudeCodeAnalyzer
 from .config import Config
-from .consts import parse_repo_name
+from .consts import parse_repo_name, WORKSPACE_DIR_DEFAULT
 from .db import UTC
 from .enums import Protocol
-from .github import GitHubClient, normalize_repo_url
+from .github import GitClient, normalize_repo_url
 from .models import Repository
 from .reporter import MarkdownReporter
+from .repo import Repo
 from .utils import get_now
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,6 @@ class RepositoryManager:
 
     def __init__(
         self,
-        github_client: GitHubClient,
         analyzer: ClaudeCodeAnalyzer,
         reporter: MarkdownReporter,
         config: Config,
@@ -95,16 +95,28 @@ class RepositoryManager:
         """Initialize repository manager.
 
         Args:
-            github_client: GitHub client
             analyzer: Claude analyzer
             reporter: Report generator
             config: Configuration object
         """
-        self.github_client = github_client
         self.analyzer = analyzer
         self.reporter = reporter
         self.config = config
         self.logger = logger
+
+        workspace_dir = (
+            config.workspace_dir
+            if hasattr(config, "workspace_dir")
+            else WORKSPACE_DIR_DEFAULT
+        )
+
+        self.git = GitClient(
+            workspace_dir=workspace_dir, timeout=config.github.git_timeout
+        )
+
+        self.gh_token = config.github.gh_token
+        self.proxy = config.github.proxy
+        self.protocol = config.github.protocol
 
     def sync(self, repos_config: list) -> SyncResult:
         """Sync repository configuration to database.
@@ -122,9 +134,10 @@ class RepositoryManager:
 
         with database.atomic():
             for repo_config in repos_config:
-                url, branch, enabled, repo_protocol = self._extract_repo_config(
-                    repo_config
-                )
+                url = repo_config.url
+                branch = repo_config.branch
+                enabled = repo_config.enabled
+                repo_protocol = repo_config.protocol
                 normalized_url = normalize_repo_url(
                     url, repo_protocol, self.config.github.protocol
                 )
@@ -195,20 +208,6 @@ class RepositoryManager:
         except Repository.DoesNotExist:
             return None
 
-    def update_commit(self, repo_id: int, commit_hash: str) -> None:
-        """Update repository's last commit hash.
-
-        Args:
-            repo_id: Repository ID
-            commit_hash: Commit hash
-        """
-        database = _get_database()
-        with database.atomic():
-            repo = Repository.get_by_id(repo_id)
-            repo.last_commit_hash = commit_hash
-            repo.last_check_time = get_now(UTC)
-            repo.save()
-
     def check(self, repo: Repository) -> RepositoryReport | None:
         """Check code changes for a single repository.
 
@@ -220,112 +219,46 @@ class RepositoryManager:
         """
         self.logger.info(f"Checking repository: {repo.url} (branch: {repo.branch})")
 
-        is_first_time = not repo.last_commit_hash
-        repo_path = self.github_client.clone_or_update(
-            repo.url, repo.branch, is_first_time
+        repo_obj = Repo(
+            repo,
+            self.git,
+            self.config,
+            gh_token=self.gh_token,
+            proxy=self.proxy,
+            protocol=self.protocol,
         )
 
-        current_commit = self.github_client.get_current_commit(repo_path)
-        self.logger.debug(f"Current commit: {current_commit[:8]}")
+        # Clone or update repository
+        repo_obj.clone_or_update()
 
-        if repo.last_commit_hash == current_commit:
+        # Get diff data, returns None if no new commits
+        diff_data = repo_obj.get_diff()
+        if diff_data is None:
             self.logger.debug("No new commits, skipping")
             return None
 
-        previous_commit = repo.last_commit_hash
-
-        if not previous_commit:
-            lookback_commits = self.config.analysis.first_run_lookback_commits
-            total_commits = self.github_client.get_total_commit_count(repo_path)
-
-            if total_commits <= 1:
-                self.logger.warning(
-                    "Repository has only one commit, cannot compare, skipping"
-                )
-                self.update_commit(repo.id, current_commit)
-                return None
-
-            effective_lookback = min(lookback_commits, total_commits)
-            self.logger.info(
-                f"First check, looking back {effective_lookback} commits (configured: {lookback_commits})"
-            )
-
-            if total_commits > effective_lookback:
-                previous_commit = self.github_client.get_nth_commit_from_head(
-                    repo_path, effective_lookback
-                )
-                if not previous_commit:
-                    self.logger.warning(
-                        "Failed to resolve base commit for first check, falling back to second-latest commit"
-                    )
-                    previous_commit = self.github_client.get_previous_commit(repo_path)
-                if not previous_commit:
-                    self.logger.warning(
-                        "Failed to resolve base commit for first check, skipping"
-                    )
-                    self.update_commit(repo.id, current_commit)
-                    return None
-                self.logger.debug(f"Base commit: {previous_commit[:8]}")
-
-                commit_messages = self.github_client.get_commit_messages(
-                    repo_path, previous_commit, current_commit
-                )
-                commit_count = self.github_client.get_commit_count(
-                    repo_path, previous_commit, current_commit
-                )
-                diff = self.github_client.get_commit_diff(
-                    repo_path, previous_commit, current_commit
-                )
-            else:
-                recent_hashes = self.github_client.get_recent_commit_hashes(
-                    repo_path, effective_lookback
-                )
-                previous_commit = recent_hashes[-1] if recent_hashes else None
-                if previous_commit:
-                    self.logger.debug(f"Oldest selected commit: {previous_commit[:8]}")
-
-                commit_messages = self.github_client.get_recent_commit_messages(
-                    repo_path, effective_lookback
-                )
-                commit_count = len(recent_hashes)
-                diff = self.github_client.get_recent_commit_patches(
-                    repo_path, effective_lookback
-                )
-        else:
-            commit_messages = self.github_client.get_commit_messages(
-                repo_path, previous_commit, current_commit
-            )
-            commit_count = self.github_client.get_commit_count(
-                repo_path, previous_commit, current_commit
-            )
-
-            diff = self.github_client.get_commit_diff(
-                repo_path, previous_commit, current_commit
-            )
-
-        self.logger.info(f"Found {commit_count} new commits")
+        diff, previous_commit, commit_count, commit_messages, _ = diff_data
 
         if not diff.strip():
             self.logger.warning("Diff is empty, skipping analysis")
-            self.update_commit(repo.id, current_commit)
+            repo_obj.update(repo_obj.get_current_commit())
             return None
 
+        self.logger.info(f"Found {commit_count} new commits")
         self.logger.info("Analyzing code changes...")
         analysis_markdown, truncated, original_length, analyzed_length = (
             self.analyzer.analyze_diff(repo.name, repo.branch, diff, commit_messages)
         )
 
-        self.update_commit(repo.id, current_commit)
+        current_commit = repo_obj.get_current_commit()
+        repo_obj.update(current_commit)
 
         self.logger.info(f"Repository {repo.name} check completed")
 
-        repo_slug = parse_repo_name(repo.url)
-        repo_web_url = f"https://github.com/{repo_slug}"
-
         return RepositoryReport(
             repo_name=repo.name,
-            repo_slug=repo_slug,
-            repo_web_url=repo_web_url,
+            repo_slug=repo_obj.slug,
+            repo_web_url=repo_obj.link,
             branch=repo.branch,
             commit_count=commit_count,
             current_commit=current_commit,
@@ -414,38 +347,4 @@ class RepositoryManager:
 
         return CheckAllResult(
             reports=reports, total_commits=total_commits, repo_statuses=repo_statuses
-        )
-
-    @staticmethod
-    def _extract_repo_config(repo_config):
-        """Extract repository parameters from configuration.
-
-        Args:
-            repo_config: dict or Pydantic model
-
-        Returns:
-            (url, branch, enabled, protocol) tuple
-        """
-        if hasattr(repo_config, "url"):
-            protocol = getattr(repo_config, "protocol", None)
-            protocol_value = protocol.value if protocol else None
-            return (
-                repo_config.url,
-                repo_config.branch,
-                repo_config.enabled,
-                protocol_value,
-            )
-        protocol = repo_config.get("protocol")
-        protocol_value = (
-            protocol.value
-            if protocol
-            else None
-            if isinstance(protocol, Protocol)
-            else protocol
-        )
-        return (
-            repo_config["url"],
-            repo_config.get("branch", "main"),
-            repo_config.get("enabled", True),
-            protocol_value,
         )

@@ -139,6 +139,63 @@ def sanitize_repo_name(name: str) -> str:
     return result or "repo"
 
 
+def resolve_repo_url(repo_url: str, protocol: str | Protocol) -> Tuple[str, str]:
+    """Resolve repository URL, return (full_url, owner/repo).
+
+    This is extracted from GitHubClient._resolve_repo_url() for migration.
+
+    Args:
+        repo_url: Repository URL in various formats:
+            - Short: owner/repo
+            - HTTPS: https://github.com/owner/repo.git
+            - SSH: git@github.com:owner/repo.git
+        protocol: Default protocol (https or ssh), only for short format
+
+    Returns:
+        (full_url, owner/repo)
+
+    Raises:
+        ValueError: If URL format is invalid
+    """
+    if isinstance(protocol, Protocol):
+        protocol = protocol.value
+    if repo_url.startswith("https://"):
+        match = re.match(r"https://github\.com/([^/]+)/([^/.]+)", repo_url)
+        if match:
+            owner, repo = match.groups()
+            short_url = f"{owner}/{repo}"
+            logger.debug(f"Detected HTTPS URL: {repo_url} -> {short_url}")
+            return repo_url, short_url
+        raise ValueError(f"Invalid HTTPS URL: {repo_url}")
+
+    if repo_url.startswith("git@"):
+        match = re.match(r"git@github\.com:([^/]+)/([^/.]+)", repo_url)
+        if match:
+            owner, repo = match.groups()
+            short_url = f"{owner}/{repo}"
+            logger.debug(f"Detected SSH URL: {repo_url} -> {short_url}")
+            return repo_url, short_url
+        raise ValueError(f"Invalid SSH URL: {repo_url}")
+
+    if "/" in repo_url:
+        parts = repo_url.split("/")
+        if len(parts) == 2:
+            owner, repo_name = parts
+            short_url = f"{owner}/{repo_name}"
+
+            if protocol == "ssh":
+                full_url = f"{GITHUB_SSH_PREFIX}{owner}/{repo_name}.git"
+            else:
+                full_url = f"{GITHUB_HTTPS_PREFIX}{owner}/{repo_name}.git"
+
+            logger.debug(
+                f"Short URL conversion: {repo_url} -> {full_url} (protocol: {protocol})"
+            )
+            return full_url, short_url
+
+    raise ValueError(f"Invalid repository URL format: {repo_url}")
+
+
 class GitClient:
     """Git client for pure Git operations."""
 
@@ -367,266 +424,3 @@ class GitClient:
             raise GitException("Git command timeout") from None
 
 
-class GitHubClient:
-    """GitHub client for GitHub interactions and proxy configuration."""
-
-    _git_lock = threading.Lock()
-
-    def __init__(
-        self,
-        workspace_dir: str = WORKSPACE_DIR_DEFAULT,
-        gh_token: Optional[str] = None,
-        protocol: str | Protocol = "https",
-        proxy: Optional[str] = None,
-        git_timeout: int = TIMEOUT_GIT_COMMAND,
-        gh_timeout: int = TIMEOUT_GH_COMMAND,
-    ):
-        """Initialize GitHub client.
-
-        Args:
-            workspace_dir: Working directory path
-            gh_token: GitHub personal access token
-            protocol: Default protocol (https or ssh)
-            proxy: Proxy URL
-            git_timeout: Git command timeout in seconds
-            gh_timeout: GitHub CLI command timeout in seconds
-        """
-        if isinstance(protocol, str):
-            protocol = Protocol(protocol)
-
-        self.workspace_dir = Path(workspace_dir)
-        self.workspace_dir.mkdir(parents=True, exist_ok=True)
-
-        self.git = GitClient(workspace_dir, timeout=git_timeout)
-
-        self.gh_token = gh_token
-        self.protocol = protocol
-        self.proxy = proxy
-        self.git_timeout = git_timeout
-        self.gh_timeout = gh_timeout
-
-        logger.debug(f"GitHub workspace directory: {self.workspace_dir}")
-        logger.debug(f"Protocol: {self.protocol}")
-        logger.debug(
-            f"Proxy: {sanitize(self.proxy) if self.proxy else 'Not configured'}"
-        )
-
-        self.ssh_available = shutil.which("ssh") is not None
-        if self.protocol == Protocol.SSH and not self.ssh_available:
-            logger.warning(
-                "SSH protocol configured but SSH client not available, falling back to HTTPS"
-            )
-        logger.debug(f"SSH available: {self.ssh_available}")
-
-    @staticmethod
-    def _resolve_repo_url(repo_url: str, protocol: str | Protocol) -> Tuple[str, str]:
-        """Resolve repository URL, return (full_url, owner/repo).
-
-        Args:
-            repo_url: Repository URL in various formats:
-                - Short: owner/repo
-                - HTTPS: https://github.com/owner/repo.git
-                - SSH: git@github.com:owner/repo.git
-            protocol: Default protocol (https or ssh), only for short format
-
-        Returns:
-            (full_url, owner/repo)
-
-        Raises:
-            ValueError: If URL format is invalid
-        """
-        if isinstance(protocol, Protocol):
-            protocol = protocol.value
-        if repo_url.startswith("https://"):
-            match = re.match(r"https://github\.com/([^/]+)/([^/.]+)", repo_url)
-            if match:
-                owner, repo = match.groups()
-                short_url = f"{owner}/{repo}"
-                logger.debug(f"Detected HTTPS URL: {repo_url} -> {short_url}")
-                return repo_url, short_url
-            raise ValueError(f"Invalid HTTPS URL: {repo_url}")
-
-        if repo_url.startswith("git@"):
-            match = re.match(r"git@github\.com:([^/]+)/([^/.]+)", repo_url)
-            if match:
-                owner, repo = match.groups()
-                short_url = f"{owner}/{repo}"
-                logger.debug(f"Detected SSH URL: {repo_url} -> {short_url}")
-                return repo_url, short_url
-            raise ValueError(f"Invalid SSH URL: {repo_url}")
-
-        if "/" in repo_url:
-            parts = repo_url.split("/")
-            if len(parts) == 2:
-                owner, repo_name = parts
-                short_url = f"{owner}/{repo_name}"
-
-                if protocol == "ssh":
-                    full_url = f"{GITHUB_SSH_PREFIX}{owner}/{repo_name}.git"
-                else:
-                    full_url = f"{GITHUB_HTTPS_PREFIX}{owner}/{repo_name}.git"
-
-                logger.debug(
-                    f"Short URL conversion: {repo_url} -> {full_url} (protocol: {protocol})"
-                )
-                return full_url, short_url
-
-        raise ValueError(f"Invalid repository URL format: {repo_url}")
-
-    def clone_or_update(
-        self, repo_url: str, branch: str, is_first_time: bool = False
-    ) -> Path:
-        """Clone or update repository.
-
-        Args:
-            repo_url: Repository URL in various formats:
-                - Short: owner/repo
-                - HTTPS: https://github.com/owner/repo.git
-                - SSH: git@github.com:owner/repo.git
-            branch: Branch name
-            is_first_time: True if first time cloning (last_commit_hash is empty)
-
-        Returns:
-            Repository path
-        """
-        url_protocol = parse_protocol_from_url(repo_url)
-        protocol = url_protocol or self.protocol
-
-        if protocol == Protocol.SSH and not self.ssh_available:
-            logger.warning(
-                f"Repository {repo_url} configured with SSH but SSH client unavailable, "
-                "falling back to HTTPS"
-            )
-            protocol = Protocol.HTTPS
-
-        full_url, short_url = self._resolve_repo_url(repo_url, protocol)
-        logger.info(f"Using URL: {full_url} (protocol: {protocol})")
-
-        repo_name = sanitize_repo_name(short_url)
-        repo_path = self.workspace_dir / repo_name
-
-        if is_first_time:
-            logger.info(f"Cloning repository: {short_url} (branch: {branch})")
-            self._run_gh_clone_command(full_url, repo_path, branch)
-        else:
-            logger.info(f"Syncing repository: {short_url} (branch: {branch})")
-            self.git.fetch_and_reset(repo_path, branch)
-
-        return repo_path
-
-    @retry(
-        times=GH_MAX_RETRIES,
-        initial_delay=1,
-        backoff="exponential",
-        exceptions=(GitException,),
-    )
-    def _run_gh_clone_command(self, url: str, repo_path: Path, branch: str) -> None:
-        """Clone repository using gh repo clone.
-
-        Args:
-            url: Full repository URL (supports SSH and HTTPS)
-            repo_path: Local path
-            branch: Branch name
-        """
-        if repo_path.exists():
-            logger.debug(f"Removing existing repository path: {repo_path}")
-            shutil.rmtree(repo_path)
-
-        cmd = [
-            CMD_GH,
-            "repo",
-            "clone",
-            url,
-            str(repo_path),
-            "--",
-            "--branch",
-            branch,
-            "--single-branch",
-        ]
-
-        self._run_command(cmd)
-
-    def _run_command(self, cmd: List[str]) -> str:
-        """Run command and return output.
-
-        Args:
-            cmd: Command list
-
-        Returns:
-            Command output
-        """
-        logger.debug(f"Executing command: {' '.join(cmd)}")
-
-        env = None
-        if cmd[0] == CMD_GH:
-            env = os.environ.copy()
-            if self.gh_token:
-                env["GH_TOKEN"] = self.gh_token
-                logger.debug(f"Using GH_TOKEN: {sanitize(self.gh_token)}")
-            if self.proxy:
-                env["HTTP_PROXY"] = self.proxy
-                env["HTTPS_PROXY"] = self.proxy
-                logger.debug(f"Using proxy: {sanitize(self.proxy)}")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=self.gh_timeout,
-                env=env,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Command failed: {e.stderr}")
-            raise GitException(f"Command failed: {e.stderr}") from e
-        except subprocess.TimeoutExpired:
-            logger.error("Command timeout")
-            raise GitException("Command timeout") from None
-
-    def get_current_commit(self, repo_path: Path) -> str:
-        """Get current commit hash (proxy to GitClient)."""
-        return self.git.get_current_commit(repo_path)
-
-    def get_previous_commit(self, repo_path: Path) -> Optional[str]:
-        """Get second latest commit hash (proxy to GitClient)."""
-        return self.git.get_previous_commit(repo_path)
-
-    def get_commit_diff(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
-    ) -> str:
-        """Get commit diff (proxy to GitClient)."""
-        return self.git.get_commit_diff(repo_path, old_commit, new_commit)
-
-    def get_commit_messages(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
-    ) -> List[str]:
-        """Get commit messages (proxy to GitClient)."""
-        return self.git.get_commit_messages(repo_path, old_commit, new_commit)
-
-    def get_commit_count(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
-    ) -> int:
-        """Get commit count (proxy to GitClient)."""
-        return self.git.get_commit_count(repo_path, old_commit, new_commit)
-
-    def get_nth_commit_from_head(self, repo_path: Path, n: int) -> Optional[str]:
-        """Get nth commit from HEAD (proxy to GitClient)."""
-        return self.git.get_nth_commit_from_head(repo_path, n)
-
-    def get_total_commit_count(self, repo_path: Path) -> int:
-        """Get total commit count (proxy to GitClient)."""
-        return self.git.get_total_commit_count(repo_path)
-
-    def get_recent_commit_hashes(self, repo_path: Path, max_count: int) -> list[str]:
-        """Get recent commit hashes (proxy to GitClient)."""
-        return self.git.get_recent_commit_hashes(repo_path, max_count)
-
-    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> List[str]:
-        """Get recent commit messages (proxy to GitClient)."""
-        return self.git.get_recent_commit_messages(repo_path, max_count)
-
-    def get_recent_commit_patches(self, repo_path: Path, max_count: int) -> str:
-        """Get recent commit patches (proxy to GitClient)."""
-        return self.git.get_recent_commit_patches(repo_path, max_count)
