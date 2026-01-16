@@ -10,6 +10,12 @@
 # - "Asia/Tokyo" - Japan Time
 timezone = "UTC"
 
+# Application language (optional, default: en)
+# Controls the language of user interface text including reports and notifications
+# Supported values: en (English), zh-hans (简体中文), or any language with gettext translation files
+# This is independent from analysis.language
+language = "en"
+
 # ========== Markpost Configuration ==========
 [markpost]
 # Markpost publish URL (including base_url and post_key)
@@ -70,9 +76,9 @@ max_diff_length = 100000
 concurrency = 1
 # Claude Code analysis timeout (seconds), default: 600 (10 minutes)
 timeout = 600
-# Analysis result language (optional, default: zh)
+# AI analysis output language (optional, default: en)
 # Supports any language code (e.g., zh, en, ja, ko, fr, de, es, pt, ru, ar, etc.)
-# If the language code is not recognized, English will be used by default
+# This is independent from the top-level language setting
 language = "zh"
 
 # ========== Repository Configuration ==========

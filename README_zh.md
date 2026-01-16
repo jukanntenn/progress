@@ -181,6 +181,10 @@ python -m progress.cli -c config.toml
 # 时区配置（可选，默认：UTC）
 timezone = "UTC"
 
+# 应用程序语言（可选，默认：en）
+# 控制用户界面文本的语言
+language = "en"
+
 [markpost]
 # Markpost 发布 URL（必需）
 url = "https://markpost.example.com/p/your-post-key"
@@ -227,9 +231,9 @@ max_diff_length = 100000
 concurrency = 1
 # Claude Code 分析超时时间（秒，默认：600）
 timeout = 600
-# 分析结果语言（可选，默认：zh）
+# AI 分析输出语言（可选，默认：en）
 # 支持任何语言代码（如：zh、en、ja、ko、fr、de、es、pt、ru、ar 等）
-# 如果语言代码不被识别，默认使用英语
+# 与顶层 language 配置相互独立
 language = "zh"
 
 # 仓库配置（至少配置一个）
@@ -278,6 +282,7 @@ enabled = false  # 暂时禁用
 **可选配置项：**
 
 - `timezone` - 时区配置，默认 UTC
+- `language` - 应用程序语言，默认 en
 - `markpost.timeout` - Markpost HTTP 请求超时时间，默认 30 秒
 - `notification.feishu.timeout` - 飞书 HTTP 请求超时时间，默认 30 秒
 - `notification.email.*` - 邮件通知配置（整个 section 可选）
@@ -288,7 +293,7 @@ enabled = false  # 暂时禁用
 - `analysis.max_diff_length` - 最大 diff 长度，默认 100000 字符
 - `analysis.concurrency` - 并发分析数，默认 1
 - `analysis.timeout` - 分析超时时间，默认 600 秒
-- `analysis.language` - 报告语言，默认 zh
+- `analysis.language` - AI 分析输出语言，默认 en
 - `repos[].branch` - 仓库分支，默认 main
 - `repos[].enabled` - 是否启用，默认 true
 - `repos[].protocol` - 仓库级协议配置

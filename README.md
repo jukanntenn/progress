@@ -181,6 +181,10 @@ Environment variables can override any value in the configuration file.
 # Timezone configuration (optional, default: UTC)
 timezone = "UTC"
 
+# Application language (optional, default: en)
+# Controls the language of user interface text
+language = "en"
+
 [markpost]
 # Markpost publish URL (required)
 url = "https://markpost.example.com/p/your-post-key"
@@ -227,9 +231,9 @@ max_diff_length = 100000
 concurrency = 1
 # Claude Code analysis timeout (seconds, default: 600)
 timeout = 600
-# Analysis result language (optional, default: zh)
+# AI analysis output language (optional, default: en)
 # Supports any language code (e.g., zh, en, ja, ko, fr, de, es, pt, ru, ar, etc.)
-# If the language code is not recognized, English is used by default
+# This is independent from the top-level language setting
 language = "zh"
 
 # Repository configuration (at least one required)
@@ -278,6 +282,7 @@ enabled = false  # Temporarily disabled
 **Optional Configuration Items:**
 
 - `timezone` - Timezone configuration, default UTC
+- `language` - Application language, default en
 - `markpost.timeout` - Markpost HTTP request timeout, default 30 seconds
 - `notification.feishu.timeout` - Feishu HTTP request timeout, default 30 seconds
 - `notification.email.*` - Email notification configuration (entire section optional)
@@ -288,7 +293,7 @@ enabled = false  # Temporarily disabled
 - `analysis.max_diff_length` - Maximum diff length, default 100000 characters
 - `analysis.concurrency` - Concurrent analysis count, default 1
 - `analysis.timeout` - Analysis timeout, default 600 seconds
-- `analysis.language` - Report language, default zh
+- `analysis.language` - AI analysis output language, default en
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
 - `repos[].protocol` - Repository-level protocol configuration

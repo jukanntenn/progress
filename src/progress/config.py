@@ -155,7 +155,7 @@ class RepositoryConfig(BaseModel):
 class Config(BaseSettings):
     """Application configuration."""
 
-    language: str = Field(default="zh-hans")
+    language: str = Field(default="en")
     timezone: str = Field(default="UTC")
 
     markpost: MarkpostConfig
