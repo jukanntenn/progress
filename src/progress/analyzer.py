@@ -1,7 +1,6 @@
 """Claude Code analyzer."""
 
 import logging
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from .consts import (
 )
 from .errors import AnalysisException
 from .i18n import gettext as _
+from .utils import run_command
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +122,11 @@ Here is the aggregated report:
 
         try:
             logger.info("Generating title and summary with Claude...")
-            result = subprocess.run(
+            output = run_command(
                 [self.claude_code_path, "-p", prompt],
-                capture_output=True,
-                text=True,
                 timeout=self.timeout,
-            )
-
-            output = result.stdout.strip()
+                check=False,
+            ).strip()
 
             title = _("Progress Report for Open Source Projects")
             summary = _("A progress report for open source projects.")
@@ -143,14 +140,12 @@ Here is the aggregated report:
             logger.info(f"Generated title: {title}")
             return title, summary
 
-        except subprocess.TimeoutExpired:
-            logger.error("Claude Code analysis timeout for title generation")
-            raise AnalysisException("Claude Code analysis timeout") from None
         except Exception as e:
-            logger.error(f"Failed to generate title and summary: {e}")
-            raise AnalysisException(
-                f"Failed to generate title and summary: {e}"
-            ) from None
+            from .errors import CommandException
+            if isinstance(e, CommandException):
+                logger.error(f"Failed to generate title and summary: {e}")
+                raise AnalysisException(str(e)) from e
+            raise
 
     def _build_analysis_prompt(
         self,
@@ -174,30 +169,39 @@ Here is the aggregated report:
         )
 
     def _run_claude_analysis(self, diff: str, prompt: str) -> str:
-        """Execute claude-code CLI analysis."""
-        cmd_claude = [self.claude_code_path, "-p", prompt]
+        """Execute claude-code CLI analysis.
+
+        Args:
+            diff: Code diff content to analyze
+            prompt: Analysis prompt
+
+        Returns:
+            Claude analysis output
+
+        Raises:
+            AnalysisException: If analysis fails
+        """
+        cmd = [self.claude_code_path, "-p", prompt]
 
         try:
-            result = subprocess.run(
-                cmd_claude,
+            output = run_command(
+                cmd,
                 input=diff,
-                capture_output=True,
-                text=True,
                 timeout=self.timeout,
+                check=False,
             )
 
-            logger.debug(f"Claude output length: {len(result.stdout)}")
+            logger.debug(f"Claude output length: {len(output)}")
+            return output
 
-            if result.stderr:
-                logger.warning(f"Claude stderr: {result.stderr}")
-
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Claude Code analysis failed: {e.stderr}")
-            raise AnalysisException(f"Claude Code analysis failed: {e.stderr}") from e
-        except subprocess.TimeoutExpired:
-            logger.error("Claude Code analysis timeout")
-            raise AnalysisException("Claude Code analysis timeout") from None
-        except FileNotFoundError as e:
-            logger.error(f"File not found: {e}")
-            raise AnalysisException(f"File not found: {e}") from None
+        except Exception as e:
+            from .errors import CommandException
+            if isinstance(e, CommandException):
+                logger.error(f"Claude Code analysis failed: {e}")
+                raise AnalysisException(str(e)) from e
+            if isinstance(e, FileNotFoundError):
+                logger.error(f"Claude Code executable not found: {e}")
+                raise AnalysisException(
+                    f"Claude Code executable not found: {self.claude_code_path}"
+                ) from e
+            raise

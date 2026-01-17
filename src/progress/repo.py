@@ -3,9 +3,8 @@
 import logging
 import os
 import shutil
-import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 from .config import Config
 from .consts import CMD_GH, GH_MAX_RETRIES, parse_repo_name
@@ -14,7 +13,7 @@ from .enums import Protocol
 from .errors import GitException
 from .github import GitClient, parse_protocol_from_url, resolve_repo_url, sanitize_repo_name
 from .models import Repository
-from .utils import get_now, retry, sanitize
+from .utils import get_now, retry, run_command, sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -346,6 +345,29 @@ class Repo:
 
         self._run_command(cmd)
 
+    def _prepare_env(self, cmd: list[str]) -> Optional[Dict[str, str]]:
+        """Prepare environment variables for gh command.
+
+        Args:
+            cmd: Command list to check
+
+        Returns:
+            Environment dict with GH_TOKEN and proxy for gh commands, None otherwise
+        """
+        if cmd[0] != CMD_GH:
+            return None
+
+        env = os.environ.copy()
+        if self.gh_token:
+            env["GH_TOKEN"] = self.gh_token
+            logger.debug(f"Using GH_TOKEN: {sanitize(self.gh_token)}")
+        if self.proxy:
+            env["HTTP_PROXY"] = self.proxy
+            env["HTTPS_PROXY"] = self.proxy
+            logger.debug(f"Using proxy: {sanitize(self.proxy)}")
+
+        return env
+
     def _run_command(self, cmd: list[str]) -> str:
         """Run command and return output.
 
@@ -360,32 +382,9 @@ class Repo:
         Raises:
             GitException: If command fails
         """
-        logger.debug(f"Executing command: {' '.join(cmd)}")
-
-        env = None
-        if cmd[0] == CMD_GH:
-            env = os.environ.copy()
-            if self.gh_token:
-                env["GH_TOKEN"] = self.gh_token
-                logger.debug(f"Using GH_TOKEN: {sanitize(self.gh_token)}")
-            if self.proxy:
-                env["HTTP_PROXY"] = self.proxy
-                env["HTTPS_PROXY"] = self.proxy
-                logger.debug(f"Using proxy: {sanitize(self.proxy)}")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=self.config.github.gh_timeout,
-                env=env,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Command failed: {e.stderr}")
-            raise GitException(f"Command failed: {e.stderr}") from e
-        except subprocess.TimeoutExpired:
-            logger.error("Command timeout")
-            raise GitException("Command timeout") from None
+        env = self._prepare_env(cmd)
+        return run_command(
+            cmd,
+            timeout=self.config.github.gh_timeout,
+            env=env,
+        )
