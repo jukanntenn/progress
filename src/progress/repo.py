@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Optional
 
 from .config import Config
-from .consts import CMD_GH, parse_repo_name
+from .consts import CMD_GH, GH_MAX_RETRIES, parse_repo_name
 from .db import UTC
 from .enums import Protocol
+from .errors import GitException
 from .github import GitClient, parse_protocol_from_url, resolve_repo_url, sanitize_repo_name
 from .models import Repository
-from .utils import get_now
+from .utils import get_now, retry, sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -307,6 +308,12 @@ class Repo:
             self.repo_path, old_commit, new_commit
         )
 
+    @retry(
+        times=GH_MAX_RETRIES,
+        initial_delay=3,
+        backoff="exponential",
+        exceptions=(GitException,),
+    )
     def _run_gh_clone_command(self, url: str, branch: str) -> None:
         """Clone repository using gh repo clone.
 
@@ -360,14 +367,10 @@ class Repo:
             env = os.environ.copy()
             if self.gh_token:
                 env["GH_TOKEN"] = self.gh_token
-                from .utils import sanitize
-
                 logger.debug(f"Using GH_TOKEN: {sanitize(self.gh_token)}")
             if self.proxy:
                 env["HTTP_PROXY"] = self.proxy
                 env["HTTPS_PROXY"] = self.proxy
-                from .utils import sanitize
-
                 logger.debug(f"Using proxy: {sanitize(self.proxy)}")
 
         try:
@@ -382,11 +385,7 @@ class Repo:
             return result.stdout
         except subprocess.CalledProcessError as e:
             logger.error(f"Command failed: {e.stderr}")
-            from .errors import GitException
-
             raise GitException(f"Command failed: {e.stderr}") from e
         except subprocess.TimeoutExpired:
             logger.error("Command timeout")
-            from .errors import GitException
-
             raise GitException("Command timeout") from None
