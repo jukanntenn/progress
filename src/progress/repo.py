@@ -310,7 +310,7 @@ class Repo:
 
     @retry(
         times=GH_MAX_RETRIES,
-        initial_delay=1,
+        initial_delay=3,
         backoff="exponential",
         exceptions=(GitException,),
     )
