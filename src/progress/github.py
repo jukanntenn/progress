@@ -23,7 +23,7 @@ from .consts import (
 )
 from .enums import Protocol
 from .errors import GitException
-from .utils import retry, sanitize
+from .utils import retry, run_command, sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -405,22 +405,6 @@ class GitClient:
             Command output
         """
         cmd = [CMD_GIT, "-C", str(repo_path)] + args
-        logger.debug(f"Executing command: {' '.join(cmd)}")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Command failed: {e.stderr}")
-            raise GitException(f"Git command failed: {e.stderr}") from e
-        except subprocess.TimeoutExpired:
-            logger.error("Command timeout")
-            raise GitException("Git command timeout") from None
+        return run_command(cmd, timeout=self.timeout)
 
 

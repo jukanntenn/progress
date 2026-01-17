@@ -23,3 +23,9 @@ class AnalysisException(ProgressException):
     """Raised when code analysis operations fail."""
 
     pass
+
+
+class CommandException(ProgressException):
+    """Raised when external command execution fails."""
+
+    pass

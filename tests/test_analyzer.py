@@ -1,7 +1,5 @@
 """Analyzer module unit tests"""
 
-from types import SimpleNamespace
-
 from progress.analyzer import ClaudeCodeAnalyzer
 
 
@@ -10,11 +8,11 @@ def test_generate_title_and_summary_prompt_includes_language_requirement(monkeyp
 
     captured = {}
 
-    def fake_run(cmd, capture_output, text, timeout):
+    def fake_run(cmd, cwd=None, timeout=None, check=True, input=None, env=None):
         captured["cmd"] = cmd
-        return SimpleNamespace(stdout="TITLE: 标题\nSUMMARY: 摘要\n", stderr="")
+        return "TITLE: 标题\nSUMMARY: 摘要\n"
 
-    monkeypatch.setattr("progress.analyzer.subprocess.run", fake_run)
+    monkeypatch.setattr("progress.analyzer.run_command", fake_run)
 
     title, summary = analyzer.generate_title_and_summary("report")
     assert title == "标题"
@@ -30,10 +28,10 @@ def test_generate_title_and_summary_prompt_includes_language_requirement(monkeyp
 def test_generate_title_and_summary_uses_fallback_when_missing_fields(monkeypatch):
     analyzer = ClaudeCodeAnalyzer(language="zh")
 
-    def fake_run(cmd, capture_output, text, timeout):
-        return SimpleNamespace(stdout="SUMMARY: only summary\n", stderr="")
+    def fake_run(cmd, cwd=None, timeout=None, check=True, input=None, env=None):
+        return "SUMMARY: only summary\n"
 
-    monkeypatch.setattr("progress.analyzer.subprocess.run", fake_run)
+    monkeypatch.setattr("progress.analyzer.run_command", fake_run)
 
     title, summary = analyzer.generate_title_and_summary("report")
     assert title == "Progress Report for Open Source Projects"
