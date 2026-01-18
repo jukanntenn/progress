@@ -192,14 +192,19 @@ url = "https://markpost.example.com/p/your-post-key"
 timeout = 30
 
 [notification]
-[notification.feishu]
+
+[[notification.channels]]
+type = "feishu"
+enabled = true
 # 飞书 webhook URL（必需）
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
 # HTTP 请求超时时间（秒，默认：30）
 timeout = 30
 
-[notification.email]
-# 邮件通知配置（可选）
+[[notification.channels]]
+type = "email"
+enabled = false
+# 邮件通知配置
 host = "smtp.example.com"
 port = 587
 user = "user@example.com"
@@ -276,7 +281,7 @@ enabled = false  # 暂时禁用
 **必需配置项：**
 
 - `markpost.url` - Markpost 发布 URL（访问 [Markpost](https://markpost.cc/) 获取）
-- `notification.feishu.webhook_url` - 飞书 webhook URL（参见 [自定义机器人使用指南](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot)）
+- `notification.channels` - 通知通道列表（至少配置 1 个且至少 1 个 enabled=true）
 - `github.gh_token` - GitHub CLI token（参见 [管理个人访问令牌](https://docs.github.com/zh/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)）
 - `repos` - 至少配置一个仓库
 
@@ -285,8 +290,10 @@ enabled = false  # 暂时禁用
 - `timezone` - 时区配置，默认 UTC
 - `language` - 应用程序语言，默认 en
 - `markpost.timeout` - Markpost HTTP 请求超时时间，默认 30 秒
-- `notification.feishu.timeout` - 飞书 HTTP 请求超时时间，默认 30 秒
-- `notification.email.*` - 邮件通知配置（整个 section 可选）
+- `notification.channels[].type` - 通道类型（例如 feishu / email）
+- `notification.channels[].enabled` - 是否启用该通道，默认 true
+- `notification.channels[].timeout` - 飞书 HTTP 请求超时时间（type=feishu），默认 30 秒
+- `notification.channels[]` - 邮件通知配置（type=email，字段见上方示例）
 - `github.protocol` - Git 协议，默认 https
 - `github.proxy` - 代理配置，默认为空
 - `github.git_timeout` - Git 命令超时时间，默认 300 秒
@@ -318,8 +325,8 @@ enabled = false  # 暂时禁用
 # 覆盖 GitHub token
 export PROGRESS__GITHUB__GH_TOKEN="ghp_your_token_here"
 
-# 覆盖飞书 webhook URL
-export PROGRESS__NOTIFICATION__FEISHU__WEBHOOK_URL="https://open.feishu.cn/..."
+# 覆盖通知通道配置（channels 为 JSON 字符串）
+export PROGRESS__NOTIFICATION__CHANNELS='[{"type":"feishu","enabled":true,"webhook_url":"https://open.feishu.cn/...","timeout":30}]'
 
 # 覆盖 Markpost URL
 export PROGRESS__MARKPOST__URL="https://markpost.cc/your-post-key"
@@ -351,7 +358,7 @@ services:
     environment:
       # 通过环境变量覆盖敏感配置
       - PROGRESS__GITHUB__GH_TOKEN=${GH_TOKEN}
-      - PROGRESS__NOTIFICATION__FEISHU__WEBHOOK_URL=${FEISHU_WEBHOOK}
+      - PROGRESS__NOTIFICATION__CHANNELS=${NOTIFICATION_CHANNELS}
       - PROGRESS__MARKPOST__URL=${MARKPOST_URL}
       - PROGRESS_SCHEDULE_CRON=0 8 * * *
     restart: always
@@ -362,7 +369,7 @@ services:
 ```bash
 # .env
 GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+NOTIFICATION_CHANNELS=[{"type":"feishu","enabled":true,"webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/xxx","timeout":30}]
 MARKPOST_URL=https://markpost.cc/your-post-key
 ```
 
@@ -374,7 +381,10 @@ MARKPOST_URL=https://markpost.cc/your-post-key
 [markpost]
 url = "https://markpost.cc/your-post-key"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
+enabled = true
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
 
 [github]

@@ -13,7 +13,7 @@ from .errors import ProgressException
 from .i18n import initialize, gettext as _
 from .log import setup as setup_log
 from .models import Repository
-from .notifier import EmailNotifier, FeishuNotifier
+from .notification import NotificationManager, NotificationMessage
 from .reporter import MarkdownReporter
 from .repository import RepositoryManager
 from .utils import get_now
@@ -37,11 +37,7 @@ def main(config: str):
         init_db(DATABASE_PATH)
         create_tables()
 
-        notifier = FeishuNotifier(
-            cfg.notification.feishu.webhook_url,
-            timeout=cfg.notification.feishu.timeout,
-        )
-        email_notifier = _create_email_notifier(cfg.notification.email)
+        notification_manager = NotificationManager.from_config(cfg.notification)
 
         analyzer = ClaudeCodeAnalyzer(
             max_diff_length=cfg.analysis.max_diff_length,
@@ -124,26 +120,16 @@ def main(config: str):
             ).format(
                 count=len(check_result.reports), commits=check_result.total_commits
             )
-            notifier.send_notification(
-                title=_("Progress Report for Open Source Projects"),
-                total_commits=check_result.total_commits,
-                summary=summary_text,
-                markpost_url=markpost_url,
-                repo_statuses=check_result.repo_statuses,
-                reports=check_result.reports,
-            )
-
-            if email_notifier:
-                logger.info("Sending email notification...")
-                email_notifier.send_notification(
-                    subject=_("Progress Report for Open Source Projects"),
+            logger.info("Sending notifications...")
+            notification_manager.send(
+                NotificationMessage(
+                    title=_("Progress Report for Open Source Projects"),
                     total_commits=check_result.total_commits,
                     summary=summary_text,
                     markpost_url=markpost_url,
                     repo_statuses=check_result.repo_statuses,
-                    reports=check_result.reports,
-                    _=_,
                 )
+            )
         else:
             logger.info(
                 _("No repositories with new changes, skipping report generation")
@@ -159,29 +145,6 @@ def main(config: str):
         raise click.ClickException(str(e))
     finally:
         close_db()
-
-
-def _create_email_notifier(email_config) -> EmailNotifier | None:
-    """Create email notifier.
-
-    Args:
-        email_config: Email configuration object (may be None)
-
-    Returns:
-        EmailNotifier instance or None
-    """
-    if not email_config:
-        return None
-    return EmailNotifier(
-        host=email_config.host,
-        port=email_config.port,
-        user=email_config.user,
-        password=email_config.password,
-        from_addr=email_config.from_addr,
-        recipient=email_config.recipient,
-        starttls=email_config.starttls,
-        ssl=email_config.ssl,
-    )
 
 
 def _upload_to_markpost(

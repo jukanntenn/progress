@@ -1,0 +1,46 @@
+timezone = "Asia/Shanghai"
+language = "zh-hans"
+repos = [
+    { url = "miniflux/v2", branch = "main" },
+    { url = "django/django", branch = "main" },
+    { url = "sansan0/TrendRadar", branch = "master" },
+    { url = "mountain-loop/yaak", branch = "main", enabled = true },
+    { url = "BloopAI/vibe-kanban", branch = "main", enabled = true },
+    { url = "code-yeongyu/oh-my-opencode", branch = "dev", enabled = true },
+    { url = "anomalyco/opencode", branch = "dev", enabled = true },
+]
+
+[markpost]
+url = "https://markpost.cc/{{ markpost_post_key }}"
+timeout = 30
+
+[notification]
+
+[[notification.channels]]
+type = "feishu"
+enabled = true
+webhook_url = "{{ feishu_webhook_url }}"
+timeout = 30
+
+[[notification.channels]]
+type = "email"
+enabled = false
+host = "smtp.163.com"
+port = 465
+user = "{{ email_user }}"
+password = "{{ email_password }}"
+from_addr = "{{ email_user }}"
+recipient = {{ email_recipient | to_json }}
+starttls = false
+ssl = true
+
+[github]
+gh_token = "{{ gh_token }}"
+protocol = "https"
+proxy = "http://192.168.5.101:7890"
+
+[analysis]
+max_diff_length = 200000
+concurrency = 3
+timeout = 300
+language = "简体中文"

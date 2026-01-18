@@ -192,14 +192,19 @@ url = "https://markpost.example.com/p/your-post-key"
 timeout = 30
 
 [notification]
-[notification.feishu]
+
+[[notification.channels]]
+type = "feishu"
+enabled = true
 # Feishu webhook URL (required)
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
 # HTTP request timeout (seconds, default: 30)
 timeout = 30
 
-[notification.email]
-# Email notification configuration (optional)
+[[notification.channels]]
+type = "email"
+enabled = false
+# Email notification configuration
 host = "smtp.example.com"
 port = 587
 user = "user@example.com"

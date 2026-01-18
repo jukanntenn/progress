@@ -20,6 +20,13 @@ def temp_config_file():
     os.unlink(path)
 
 
+def get_notification_channel(config: Config, channel_type: str):
+    return next(
+        (channel for channel in config.notification.channels if channel.type == channel_type),
+        None,
+    )
+
+
 # ========== Test Cases ==========
 
 
@@ -29,7 +36,9 @@ def test_load_from_file_with_only_required_fields(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test-key"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -41,10 +50,9 @@ gh_token = "ghp_test_token_12345"
 
     # Verify required config items
     assert str(config.markpost.url) == "https://markpost.example.com/p/test-key"
-    assert (
-        str(config.notification.feishu.webhook_url)
-        == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
-    )
+    feishu = get_notification_channel(config, "feishu")
+    assert feishu is not None
+    assert str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
     assert config.github.gh_token == "ghp_test_token_12345"
 
     # Verify optional config item defaults
@@ -67,8 +75,8 @@ def test_load_from_env_with_only_required_fields(temp_config_file, monkeypatch):
         "PROGRESS_MARKPOST__URL", "https://markpost.example.com/p/env-key"
     )
     monkeypatch.setenv(
-        "PROGRESS_NOTIFICATION__FEISHU__WEBHOOK_URL",
-        "https://open.feishu.cn/open-apis/bot/v2/hook/env",
+        "PROGRESS_NOTIFICATION__CHANNELS",
+        '[{"type":"feishu","webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/env","timeout":30}]',
     )
     monkeypatch.setenv("PROGRESS_GITHUB__GH_TOKEN", "ghp_env_token_67890")
 
@@ -76,10 +84,9 @@ def test_load_from_env_with_only_required_fields(temp_config_file, monkeypatch):
 
     # Verify config loaded from environment variables
     assert str(config.markpost.url) == "https://markpost.example.com/p/env-key"
-    assert (
-        str(config.notification.feishu.webhook_url)
-        == "https://open.feishu.cn/open-apis/bot/v2/hook/env"
-    )
+    feishu = get_notification_channel(config, "feishu")
+    assert feishu is not None
+    assert str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/env"
     assert config.github.gh_token == "ghp_env_token_67890"
 
     # Verify defaults
@@ -100,7 +107,9 @@ max_diff_length = 100000
 [markpost]
 url = "https://markpost.example.com/p/file-key"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/file"
 
 [github]
@@ -127,10 +136,9 @@ protocol = "https"
 
     # Verify non-overridden config keeps file values
     assert str(config.markpost.url) == "https://markpost.example.com/p/file-key"
-    assert (
-        str(config.notification.feishu.webhook_url)
-        == "https://open.feishu.cn/open-apis/bot/v2/hook/file"
-    )
+    feishu = get_notification_channel(config, "feishu")
+    assert feishu is not None
+    assert str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/file"
 
 
 def test_config_file_not_found():
@@ -149,7 +157,9 @@ timezone = "Invalid/Timezone"
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -167,13 +177,16 @@ def test_invalid_port_range(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
 gh_token = "ghp_test"
 
-[notification.email]
+[[notification.channels]]
+type = "email"
 host = "smtp.gmail.com"
 port = 99999
 from_addr = "test@example.com"
@@ -191,7 +204,9 @@ def test_invalid_protocol(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -210,7 +225,9 @@ def test_invalid_repo_url_format(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -231,13 +248,16 @@ def test_email_partial_config_missing_required_fields(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
 gh_token = "ghp_test"
 
-[notification.email]
+[[notification.channels]]
+type = "email"
 host = "smtp.gmail.com"
 port = 587
 # Missing recipient
@@ -257,7 +277,9 @@ max_diff_length = 0
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -278,7 +300,9 @@ concurrency = 0
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -299,7 +323,9 @@ first_run_lookback_commits = 0
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -314,7 +340,9 @@ gh_token = "ghp_test"
 def test_missing_required_markpost_url(temp_config_file):
     """Test: Missing required markpost url"""
     content = """
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -347,7 +375,9 @@ def test_missing_required_gh_token(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 """
     Path(temp_config_file).write_text(content)
@@ -362,7 +392,9 @@ def test_empty_repos_list(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -380,7 +412,9 @@ def test_repo_enabled_filtering(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -425,7 +459,9 @@ timezone = "Asia/Shanghai"
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -445,13 +481,16 @@ def test_email_config_with_ssl(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
 gh_token = "ghp_test"
 
-[notification.email]
+[[notification.channels]]
+type = "email"
 host = "smtp.gmail.com"
 port = 465
 user = "test@gmail.com"
@@ -465,9 +504,10 @@ ssl = true
 
     config = Config.load_from_file(temp_config_file)
 
-    assert config.notification.email is not None
-    assert config.notification.email.ssl is True
-    assert config.notification.email.starttls is False
+    email = get_notification_channel(config, "email")
+    assert email is not None
+    assert email.ssl is True
+    assert email.starttls is False
 
 
 def test_repo_with_protocol_override(temp_config_file):
@@ -476,7 +516,9 @@ def test_repo_with_protocol_override(temp_config_file):
 [markpost]
 url = "https://markpost.example.com/p/test"
 
-[notification.feishu]
+[notification]
+[[notification.channels]]
+type = "feishu"
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
@@ -527,4 +569,3 @@ def test_repository_config_protocol_rejects_invalid_string():
     with pytest.raises(ValueError) as exc_info:
         RepositoryConfig(url="vitejs/vite", protocol="ftp")
     assert "protocol" in str(exc_info.value).lower()
-

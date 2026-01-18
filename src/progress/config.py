@@ -3,7 +3,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional, Union
 from zoneinfo import ZoneInfo, available_timezones
 
 from pydantic import (
@@ -28,8 +28,11 @@ from .errors import ConfigException
 logger = logging.getLogger(__name__)
 
 
-class FeishuConfig(BaseModel):
-    """Feishu webhook configuration."""
+class FeishuChannelConfig(BaseModel):
+    """Feishu webhook notification channel configuration."""
+
+    type: Literal["feishu"] = "feishu"
+    enabled: bool = True
 
     webhook_url: HttpUrl
     timeout: int = Field(default=30, ge=1)
@@ -42,8 +45,11 @@ class MarkpostConfig(BaseModel):
     timeout: int = Field(default=30, ge=1)
 
 
-class EmailConfig(BaseModel):
-    """Email notification configuration."""
+class EmailChannelConfig(BaseModel):
+    """Email notification channel configuration."""
+
+    type: Literal["email"] = "email"
+    enabled: bool = True
 
     host: str = ""
     port: int = Field(default=587, ge=1, le=65535)
@@ -55,16 +61,8 @@ class EmailConfig(BaseModel):
     ssl: bool = False
 
     @model_validator(mode="after")
-    def validate_email_config(self) -> "EmailConfig":
-        """Validate required fields when email is configured."""
-        if not any(
-            [
-                self.host,
-                self.user,
-                self.password,
-                self.recipient,
-            ]
-        ):
+    def validate_email_config(self) -> "EmailChannelConfig":
+        if not self.enabled:
             return self
 
         missing_fields = []
@@ -81,11 +79,24 @@ class EmailConfig(BaseModel):
         return self
 
 
+NotificationChannelConfig = Annotated[
+    Union[FeishuChannelConfig, EmailChannelConfig],
+    Field(discriminator="type"),
+]
+
+
 class NotificationConfig(BaseModel):
     """Notification configuration."""
 
-    feishu: FeishuConfig
-    email: Optional[EmailConfig] = None
+    channels: List[NotificationChannelConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_notification_config(self) -> "NotificationConfig":
+        if not self.channels:
+            raise ValueError("At least one notification channel must be configured")
+        if not any(getattr(channel, "enabled", True) for channel in self.channels):
+            raise ValueError("At least one enabled notification channel is required")
+        return self
 
 
 class GitHubConfig(BaseModel):
