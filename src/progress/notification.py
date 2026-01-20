@@ -130,7 +130,9 @@ class FeishuNotification:
             },
         }
 
-    def _build_stats_element(self, stats: NotificationStats, total_commits: int) -> dict[str, Any]:
+    def _build_stats_element(
+        self, stats: NotificationStats, total_commits: int
+    ) -> dict[str, Any]:
         return {
             "tag": "div",
             "fields": [
@@ -150,7 +152,9 @@ class FeishuNotification:
             },
         }
 
-    def _build_repo_list_element(self, title: str, repos: list[str]) -> dict[str, Any] | None:
+    def _build_repo_list_element(
+        self, title: str, repos: list[str]
+    ) -> dict[str, Any] | None:
         if not repos:
             return None
 
@@ -223,10 +227,13 @@ class EmailNotification:
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        self.jinja_env.globals["_"] = _
 
     def send(self, message: NotificationMessage) -> None:
         html_content = self._render_html(message)
-        mime_message = self._build_mime(subject=message.title, html_content=html_content)
+        mime_message = self._build_mime(
+            subject=message.title, html_content=html_content
+        )
         self._send_mime(mime_message, subject=message.title)
 
     def _render_html(self, message: NotificationMessage) -> str:
@@ -243,7 +250,6 @@ class EmailNotification:
             failed_repos=list(stats.failed_repos),
             skipped_repos=list(stats.skipped_repos),
             markpost_url=message.markpost_url,
-            _=_,
         )
 
     def _build_mime(self, subject: str, html_content: str) -> MIMEMultipart:
@@ -288,7 +294,9 @@ class NotificationManager:
         self._channels = list(channels)
 
     @classmethod
-    def from_config(cls, notification_config: NotificationConfig) -> "NotificationManager":
+    def from_config(
+        cls, notification_config: NotificationConfig
+    ) -> "NotificationManager":
         channels: list[NotificationChannel] = [
             cls._build_channel(channel_config)
             for channel_config in notification_config.channels
@@ -298,7 +306,9 @@ class NotificationManager:
         return cls(channels)
 
     @staticmethod
-    def _build_channel(channel_config: NotificationChannelConfig) -> NotificationChannel:
+    def _build_channel(
+        channel_config: NotificationChannelConfig,
+    ) -> NotificationChannel:
         match channel_config.type:
             case "feishu":
                 return FeishuNotification(

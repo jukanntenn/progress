@@ -26,6 +26,7 @@ class MarkdownReporter:
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        self.jinja_env.globals["_"] = _
 
     def generate_repository_report(
         self, report, timezone: ZoneInfo = ZoneInfo("UTC")
@@ -43,7 +44,6 @@ class MarkdownReporter:
         return template.render(
             report=report,
             timezone=timezone,
-            _=_,
         )
 
     def generate_aggregated_report(
@@ -80,5 +80,4 @@ class MarkdownReporter:
             timezone=timezone,
             generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
             iso_time=now.isoformat(),
-            _=_,
         )
