@@ -43,6 +43,7 @@ class MarkpostConfig(BaseModel):
 
     url: HttpUrl
     timeout: int = Field(default=30, ge=1)
+    max_batch_size: int = Field(default=1048576, gt=0)
 
 
 class EmailChannelConfig(BaseModel):

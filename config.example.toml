@@ -23,6 +23,9 @@ language = "en"
 url = "https://markpost.example.com/p/your-post-key"
 # HTTP request timeout (seconds), default: 30
 timeout = 30
+# Maximum batch size for uploads (bytes), default: 1048576 (1MB)
+# Reports larger than this will be split into multiple batches
+max_batch_size = 1048576
 
 # ========== Notification Configuration ==========
 [notification]

@@ -105,6 +105,41 @@ class MarkpostClient:
             )
             _handle_request_exception(e, "upload to Markpost")
 
+    def upload_batch(
+        self,
+        content: str,
+        title: Optional[str] = None,
+        batch_index: int = 0,
+        total_batches: int = 1,
+    ) -> str:
+        """Upload a batch of content to Markpost with batch suffix in title.
+
+        Args:
+            content: Content body to publish
+            title: Content title (batch suffix will be appended if total_batches > 1)
+            batch_index: Current batch index (0-based)
+            total_batches: Total number of batches
+
+        Returns:
+            Full URL of the published post
+
+        Raises:
+            ProgressException: If upload fails
+
+        Note:
+            When total_batches > 1, appends " (n/m)" suffix to title
+        """
+        final_title = title
+        if total_batches > 1 and title:
+            final_title = f"{title} ({batch_index + 1}/{total_batches})"
+
+        logger.info(
+            f"Uploading batch {batch_index + 1}/{total_batches} "
+            f"({len(content.encode('utf-8'))} bytes)"
+        )
+
+        return self.upload(content, final_title)
+
     def get_status(self, post_id: str) -> bool:
         """Check if a post exists by ID.
 

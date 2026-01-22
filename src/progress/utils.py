@@ -3,6 +3,7 @@
 import logging
 import subprocess
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -212,3 +213,86 @@ def run_command(
     except subprocess.SubprocessError as e:
         from .errors import CommandException
         raise CommandException("Failed to run command") from e
+
+
+@dataclass
+class ReportBatch:
+    """A batch of repository reports."""
+
+    reports: list
+    total_size: int
+    batch_index: int
+    total_batches: int
+
+
+def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatch]:
+    """Split repository reports into batches by size.
+
+    Args:
+        reports: List of RepositoryReport objects
+        max_batch_size: Maximum size per batch in bytes
+
+    Returns:
+        List of ReportBatch objects
+
+    Notes:
+        - Each batch contains at least 1 report
+        - If a single report exceeds max_batch_size, it gets its own batch (will be skipped during upload)
+        - Batch size is calculated based on rendered report content
+    """
+    if not reports:
+        return []
+
+    batches = []
+    current_batch = []
+    current_size = 0
+
+    for report in reports:
+        report_size = len(report.content.encode("utf-8"))
+
+        if report_size > max_batch_size:
+            if current_batch:
+                batches.append(_create_batch(current_batch, current_size, len(batches)))
+                current_batch = []
+                current_size = 0
+
+            logger.warning(
+                f"Report for {report.repo_name} ({report_size} bytes) exceeds "
+                f"max_batch_size ({max_batch_size} bytes)"
+            )
+            batches.append(_create_batch([report], report_size, len(batches)))
+            continue
+
+        if current_batch and current_size + report_size > max_batch_size:
+            batches.append(_create_batch(current_batch, current_size, len(batches)))
+            current_batch = []
+            current_size = 0
+
+        current_batch.append(report)
+        current_size += report_size
+
+    if current_batch:
+        batches.append(_create_batch(current_batch, current_size, len(batches)))
+
+    total_batches = len(batches)
+    for batch in batches:
+        batch.total_batches = total_batches
+
+    logger.info(
+        f"Created {total_batches} batch(es) from {len(reports)} report(s), "
+        f"max_batch_size={max_batch_size} bytes"
+    )
+
+    return batches
+
+
+def _create_batch(
+    reports: list, total_size: int, batch_index: int
+) -> ReportBatch:
+    """Helper to create a ReportBatch."""
+    return ReportBatch(
+        reports=reports,
+        total_size=total_size,
+        batch_index=batch_index,
+        total_batches=0,
+    )

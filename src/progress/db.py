@@ -57,8 +57,8 @@ def save_report(
     commit_hash: str,
     previous_commit_hash: str,
     commit_count: int,
-    markpost_url: str = None,
-    content: str = None,
+    markpost_url: str | None = None,
+    content: str | None = None,
 ) -> int:
     """Save report."""
     with database.atomic():
