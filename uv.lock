@@ -240,7 +240,7 @@ requires-dist = [
     { name = "peewee", specifier = ">=3.18.3" },
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "pydantic-settings", specifier = ">=2.7.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.2" },
     { name = "requests", specifier = ">=2.32.5" },
 ]
 provides-extras = ["test"]

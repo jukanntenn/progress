@@ -1,0 +1,223 @@
+"""Markpost client module for publishing content."""
+
+import logging
+from urllib.parse import urlparse
+from typing import Optional
+
+import requests
+
+from .config import MarkpostConfig
+from .errors import ProgressException
+from .utils import sanitize
+
+logger = logging.getLogger(__name__)
+
+
+def _handle_request_exception(exception: requests.RequestException, operation: str) -> None:
+    """Handle RequestException by logging and raising ProgressException.
+
+    Args:
+        exception: The RequestException from requests library
+        operation: Description of the operation being performed (e.g., "upload to Markpost")
+
+    Raises:
+        ProgressException: Always raises with formatted error message
+    """
+    status_code = getattr(exception.response, 'status_code', 'N/A')
+    logger.error(
+        f"Failed to {operation}: status_code={status_code}"
+    )
+    raise ProgressException(
+        f"Failed to {operation} (status: {status_code})"
+    ) from exception
+
+
+class MarkpostClient:
+    """Client for uploading content to Markpost service."""
+
+    def __init__(self, config: MarkpostConfig):
+        """Initialize Markpost client.
+
+        Args:
+            config: MarkpostConfig instance with url and timeout settings
+
+        Raises:
+            ProgressException: If URL format is invalid
+        """
+        full_url = str(config.url)
+        self.base_url = self._extract_base_url(full_url)
+        self.post_key = self._extract_post_key(full_url)
+        self.timeout = config.timeout
+
+        logger.debug(
+            f"MarkpostClient initialized: "
+            f"base_url={self.base_url}, "
+            f"post_key={sanitize(self.post_key)}, "
+            f"timeout={self.timeout}"
+        )
+
+    def upload(self, content: str, title: Optional[str] = None) -> str:
+        """Upload content to Markpost and return the published URL.
+
+        Args:
+            content: Content body to publish (required)
+            title: Content title (optional)
+
+        Returns:
+            Full URL of the published post (e.g., https://example.com/p/abc123)
+
+        Raises:
+            ProgressException: If upload fails due to network or server error
+
+        Example:
+            >>> config = MarkpostConfig(url="https://markpost.example.com/p/key")
+            >>> client = MarkpostClient(config)
+            >>> url = client.upload("Hello World", title="My Post")
+            >>> print(url)
+            https://markpost.example.com/p/xyz789
+        """
+        if not content:
+            raise ProgressException("Content cannot be empty")
+
+        url = f"{self.base_url}/{self.post_key}"
+        payload = {"title": title or "", "body": content}
+
+        try:
+            logger.info(f"Uploading content to Markpost: {self._mask_url(url)}")
+            response = requests.post(url, json=payload, timeout=self.timeout)
+            response.raise_for_status()
+
+            result = response.json()
+            post_id = result.get("id")
+
+            if not post_id:
+                logger.error("Markpost API response missing 'id' field")
+                raise ProgressException("Invalid Markpost API response: missing 'id'")
+
+            published_url = f"{self.base_url}/{post_id}"
+            logger.info(f"Content uploaded successfully: {published_url}")
+            return published_url
+
+        except requests.RequestException as e:
+            response_text = getattr(e.response, 'text', 'N/A')
+            logger.error(
+                f"Failed to upload to Markpost: response={response_text[:200]}"
+            )
+            _handle_request_exception(e, "upload to Markpost")
+
+    def get_status(self, post_id: str) -> bool:
+        """Check if a post exists by ID.
+
+        Args:
+            post_id: The nanoid of the post
+
+        Returns:
+            True if post exists (HTTP 200), False otherwise
+
+        Raises:
+            ProgressException: If network error occurs
+
+        Note:
+            The Markpost GET /:id endpoint returns HTML rather than JSON.
+            This method only checks the HTTP status code to verify existence.
+            API documentation is unclear about exact response format.
+        """
+        if not post_id:
+            raise ProgressException("Post ID cannot be empty")
+
+        url = f"{self.base_url}/{post_id}"
+
+        try:
+            logger.debug(f"Checking post status: {sanitize(post_id)}")
+            response = requests.get(url, timeout=self.timeout)
+
+            exists = response.status_code == 200
+            logger.debug(
+                f"Post {sanitize(post_id)} status: "
+                f"{'exists' if exists else 'not found'}"
+            )
+            return exists
+
+        except requests.RequestException as e:
+            _handle_request_exception(e, "check post status")
+
+    @staticmethod
+    def _extract_base_url(url: str) -> str:
+        """Extract base URL from markpost URL.
+
+        Args:
+            url: Full markpost URL (e.g., https://example.com/p/key)
+
+        Returns:
+            Base URL (e.g., https://example.com)
+
+        Raises:
+            ProgressException: If URL format is invalid
+
+        Example:
+            >>> MarkpostClient._extract_base_url("https://markpost.example.com/p/test-key")
+            'https://markpost.example.com'
+        """
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ProgressException("Invalid markpost URL format: missing scheme or netloc")
+
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    @staticmethod
+    def _extract_post_key(url: str) -> str:
+        """Extract post key from markpost URL.
+
+        Args:
+            url: Full markpost URL (e.g., https://example.com/p/key)
+
+        Returns:
+            Post key (e.g., "key")
+
+        Raises:
+            ProgressException: If URL format is invalid
+
+        Example:
+            >>> MarkpostClient._extract_post_key("https://markpost.example.com/p/test-key")
+            'test-key'
+        """
+        parsed = urlparse(url)
+        path = parsed.path.rstrip('/')
+
+        if not path:
+            raise ProgressException("Invalid markpost URL: missing path")
+
+        parts = path.split('/')
+        if len(parts) < 2:
+            raise ProgressException("Invalid markpost URL: path too short")
+
+        post_key = parts[-1]
+        if not post_key:
+            raise ProgressException("Invalid markpost URL: empty post key")
+
+        return post_key
+
+    @staticmethod
+    def _mask_url(url: str) -> str:
+        """Mask sensitive information in URL for logging.
+
+        Args:
+            url: Full URL with post_key
+
+        Returns:
+            Masked URL with post_key partially hidden
+
+        Example:
+            >>> MarkpostClient._mask_url("https://example.com/p/sensitive-key")
+            'https://example.com/p/se***ey'
+        """
+        parsed = urlparse(url)
+        path = parsed.path.rstrip('/')
+
+        if path:
+            parts = path.split('/')
+            if len(parts) >= 2:
+                parts[-1] = sanitize(parts[-1])
+                path = '/'.join(parts)
+
+        return f"{parsed.scheme}://{parsed.netloc}{path}"
