@@ -41,6 +41,22 @@ def initialize_components(cfg):
     return notification_manager, markpost_client, repo_manager, reporter
 
 
+def add_batch_suffix(title: str, batch_index: int, total_batches: int) -> str:
+    """Add batch suffix to title if multiple batches exist.
+
+    Args:
+        title: Original title
+        batch_index: Current batch index (0-based)
+        total_batches: Total number of batches
+
+    Returns:
+        Title with batch suffix if total_batches > 1, otherwise original title
+    """
+    if total_batches > 1:
+        return f"{title} ({batch_index + 1}/{total_batches})"
+    return title
+
+
 def generate_report_title_and_content(
     analyzer, aggregated_report, timezone, batch_context=None
 ):
@@ -54,6 +70,9 @@ def generate_report_title_and_content(
             - batch_index: int (0-based)
             - total_batches: int
     """
+    batch_index = batch_context.get("batch_index", 0) if batch_context else 0
+    total_batches = batch_context.get("total_batches", 1) if batch_context else 1
+
     try:
         logger.info("Generating title and summary with Claude...")
         title, summary = analyzer.generate_title_and_summary(aggregated_report)
@@ -63,11 +82,7 @@ def generate_report_title_and_content(
             else aggregated_report
         )
 
-        if batch_context and batch_context.get("total_batches", 1) > 1:
-            batch_index = batch_context.get("batch_index", 0)
-            total_batches = batch_context.get("total_batches", 1)
-            title = f"{title} ({batch_index + 1}/{total_batches})"
-
+        title = add_batch_suffix(title, batch_index, total_batches)
         logger.info(f"Generated report title: {title}")
         return title, final_report
     except Exception as e:
@@ -78,11 +93,7 @@ def generate_report_title_and_content(
             date=get_now(timezone).strftime("%Y-%m-%d %H:%M")
         )
 
-        if batch_context and batch_context.get("total_batches", 1) > 1:
-            batch_index = batch_context.get("batch_index", 0)
-            total_batches = batch_context.get("total_batches", 1)
-            title = f"{title} ({batch_index + 1}/{total_batches})"
-
+        title = add_batch_suffix(title, batch_index, total_batches)
         final_report = f"# {title}\n\n{aggregated_report}"
         return title, final_report
 
@@ -134,6 +145,8 @@ def process_reports(
     upload_errors = []
 
     for batch in batches:
+        markpost_url = None
+
         try:
             logger.info(
                 f"Processing batch {batch.batch_index + 1}/{batch.total_batches} "
@@ -172,7 +185,6 @@ def process_reports(
                     f"Batch {batch.batch_index + 1}: Report for {first_report.repo_name} "
                     f"exceeds size limit ({report_size} bytes)"
                 )
-                markpost_url = None
             else:
                 logger.info(
                     f"Uploading batch {batch.batch_index + 1}/{batch.total_batches} to Markpost..."
@@ -186,22 +198,6 @@ def process_reports(
                 logger.info(f"Batch {batch.batch_index + 1} uploaded: {markpost_url}")
                 uploaded_urls.append(markpost_url)
 
-            logger.info("Saving batch reports to database...")
-            for report in batch.reports:
-                repo = Repository.get_or_none(
-                    Repository.name == report.repo_name
-                )
-                if repo:
-                    save_report(
-                        repo_id=repo.id,
-                        commit_hash=report.current_commit,
-                        previous_commit_hash=report.previous_commit or "",
-                        commit_count=report.commit_count,
-                        markpost_url=markpost_url,
-                        content=report.content,
-                    )
-            logger.info(f"Saved {len(batch.reports)} reports to database")
-
         except Exception as e:
             error_msg = f"Batch {batch.batch_index + 1}: {str(e)}"
             logger.error(
@@ -210,24 +206,24 @@ def process_reports(
             )
             upload_errors.append(error_msg)
 
-            for report in batch.reports:
-                repo = Repository.get_or_none(
-                    Repository.name == report.repo_name
-                )
-                if repo:
-                    try:
-                        save_report(
-                            repo_id=repo.id,
-                            commit_hash=report.current_commit,
-                            previous_commit_hash=report.previous_commit or "",
-                            commit_count=report.commit_count,
-                            markpost_url=None,
-                            content=report.content,
-                        )
-                    except Exception as db_error:
-                        logger.error(
-                            f"Failed to save report for {report.repo_name}: {db_error}"
-                        )
+        logger.info("Saving batch reports to database...")
+        for report in batch.reports:
+            repo = Repository.get_or_none(Repository.name == report.repo_name)
+            if repo:
+                try:
+                    save_report(
+                        repo_id=repo.id,
+                        commit_hash=report.current_commit,
+                        previous_commit_hash=report.previous_commit or "",
+                        commit_count=report.commit_count,
+                        markpost_url=markpost_url,
+                        content=report.content,
+                    )
+                except Exception as db_error:
+                    logger.error(
+                        f"Failed to save report for {report.repo_name}: {db_error}"
+                    )
+        logger.info(f"Saved {len(batch.reports)} reports to database")
 
     if uploaded_urls:
         logger.info(f"Successfully uploaded {len(uploaded_urls)} batch(es)")

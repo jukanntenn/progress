@@ -9,7 +9,7 @@ from progress.markpost import MarkpostClient
 
 
 class TestUrlParsing:
-    """Test URL parsing methods."""
+    """Test URL parsing during initialization."""
 
     @pytest.mark.parametrize(
         "url,expected_base,expected_key",
@@ -19,20 +19,25 @@ class TestUrlParsing:
             ("http://localhost:8080/p/dev-key", "http://localhost:8080", "dev-key"),
         ],
     )
-    def test_extract_base_url(self, url, expected_base, expected_key):
-        """Test base URL extraction."""
-        assert MarkpostClient._extract_base_url(url) == expected_base
-        assert MarkpostClient._extract_post_key(url) == expected_key
+    def test_extract_url_components(self, url, expected_base, expected_key):
+        """Test URL parsing during client initialization."""
+        config = MarkpostConfig(url=url, timeout=30)
+        client = MarkpostClient(config)
+        assert client.base_url == expected_base
+        assert client.post_key == expected_key
 
     def test_extract_invalid_url(self):
-        """Test invalid URL raises exception."""
-        with pytest.raises(ProgressException, match="Invalid markpost URL"):
-            MarkpostClient._extract_base_url("not-a-url")
+        """Test invalid URL raises exception during client initialization."""
+        import pydantic
+        with pytest.raises((ProgressException, pydantic.ValidationError)):
+            config = MarkpostConfig(url="not-a-url", timeout=30)
+            MarkpostClient(config)
 
     def test_extract_missing_path(self):
         """Test URL without path raises exception."""
         with pytest.raises(ProgressException, match="missing path"):
-            MarkpostClient._extract_post_key("https://example.com")
+            config = MarkpostConfig(url="https://example.com", timeout=30)
+            MarkpostClient(config)
 
 
 class TestUrlMasking:
@@ -40,13 +45,17 @@ class TestUrlMasking:
 
     def test_mask_url(self):
         """Test URL masking function."""
-        masked = MarkpostClient._mask_url("https://example.com/p/sensitive-key")
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        client = MarkpostClient(config)
+        masked = client._mask_url("https://example.com/p/sensitive-key")
         assert "sensitive-key" not in masked
         assert "***" in masked
 
     def test_mask_short_key(self):
         """Test masking short keys."""
-        masked = MarkpostClient._mask_url("https://example.com/p/ab")
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        client = MarkpostClient(config)
+        masked = client._mask_url("https://example.com/p/ab")
         assert "ab" not in masked or "***" in masked
 
 
@@ -64,7 +73,7 @@ class TestUpload:
             def raise_for_status(self):
                 pass
 
-        def fake_post(url, json, timeout):
+        def fake_post(*_, **__):
             return FakeResponse()
 
         monkeypatch.setattr(requests, "post", fake_post)
@@ -94,7 +103,7 @@ class TestUpload:
             def raise_for_status(self):
                 pass
 
-        def fake_post(url, json, timeout):
+        def fake_post(*_, **__):
             return FakeResponse()
 
         monkeypatch.setattr(requests, "post", fake_post)
@@ -105,15 +114,15 @@ class TestUpload:
         with pytest.raises(ProgressException, match="missing 'id'"):
             client.upload("content", "title")
 
-    def test_upload_http_error(self, monkeypatch, caplog):
+    def test_upload_http_error(self, monkeypatch):
         """Test upload failure with HTTP error."""
         class FakeResponse:
             status_code = 400
             text = '{"error": "Invalid request"}'
 
-        def fake_post(url, json, timeout):
+        def fake_post(*_, **__):
             e = requests.RequestException()
-            e.response = FakeResponse()
+            e.response = FakeResponse()  # type: ignore[attr-defined]
             raise e
 
         monkeypatch.setattr(requests, "post", fake_post)
@@ -133,7 +142,7 @@ class TestGetStatus:
         class FakeResponse:
             status_code = 200
 
-        def fake_get(url, timeout):
+        def fake_get(*_, **__):
             return FakeResponse()
 
         monkeypatch.setattr(requests, "get", fake_get)
@@ -148,7 +157,7 @@ class TestGetStatus:
         class FakeResponse:
             status_code = 404
 
-        def fake_get(url, timeout):
+        def fake_get(*_, **__):
             return FakeResponse()
 
         monkeypatch.setattr(requests, "get", fake_get)

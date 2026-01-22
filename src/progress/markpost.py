@@ -2,7 +2,7 @@
 
 import logging
 from urllib.parse import urlparse
-from typing import Optional
+from typing import NoReturn, Optional
 
 import requests
 
@@ -13,7 +13,7 @@ from .utils import sanitize
 logger = logging.getLogger(__name__)
 
 
-def _handle_request_exception(exception: requests.RequestException, operation: str) -> None:
+def _handle_request_exception(exception: requests.RequestException, operation: str) -> NoReturn:
     """Handle RequestException by logging and raising ProgressException.
 
     Args:
@@ -45,8 +45,24 @@ class MarkpostClient:
             ProgressException: If URL format is invalid
         """
         full_url = str(config.url)
-        self.base_url = self._extract_base_url(full_url)
-        self.post_key = self._extract_post_key(full_url)
+        parsed_url = urlparse(full_url)
+
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise ProgressException("Invalid markpost URL format: missing scheme or netloc")
+
+        path = parsed_url.path.rstrip('/')
+        if not path:
+            raise ProgressException("Invalid markpost URL: missing path")
+
+        parts = path.split('/')
+        if len(parts) < 2:
+            raise ProgressException("Invalid markpost URL: path too short")
+
+        self.base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        self.post_key = parts[-1]
+        if not self.post_key:
+            raise ProgressException("Invalid markpost URL: empty post key")
+
         self.timeout = config.timeout
 
         logger.debug(
@@ -176,64 +192,7 @@ class MarkpostClient:
         except requests.RequestException as e:
             _handle_request_exception(e, "check post status")
 
-    @staticmethod
-    def _extract_base_url(url: str) -> str:
-        """Extract base URL from markpost URL.
-
-        Args:
-            url: Full markpost URL (e.g., https://example.com/p/key)
-
-        Returns:
-            Base URL (e.g., https://example.com)
-
-        Raises:
-            ProgressException: If URL format is invalid
-
-        Example:
-            >>> MarkpostClient._extract_base_url("https://markpost.example.com/p/test-key")
-            'https://markpost.example.com'
-        """
-        parsed = urlparse(url)
-        if not parsed.scheme or not parsed.netloc:
-            raise ProgressException("Invalid markpost URL format: missing scheme or netloc")
-
-        return f"{parsed.scheme}://{parsed.netloc}"
-
-    @staticmethod
-    def _extract_post_key(url: str) -> str:
-        """Extract post key from markpost URL.
-
-        Args:
-            url: Full markpost URL (e.g., https://example.com/p/key)
-
-        Returns:
-            Post key (e.g., "key")
-
-        Raises:
-            ProgressException: If URL format is invalid
-
-        Example:
-            >>> MarkpostClient._extract_post_key("https://markpost.example.com/p/test-key")
-            'test-key'
-        """
-        parsed = urlparse(url)
-        path = parsed.path.rstrip('/')
-
-        if not path:
-            raise ProgressException("Invalid markpost URL: missing path")
-
-        parts = path.split('/')
-        if len(parts) < 2:
-            raise ProgressException("Invalid markpost URL: path too short")
-
-        post_key = parts[-1]
-        if not post_key:
-            raise ProgressException("Invalid markpost URL: empty post key")
-
-        return post_key
-
-    @staticmethod
-    def _mask_url(url: str) -> str:
+    def _mask_url(self, url: str) -> str:
         """Mask sensitive information in URL for logging.
 
         Args:
@@ -243,7 +202,8 @@ class MarkpostClient:
             Masked URL with post_key partially hidden
 
         Example:
-            >>> MarkpostClient._mask_url("https://example.com/p/sensitive-key")
+            >>> client = MarkpostClient(config)
+            >>> client._mask_url("https://example.com/p/sensitive-key")
             'https://example.com/p/se***ey'
         """
         parsed = urlparse(url)

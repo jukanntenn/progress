@@ -252,7 +252,14 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
 
         if report_size > max_batch_size:
             if current_batch:
-                batches.append(_create_batch(current_batch, current_size, len(batches)))
+                batches.append(
+                    ReportBatch(
+                        reports=current_batch,
+                        total_size=current_size,
+                        batch_index=len(batches),
+                        total_batches=0,
+                    )
+                )
                 current_batch = []
                 current_size = 0
 
@@ -260,11 +267,25 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
                 f"Report for {report.repo_name} ({report_size} bytes) exceeds "
                 f"max_batch_size ({max_batch_size} bytes)"
             )
-            batches.append(_create_batch([report], report_size, len(batches)))
+            batches.append(
+                ReportBatch(
+                    reports=[report],
+                    total_size=report_size,
+                    batch_index=len(batches),
+                    total_batches=0,
+                )
+            )
             continue
 
         if current_batch and current_size + report_size > max_batch_size:
-            batches.append(_create_batch(current_batch, current_size, len(batches)))
+            batches.append(
+                ReportBatch(
+                    reports=current_batch,
+                    total_size=current_size,
+                    batch_index=len(batches),
+                    total_batches=0,
+                )
+            )
             current_batch = []
             current_size = 0
 
@@ -272,7 +293,14 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
         current_size += report_size
 
     if current_batch:
-        batches.append(_create_batch(current_batch, current_size, len(batches)))
+        batches.append(
+            ReportBatch(
+                reports=current_batch,
+                total_size=current_size,
+                batch_index=len(batches),
+                total_batches=0,
+            )
+        )
 
     total_batches = len(batches)
     for batch in batches:
@@ -284,15 +312,3 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
     )
 
     return batches
-
-
-def _create_batch(
-    reports: list, total_size: int, batch_index: int
-) -> ReportBatch:
-    """Helper to create a ReportBatch."""
-    return ReportBatch(
-        reports=reports,
-        total_size=total_size,
-        batch_index=batch_index,
-        total_batches=0,
-    )
