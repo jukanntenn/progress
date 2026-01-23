@@ -52,6 +52,8 @@ class MarkdownReporter:
         total_commits: int,
         repo_statuses: dict[str, str],
         timezone: ZoneInfo = ZoneInfo("UTC"),
+        batch_index: int = 0,
+        total_batches: int = 1,
     ) -> str:
         """Generate aggregated report with status block.
 
@@ -60,6 +62,8 @@ class MarkdownReporter:
             total_commits: Total commit count across all repos
             repo_statuses: Dict mapping repo names to status ("success" | "failed" | "skipped")
             timezone: Timezone for timestamps
+            batch_index: Current batch index (0-based)
+            total_batches: Total number of batches
 
         Returns:
             Complete aggregated Markdown report
@@ -80,4 +84,6 @@ class MarkdownReporter:
             timezone=timezone,
             generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
             iso_time=now.isoformat(),
+            batch_index=batch_index,
+            total_batches=total_batches,
         )

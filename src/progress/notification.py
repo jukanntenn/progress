@@ -38,6 +38,8 @@ class NotificationMessage:
     total_commits: int
     markpost_url: str | None = None
     repo_statuses: Mapping[str, str] | None = None
+    batch_index: int | None = None
+    total_batches: int | None = None
 
     def stats(self) -> NotificationStats:
         statuses = self.repo_statuses or {}
@@ -76,16 +78,23 @@ class FeishuNotification:
 
     def send(self, message: NotificationMessage) -> None:
         card = self._build_card(message)
-        self._post_card(card, title=message.title)
+        title_with_batch = self._add_batch_indicator(message.title, message.batch_index, message.total_batches)
+        self._post_card(card, title=title_with_batch)
 
     def _build_card(self, message: NotificationMessage) -> dict[str, Any]:
+        title_with_batch = self._add_batch_indicator(message.title, message.batch_index, message.total_batches)
         return {
             "msg_type": "interactive",
             "card": {
-                "header": self._build_header(message.title),
+                "header": self._build_header(title_with_batch),
                 "elements": self._build_elements(message),
             },
         }
+
+    def _add_batch_indicator(self, title: str, batch_index: int | None, total_batches: int | None) -> str:
+        if batch_index is not None and total_batches is not None and total_batches > 1:
+            return f"{title} ({batch_index + 1}/{total_batches})"
+        return title
 
     def _build_header(self, title: str) -> dict[str, Any]:
         return {
@@ -230,11 +239,17 @@ class EmailNotification:
         self.jinja_env.globals["_"] = _
 
     def send(self, message: NotificationMessage) -> None:
+        title_with_batch = self._add_batch_indicator(message.title, message.batch_index, message.total_batches)
         html_content = self._render_html(message)
         mime_message = self._build_mime(
-            subject=message.title, html_content=html_content
+            subject=title_with_batch, html_content=html_content
         )
-        self._send_mime(mime_message, subject=message.title)
+        self._send_mime(mime_message, subject=title_with_batch)
+
+    def _add_batch_indicator(self, title: str, batch_index: int | None, total_batches: int | None) -> str:
+        if batch_index is not None and total_batches is not None and total_batches > 1:
+            return f"{title} ({batch_index + 1}/{total_batches})"
+        return title
 
     def _render_html(self, message: NotificationMessage) -> str:
         stats = message.stats()

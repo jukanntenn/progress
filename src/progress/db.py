@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from peewee import CharField
+from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
 from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
@@ -37,9 +39,57 @@ def init_db(db_path: str):
     logger.info(f"Database connection pool initialized: {db_path}")
 
 
+def migrate_database():
+    """Migrate database schema to latest version."""
+    migrator = SqliteMigrator(database)
+
+    cursor = database.execute_sql("PRAGMA table_info(reports)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    if "title" not in existing_columns:
+        logger.info("Migrating: Adding 'title' column to reports table")
+        migrate(
+            migrator.add_column(
+                "reports",
+                "title",
+                CharField(default=""),
+            )
+        )
+        logger.info("Migration completed: 'title' column added")
+
+    cursor = database.execute_sql("PRAGMA table_info(reports)")
+    columns_info = cursor.fetchall()
+    repo_column_info = next((c for c in columns_info if c[1] == "repo"), None)
+
+    if repo_column_info and repo_column_info[3] != 0:
+        logger.info("Migrating: Making 'repo' column nullable in reports table")
+        database.execute_sql(
+            "CREATE TABLE reports_new ("
+            "id INTEGER PRIMARY KEY,"
+            "repo INTEGER NULL REFERENCES repositories(id) ON DELETE CASCADE,"
+            "title VARCHAR NOT NULL DEFAULT '',"
+            "commit_hash VARCHAR NOT NULL,"
+            "previous_commit_hash VARCHAR,"
+            "commit_count INTEGER NOT NULL DEFAULT 1,"
+            "markpost_url VARCHAR,"
+            "content TEXT,"
+            "created_at VARCHAR NOT NULL)"
+        )
+        database.execute_sql(
+            "INSERT INTO reports_new (id, repo, commit_hash, previous_commit_hash, "
+            "commit_count, markpost_url, content, created_at) "
+            "SELECT id, repo, commit_hash, previous_commit_hash, "
+            "commit_count, markpost_url, content, created_at FROM reports"
+        )
+        database.execute_sql("DROP TABLE reports")
+        database.execute_sql("ALTER TABLE reports_new RENAME TO reports")
+        logger.info("Migration completed: 'repo' column is now nullable")
+
+
 def create_tables():
     """Create database tables and migrate schema."""
     database.create_tables([Repository, Report], safe=True)
+    migrate_database()
 
     logger.info("Database tables created")
 
@@ -53,17 +103,19 @@ def close_db():
 
 
 def save_report(
-    repo_id: int,
+    repo_id: int | None,
     commit_hash: str,
     previous_commit_hash: str,
     commit_count: int,
     markpost_url: str | None = None,
     content: str | None = None,
+    title: str = "",
 ) -> int:
     """Save report."""
     with database.atomic():
         report = Report.create(
             repo=repo_id,
+            title=title,
             commit_hash=commit_hash,
             previous_commit_hash=previous_commit_hash,
             commit_count=commit_count,

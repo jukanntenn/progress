@@ -190,6 +190,9 @@ language = "en"
 url = "https://markpost.example.com/p/your-post-key"
 # HTTP 请求超时时间（秒，默认：30）
 timeout = 30
+# 最大批次上传大小（字节，默认：1048576）
+# 超过此大小的报告将被拆分为多个批次上传
+max_batch_size = 1048576
 
 [notification]
 
@@ -290,6 +293,7 @@ enabled = false  # 暂时禁用
 - `timezone` - 时区配置，默认 UTC
 - `language` - 应用程序语言，默认 en
 - `markpost.timeout` - Markpost HTTP 请求超时时间，默认 30 秒
+- `markpost.max_batch_size` - 最大批次上传大小（字节），默认 1048576（1MB）。超过此大小的报告将被拆分为多个批次上传
 - `notification.channels[].type` - 通道类型（例如 feishu / email）
 - `notification.channels[].enabled` - 是否启用该通道，默认 true
 - `notification.channels[].timeout` - 飞书 HTTP 请求超时时间（type=feishu），默认 30 秒

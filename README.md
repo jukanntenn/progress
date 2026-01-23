@@ -190,6 +190,9 @@ language = "en"
 url = "https://markpost.example.com/p/your-post-key"
 # HTTP request timeout (seconds, default: 30)
 timeout = 30
+# Maximum batch size for uploads (bytes, default: 1048576)
+# Reports larger than this will be split into multiple batches
+max_batch_size = 1048576
 
 [notification]
 
@@ -290,6 +293,7 @@ enabled = false  # Temporarily disabled
 - `timezone` - Timezone configuration, default UTC
 - `language` - Application language, default en
 - `markpost.timeout` - Markpost HTTP request timeout, default 30 seconds
+- `markpost.max_batch_size` - Maximum batch size for uploads in bytes, default 1048576 (1MB). Reports larger than this will be split into multiple batches for uploading
 - `notification.feishu.timeout` - Feishu HTTP request timeout, default 30 seconds
 - `notification.email.*` - Email notification configuration (entire section optional)
 - `github.protocol` - Git protocol, default https

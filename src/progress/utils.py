@@ -239,9 +239,13 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
         - Each batch contains at least 1 report
         - If a single report exceeds max_batch_size, it gets its own batch (will be skipped during upload)
         - Batch size is calculated based on rendered report content
+        - Uses 0.8 factor to reserve space for summary/title
     """
     if not reports:
         return []
+
+    effective_limit = int(max_batch_size * 0.8)
+    logger.info(f"Batch size limit: {effective_limit} bytes (0.8 * {max_batch_size})")
 
     batches = []
     current_batch = []
@@ -250,7 +254,7 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
     for report in reports:
         report_size = len(report.content.encode("utf-8"))
 
-        if report_size > max_batch_size:
+        if report_size > effective_limit:
             if current_batch:
                 batches.append(
                     ReportBatch(
@@ -265,7 +269,7 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
 
             logger.warning(
                 f"Report for {report.repo_name} ({report_size} bytes) exceeds "
-                f"max_batch_size ({max_batch_size} bytes)"
+                f"effective_limit ({effective_limit} bytes)"
             )
             batches.append(
                 ReportBatch(
@@ -277,7 +281,7 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
             )
             continue
 
-        if current_batch and current_size + report_size > max_batch_size:
+        if current_batch and current_size + report_size > effective_limit:
             batches.append(
                 ReportBatch(
                     reports=current_batch,
@@ -308,7 +312,7 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
 
     logger.info(
         f"Created {total_batches} batch(es) from {len(reports)} report(s), "
-        f"max_batch_size={max_batch_size} bytes"
+        f"effective_limit={effective_limit} bytes"
     )
 
     return batches

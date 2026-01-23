@@ -58,7 +58,9 @@ class Report(BaseModel):
         Repository,
         backref="reports",
         on_delete="CASCADE",
+        null=True,
     )
+    title = CharField(default="")
     commit_hash = CharField()
     previous_commit_hash = CharField(null=True)
     commit_count = IntegerField(default=1)

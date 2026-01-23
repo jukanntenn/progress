@@ -119,8 +119,9 @@ def process_reports(
         max_batch_size: Maximum batch size in bytes (from config)
 
     Note:
+        - Generates single unified title/summary from full aggregated report
         - Splits reports into batches if total size exceeds max_batch_size
-        - Each batch generates independent title/summary and uploads separately
+        - Each batch uses the same unified title and summary
         - Database save always succeeds even if uploads fail
         - Partial upload failure is handled gracefully
     """
@@ -133,6 +134,27 @@ def process_reports(
         f"(success: {success_count}, failed: {failed_count}, skipped: {skipped_count})"
     )
 
+    logger.info("Generating full aggregated report for title/summary...")
+    full_aggregated_report = reporter.generate_aggregated_report(
+        check_result.reports,
+        check_result.total_commits,
+        check_result.repo_statuses,
+        timezone,
+    )
+
+    logger.info("Generating unified title and summary...")
+    try:
+        unified_title, unified_summary = analyzer.generate_title_and_summary(
+            full_aggregated_report
+        )
+        logger.info(f"Generated unified title: {unified_title}")
+    except Exception as e:
+        logger.warning(f"Failed to generate title/summary: {e}, using defaults")
+        unified_title = _("Progress Report for Open Source Projects - {date}").format(
+            date=get_now(timezone).strftime("%Y-%m-%d %H:%M")
+        )
+        unified_summary = ""
+
     if max_batch_size:
         batches = create_report_batches(check_result.reports, max_batch_size)
         logger.info(
@@ -143,6 +165,7 @@ def process_reports(
 
     uploaded_urls = []
     upload_errors = []
+    first_batch_url = None
 
     for batch in batches:
         markpost_url = None
@@ -158,15 +181,13 @@ def process_reports(
                 check_result.total_commits,
                 check_result.repo_statuses,
                 timezone,
+                batch_index=batch.batch_index,
+                total_batches=batch.total_batches,
             )
 
-            batch_context = {
-                "batch_index": batch.batch_index,
-                "total_batches": batch.total_batches,
-            }
-            title, final_report = generate_report_title_and_content(
-                analyzer, batch_report, timezone, batch_context
-            )
+            final_report = batch_report
+            if unified_summary.strip():
+                final_report = f"{unified_summary.strip()}\n\n{batch_report}"
 
             first_report = batch.reports[0]
             report_size = len(first_report.content.encode("utf-8"))
@@ -191,12 +212,14 @@ def process_reports(
                 )
                 markpost_url = markpost_client.upload_batch(
                     final_report,
-                    title,
+                    unified_title,
                     batch_index=batch.batch_index,
                     total_batches=batch.total_batches,
                 )
                 logger.info(f"Batch {batch.batch_index + 1} uploaded: {markpost_url}")
                 uploaded_urls.append(markpost_url)
+                if batch.batch_index == 0:
+                    first_batch_url = markpost_url
 
         except Exception as e:
             error_msg = f"Batch {batch.batch_index + 1}: {str(e)}"
@@ -216,14 +239,64 @@ def process_reports(
                         commit_hash=report.current_commit,
                         previous_commit_hash=report.previous_commit or "",
                         commit_count=report.commit_count,
-                        markpost_url=markpost_url,
+                        markpost_url="",
                         content=report.content,
+                        title="",
                     )
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save report for {report.repo_name}: {db_error}"
                     )
         logger.info(f"Saved {len(batch.reports)} reports to database")
+
+        if markpost_url:
+            batch_commit_count = sum(r.commit_count for r in batch.reports)
+            summary_text = _(
+                "This report covered {count} projects with {commits} commits total"
+            ).format(
+                count=len(batch.reports), commits=batch_commit_count
+            )
+
+            batch_repo_statuses = {
+                name: status
+                for name, status in check_result.repo_statuses.items()
+                if any(r.repo_name == name for r in batch.reports)
+            }
+
+            logger.info(f"Sending notification for batch {batch.batch_index + 1}...")
+            notification_manager.send(
+                NotificationMessage(
+                    title=_("Progress Report for Open Source Projects"),
+                    total_commits=batch_commit_count,
+                    summary=summary_text,
+                    markpost_url=markpost_url,
+                    repo_statuses=batch_repo_statuses,
+                    batch_index=batch.batch_index,
+                    total_batches=batch.total_batches,
+                )
+            )
+
+    logger.info("Saving aggregated report to database...")
+    try:
+        aggregated_report_with_summary = full_aggregated_report
+        if unified_summary.strip():
+            aggregated_report_with_summary = (
+                f"{unified_summary.strip()}\n\n{full_aggregated_report}"
+            )
+
+        aggregated_markpost_url = first_batch_url if len(batches) == 1 else ""
+        save_report(
+            repo_id=None,
+            commit_hash="",
+            previous_commit_hash="",
+            commit_count=check_result.total_commits,
+            markpost_url=aggregated_markpost_url,
+            content=aggregated_report_with_summary,
+            title=unified_title,
+        )
+        logger.info("Aggregated report saved to database")
+    except Exception as db_error:
+        logger.error(f"Failed to save aggregated report: {db_error}")
 
     if uploaded_urls:
         logger.info(f"Successfully uploaded {len(uploaded_urls)} batch(es)")
@@ -236,25 +309,6 @@ def process_reports(
         )
         for error in upload_errors:
             logger.warning(f"  - {error}")
-
-    summary_text = _(
-        "This report covered {count} projects with {commits} commits total"
-    ).format(
-        count=len(check_result.reports), commits=check_result.total_commits
-    )
-
-    notification_url = uploaded_urls[0] if uploaded_urls else None
-
-    logger.info("Sending notifications...")
-    notification_manager.send(
-        NotificationMessage(
-            title=_("Progress Report for Open Source Projects"),
-            total_commits=check_result.total_commits,
-            summary=summary_text,
-            markpost_url=notification_url,
-            repo_statuses=check_result.repo_statuses,
-        )
-    )
 
 
 @click.command()
