@@ -7,27 +7,77 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 Keep this section up to date with the project structure. Use it as a reference to find files and directories.
 
 ```text
-src/progress/
-├── __init__.py         # Package initialization
-├── cli.py              # CLI entry point and main flow control
-├── config.py           # Configuration file loading and validation
-├── consts.py           # Constants definition
-├── enums.py            # Enum definitions
-├── models.py           # Peewee ORM model definitions
-├── db.py               # Database operations
-├── errors.py           # Custom errors and exceptions
-├── log.py              # Logging configuration
-├── github.py           # GitHub CLI interactions (clone, sync, diff)
-├── repository.py       # Repository manager
-├── analyzer.py         # Claude Code analyzer
-├── reporter.py         # Markdown report generator (Jinja2)
-├── notifier.py         # Feishu webhook and email notifications
-├── utils.py            # Utility functions
-└── templates/          # Jinja2 template files
-    ├── repository_report.j2
-    ├── aggregated_report.j2
-    ├── analysis_prompt.j2
-    └── email_notification.j2
+progress/
+├── pyproject.toml          # Project configuration
+├── config.example.toml     # Example configuration file
+├── requirements.txt        # Dependencies list
+├── uv.lock                # uv lock file
+├── README.md              # Project README (English)
+├── README_zh.md           # Project README (Chinese)
+├── CLAUDE.md              # Project instructions
+├── .gitignore             # Git ignore file
+├── .dockerignore          # Docker ignore file
+├── .github/               # GitHub workflow files
+├── .claude/               # Claude Code configuration
+├── config/                # Configuration files directory
+│   ├── docker.toml       # Docker configuration
+│   ├── full.toml         # Full configuration
+│   └── simple.toml       # Simple configuration
+├── data/                  # Application data directory
+│   ├── progress.db       # SQLite database
+│   ├── progress.log      # Application log
+│   └── repos/            # Repositories data
+├── docker/                # Docker configuration files
+│   ├── Dockerfile        # Docker container definition
+│   ├── docker-compose.yml # Docker Compose configuration
+│   ├── build.sh          # Docker build script
+│   └── entrypoint.sh     # Docker entrypoint script
+├── devops/                # DevOps related files
+├── guides/                # Guide documentation
+│   ├── config.md         # Configuration guide
+│   ├── i18n.md           # Internationalization guide
+│   └── testing.md        # Testing guide
+├── scripts/               # Utility scripts
+│   ├── compilemessages.sh # Compile localization messages
+│   └── makemessages.sh   # Generate localization messages
+├── src/                   # Source code directory
+│   └── progress/          # Main package directory
+│       ├── __init__.py    # Package initialization
+│       ├── cli.py         # CLI entry point
+│       ├── config.py      # Configuration management
+│       ├── consts.py      # Constants
+│       ├── db.py          # Database operations
+│       ├── enums.py       # Enum definitions
+│       ├── errors.py      # Custom errors
+│       ├── github.py      # GitHub CLI interactions
+│       ├── i18n.py        # Internationalization
+│       ├── log.py         # Logging
+│       ├── markpost.py    # Markpost functionality
+│       ├── models.py      # Peewee ORM models
+│       ├── notification.py # Notifications
+│       ├── notifier.py    # Notifications (legacy)
+│       ├── repo.py        # Repository management
+│       ├── repository.py  # Extended repository operations
+│       ├── reporter.py    # Markdown report generator
+│       └── utils.py       # Utility functions
+│       ├── templates/     # Jinja2 template files
+│       │   ├── repository_report.j2
+│       │   ├── aggregated_report.j2
+│       │   ├── analysis_prompt.j2
+│       │   └── email_notification.j2
+│       └── locales/       # Localization files
+│           ├── progress.pot
+│           └── zh-hans/
+│               └── LC_MESSAGES/
+│                   └── progress.po
+└── tests/                 # Test files directory
+    ├── __init__.py
+    ├── test_analyzer.py
+    ├── test_config.py
+    ├── test_github.py
+    ├── test_repo.py
+    ├── test_markpost.py
+    └── test_utils.py
 ```
 
 ## Commands
@@ -54,7 +104,7 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 - Prefer using dbhub MCP instead of bash commands for database-related operations
 - Prefer using Context7 MCP when need library/API documentation, code generation, setup or configuration steps without having to explicitly ask
 - Prior to running any external tool (e.g., gh, claude) within the code, it is recommended to verify its usage by using the help parameter (e.g., `gh repo clone --help`)
-- English shall be used for comments, documentation, log messages and exception information in code
+- English shall be used for comments, documentation, log messages and exception information in code except for those intended to be targeted to other languages (e.g., Chinese documentation / prompt files)
 - For adding or modifying configuration items, refer to `guides/config.md`
 - For writing test code, refer to `guides/testing.md`
 - For i18n, refer to `guides/i18n.md`
