@@ -59,14 +59,14 @@ def migrate_database():
 
     cursor = database.execute_sql("PRAGMA table_info(reports)")
     columns_info = cursor.fetchall()
-    repo_column_info = next((c for c in columns_info if c[1] == "repo"), None)
+    repo_column_info = next((c for c in columns_info if c[1] == "repo_id"), None)
 
     if repo_column_info and repo_column_info[3] != 0:
         logger.info("Migrating: Making 'repo' column nullable in reports table")
         database.execute_sql(
             "CREATE TABLE reports_new ("
             "id INTEGER PRIMARY KEY,"
-            "repo INTEGER NULL REFERENCES repositories(id) ON DELETE CASCADE,"
+            "repo_id INTEGER NULL REFERENCES repositories(id) ON DELETE CASCADE,"
             "title VARCHAR NOT NULL DEFAULT '',"
             "commit_hash VARCHAR NOT NULL,"
             "previous_commit_hash VARCHAR,"
@@ -76,9 +76,9 @@ def migrate_database():
             "created_at VARCHAR NOT NULL)"
         )
         database.execute_sql(
-            "INSERT INTO reports_new (id, repo, commit_hash, previous_commit_hash, "
+            "INSERT INTO reports_new (id, repo_id, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at) "
-            "SELECT id, repo, commit_hash, previous_commit_hash, "
+            "SELECT id, repo_id, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at FROM reports"
         )
         database.execute_sql("DROP TABLE reports")
