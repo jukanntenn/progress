@@ -7,31 +7,20 @@ Branch: {{ branch }}
 **WARNING**: The diff was truncated due to size limitations (original: {{ original_diff_length }} chars, analyzed: {{ analyzed_diff_length }} chars). Analysis is based on partial diff.
 {% endif %}
 
-Your task: Analyze the code diff from stdin and generate a Markdown report with ONLY the analysis content.
+Your task: Analyze the code diff from stdin and generate a JSON output with summary and detail.
 
 CRITICAL FORMAT REQUIREMENTS:
-1. DO NOT output repository name, branch, commit list, or any metadata - ONLY analysis
-2. Start immediately with "### Summary" (or its translated equivalent)
-3. Use exactly "### Summary" followed by "### Detailed Analysis" as section headers
-4. DO NOT add any introductory text before "### Summary"
+1. You MUST output ONLY a valid JSON object (no markdown, no code blocks, no explanations)
+2. The JSON must have exactly two fields: "summary" and "detail"
+3. DO NOT output any text before or after the JSON
 
 Remember: Analyze ONLY the diff content from stdin for repository "{{ repo_name }}".
 
-Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output **INCLUDING HEADERS**.
-For example, if the language is "zh":
-- Use "### 摘要" instead of "### Summary"
-- Use "### 详细分析" instead of "### Detailed Analysis"
+Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output.
+For example, if the language is "zh", both summary and detail must be in Chinese.
 
-Required output structure:
-
-### Summary
-[Provide a brief 1-2 paragraph summary of the main changes from the stdin diff]
-
-### Detailed Analysis
-[Provide detailed analysis of the code changes from stdin, including:
-- Breaking changes
-- Added public APIs
-- Removed public APIs
-- Important feature modifications
-- Performance-related changes
-- Any other significant changes]
+Required JSON structure:
+{
+  "summary": "[A brief 1-2 paragraph summary of the main changes from the stdin diff]",
+  "detail": "[Detailed analysis of the code changes from stdin, including: Breaking changes, Added public APIs, Removed public APIs, Important feature modifications, Performance-related changes, Any other significant changes. This should be formatted as Markdown with appropriate headers and bullet points.]"
+}

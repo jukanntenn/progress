@@ -52,7 +52,8 @@ class RepositoryReport:
     current_commit: str
     previous_commit: str | None
     commit_messages: list[str]
-    analysis_markdown: str
+    analysis_summary: str
+    analysis_detail: str
     truncated: bool
     original_diff_length: int
     analyzed_diff_length: int
@@ -61,7 +62,7 @@ class RepositoryReport:
     def content(self) -> str:
         if hasattr(self, "_content"):
             return self._content
-        return self.analysis_markdown
+        return f"{self.analysis_summary}\n\n{self.analysis_detail}"
 
     @content.setter
     def content(self, value: str):
@@ -246,7 +247,7 @@ class RepositoryManager:
 
         self.logger.info(f"Found {commit_count} new commits")
         self.logger.info("Analyzing code changes...")
-        analysis_markdown, truncated, original_length, analyzed_length = (
+        analysis_summary, analysis_detail, truncated, original_length, analyzed_length = (
             self.analyzer.analyze_diff(repo.name, repo.branch, diff, commit_messages)
         )
 
@@ -264,7 +265,8 @@ class RepositoryManager:
             current_commit=current_commit,
             previous_commit=previous_commit,
             commit_messages=commit_messages,
-            analysis_markdown=analysis_markdown,
+            analysis_summary=analysis_summary,
+            analysis_detail=analysis_detail,
             truncated=truncated,
             original_diff_length=original_length,
             analyzed_diff_length=analyzed_length,

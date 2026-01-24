@@ -87,6 +87,10 @@ msgstr "查看详细报告"
 msgid "Diff truncated"
 msgstr "Diff 已截断"
 
+#: /home/alice/Workspace/progress/src/progress/templates/repository_report.j2:25
+msgid "Click to view detailed analysis"
+msgstr "点击查看详细分析"
+
 #: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:48
 msgid "Report Summary"
 msgstr "报告摘要"

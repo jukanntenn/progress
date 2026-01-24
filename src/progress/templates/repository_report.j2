@@ -15,10 +15,16 @@
 {{ msg }}
 </details>
 {% else %}
-{{ msg }} 
+{{ msg }}
 {% endif %}
 {% endfor %}
 
-{{ report.analysis_markdown }}
+{{ report.analysis_summary }}
+
+<details>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
+
+{{ report.analysis_detail }}
+</details>
 
 ---

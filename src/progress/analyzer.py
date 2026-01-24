@@ -1,6 +1,8 @@
 """Claude Code analyzer."""
 
+import json
 import logging
+import re
 import tempfile
 from pathlib import Path
 
@@ -45,8 +47,8 @@ class ClaudeCodeAnalyzer:
         branch: str,
         diff: str,
         commit_messages: list[str],
-    ) -> tuple[str, bool, int, int]:
-        """Analyze code diff and return Markdown report.
+    ) -> tuple[str, str, bool, int, int]:
+        """Analyze code diff and return summary and detail.
 
         Args:
             repo_name: Repository name
@@ -55,7 +57,7 @@ class ClaudeCodeAnalyzer:
             commit_messages: List of commit messages
 
         Returns:
-            (markdown_report, truncated, original_diff_length, analyzed_diff_length)
+            (summary, detail, truncated, original_diff_length, analyzed_diff_length)
         """
         original_length = len(diff)
         truncated = False
@@ -87,9 +89,9 @@ class ClaudeCodeAnalyzer:
                 len(diff),
             )
             logger.info(f"Analyzing code changes for {repo_name}...")
-            markdown_report = self._run_claude_analysis(diff, prompt)
+            summary, detail = self._run_claude_analysis(diff, prompt)
 
-            return markdown_report, truncated, original_length, len(diff)
+            return summary, detail, truncated, original_length, len(diff)
 
     def generate_title_and_summary(self, aggregated_report: str) -> tuple[str, str]:
         """Generate title and summary from aggregated report.
@@ -168,7 +170,7 @@ Here is the aggregated report:
             analyzed_diff_length=analyzed_length,
         )
 
-    def _run_claude_analysis(self, diff: str, prompt: str) -> str:
+    def _run_claude_analysis(self, diff: str, prompt: str) -> tuple[str, str]:
         """Execute claude-code CLI analysis.
 
         Args:
@@ -176,12 +178,13 @@ Here is the aggregated report:
             prompt: Analysis prompt
 
         Returns:
-            Claude analysis output
+            (summary, detail) tuple
 
         Raises:
-            AnalysisException: If analysis fails
+            AnalysisException: If analysis fails or JSON is invalid
         """
         cmd = [self.claude_code_path, "-p", prompt]
+        output = ""
 
         try:
             output = run_command(
@@ -192,8 +195,23 @@ Here is the aggregated report:
             )
 
             logger.debug(f"Claude output length: {len(output)}")
-            return output
 
+            json_str = self._extract_json(output)
+            data = json.loads(json_str)
+
+            summary = data.get("summary", "")
+            detail = data.get("detail", "")
+
+            if not summary or not detail:
+                logger.error("JSON response missing required fields")
+                raise AnalysisException("Invalid JSON response: missing 'summary' or 'detail' field")
+
+            return summary, detail
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude output: {e}")
+            logger.debug(f"Raw output: {output}")
+            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
         except Exception as e:
             from .errors import CommandException
             if isinstance(e, CommandException):
@@ -205,3 +223,25 @@ Here is the aggregated report:
                     f"Claude Code executable not found: {self.claude_code_path}"
                 ) from e
             raise
+
+    def _extract_json(self, output: str) -> str:
+        """Extract JSON from output, handling markdown code blocks.
+
+        Args:
+            output: Raw output from Claude
+
+        Returns:
+            Extracted JSON string
+
+        Raises:
+            AnalysisException: If JSON cannot be extracted
+        """
+        output = output.strip()
+
+        json_pattern = r'\{[\s\S]*\}'
+        match = re.search(json_pattern, output)
+
+        if match:
+            return match.group(0)
+
+        raise AnalysisException("Could not extract JSON from Claude output")
