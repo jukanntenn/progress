@@ -7,8 +7,8 @@ from typing import NoReturn, Optional
 import requests
 
 from .config import MarkpostConfig
-from .errors import ProgressException
-from .utils import sanitize
+from .errors import ClientError, ProgressException
+from .utils import retry, sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,19 @@ class MarkpostClient:
             f"timeout={self.timeout}"
         )
 
+    @staticmethod
+    def _check_http_status(_args, _kwargs, error, _attempt):
+        status_code = getattr(error.response, 'status_code', None) if hasattr(error, 'response') else None
+        if status_code and 400 <= status_code < 500:
+            raise ClientError(f"Client error {status_code}: not retrying") from error
+
+    @retry(
+        times=3,
+        initial_delay=5,
+        backoff="exponential",
+        exceptions=(requests.RequestException,),
+        on_retry=lambda args, kwargs, error, attempt: MarkpostClient._check_http_status(args, kwargs, error, attempt),
+    )
     def upload(self, content: str, title: Optional[str] = None) -> str:
         """Upload content to Markpost and return the published URL.
 
@@ -98,28 +111,20 @@ class MarkpostClient:
         url = f"{self.base_url}/{self.post_key}"
         payload = {"title": title or "", "body": content}
 
-        try:
-            logger.info(f"Uploading content to Markpost: {self._mask_url(url)}")
-            response = requests.post(url, json=payload, timeout=self.timeout)
-            response.raise_for_status()
+        logger.info(f"Uploading content to Markpost: {self._mask_url(url)}")
+        response = requests.post(url, json=payload, timeout=self.timeout)
+        response.raise_for_status()
 
-            result = response.json()
-            post_id = result.get("id")
+        result = response.json()
+        post_id = result.get("id")
 
-            if not post_id:
-                logger.error("Markpost API response missing 'id' field")
-                raise ProgressException("Invalid Markpost API response: missing 'id'")
+        if not post_id:
+            logger.error("Markpost API response missing 'id' field")
+            raise ProgressException("Invalid Markpost API response: missing 'id'")
 
-            published_url = f"{self.base_url}/{post_id}"
-            logger.info(f"Content uploaded successfully: {published_url}")
-            return published_url
-
-        except requests.RequestException as e:
-            response_text = getattr(e.response, 'text', 'N/A')
-            logger.error(
-                f"Failed to upload to Markpost: response={response_text[:200]}"
-            )
-            _handle_request_exception(e, "upload to Markpost")
+        published_url = f"{self.base_url}/{post_id}"
+        logger.info(f"Content uploaded successfully: {published_url}")
+        return published_url
 
     def upload_batch(
         self,

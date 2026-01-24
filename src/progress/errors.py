@@ -29,3 +29,9 @@ class CommandException(ProgressException):
     """Raised when external command execution fails."""
 
     pass
+
+
+class ClientError(ProgressException):
+    """Raised when HTTP 4XX client errors occur and should not be retried."""
+
+    pass

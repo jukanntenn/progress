@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from progress.config import MarkpostConfig
-from progress.errors import ProgressException
+from progress.errors import ClientError, ProgressException
 from progress.markpost import MarkpostClient
 
 
@@ -114,13 +114,16 @@ class TestUpload:
         with pytest.raises(ProgressException, match="missing 'id'"):
             client.upload("content", "title")
 
-    def test_upload_http_error(self, monkeypatch):
-        """Test upload failure with HTTP error."""
+    def test_upload_4xx_error_no_retry(self, monkeypatch):
+        """Test 4XX errors raise ClientError and are not retried."""
+        call_count = []
+
         class FakeResponse:
             status_code = 400
             text = '{"error": "Invalid request"}'
 
         def fake_post(*_, **__):
+            call_count.append(1)
             e = requests.RequestException()
             e.response = FakeResponse()  # type: ignore[attr-defined]
             raise e
@@ -130,8 +133,34 @@ class TestUpload:
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
         client = MarkpostClient(config)
 
-        with pytest.raises(ProgressException, match="Failed to upload.*status: 400"):
+        with pytest.raises(ClientError, match="Client error 400"):
             client.upload("content", "title")
+
+        assert len(call_count) == 1, "4XX errors should not be retried"
+
+    def test_upload_5xx_error_with_retry(self, monkeypatch):
+        """Test 5XX errors are retried (3 attempts total)."""
+        call_count = []
+
+        class FakeResponse:
+            status_code = 500
+            text = '{"error": "Internal server error"}'
+
+        def fake_post(*_, **__):
+            call_count.append(1)
+            e = requests.RequestException()
+            e.response = FakeResponse()  # type: ignore[attr-defined]
+            raise e
+
+        monkeypatch.setattr(requests, "post", fake_post)
+
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        client = MarkpostClient(config)
+
+        with pytest.raises(requests.RequestException):
+            client.upload("content", "title")
+
+        assert len(call_count) == 3, "5XX errors should be retried 3 times"
 
 
 class TestGetStatus:
