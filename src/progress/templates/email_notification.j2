@@ -12,6 +12,7 @@
         .metric-label { font-weight: bold; color: #666; }
         .metric-value { font-size: 24px; color: #1890ff; margin-top: 5px; }
         .summary { margin: 20px 0; padding: 15px; background-color: #fff; border-left: 4px solid #1890ff; }
+        hr { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
         .status-list { margin: 20px 0; padding: 15px; }
         .status-title { font-weight: bold; margin-bottom: 10px; }
         .button { text-align: center; margin: 20px 0; }
@@ -25,6 +26,13 @@
             <h2>{{ subject }}</h2>
         </div>
         <div class="content">
+            <div class="summary">
+                <strong>{{ _("Overview") }}</strong>
+                <p>{{ summary }}</p>
+            </div>
+
+            <hr>
+
             <div class="metrics">
                 <div class="metric">
                     <div class="metric-label">{{ _("Total Repositories") }}</div>
@@ -42,11 +50,6 @@
                     <div class="metric-label">{{ _("Failed") }}</div>
                     <div class="metric-value">{{ failed_count }}</div>
                 </div>
-            </div>
-
-            <div class="summary">
-                <strong>{{ _("Report Summary") }}</strong>
-                <p>{{ summary }}</p>
             </div>
 
             {% if failed_repos %}

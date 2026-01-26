@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-23 12:29+0800\n"
+"POT-Creation-Date: 2026-01-26 13:50+0800\n"
 "PO-Revision-Date: 2026-01-16 12:00+0000\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -16,12 +16,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: /home/alice/Workspace/progress/src/progress/analyzer.py:131
-#: /home/alice/Workspace/progress/src/progress/cli.py:277
+#: /home/alice/Workspace/progress/src/progress/analyzer.py:133
+#: /home/alice/Workspace/progress/src/progress/cli.py:269
 msgid "Progress Report for Open Source Projects"
 msgstr "开源项目进度报告"
 
-#: /home/alice/Workspace/progress/src/progress/analyzer.py:132
+#: /home/alice/Workspace/progress/src/progress/analyzer.py:134
 msgid "A progress report for open source projects."
 msgstr "一份开源项目进度报告"
 
@@ -31,55 +31,56 @@ msgstr "一份开源项目进度报告"
 msgid "Progress Report for Open Source Projects - {date}"
 msgstr "开源项目进度报告 - {date}"
 
-#: /home/alice/Workspace/progress/src/progress/templates/aggregated_report.j2:21
-msgid "More reports will follow in the next batch..."
-msgstr "更多报告将在下一批次中继续..."
-
-#: /home/alice/Workspace/progress/src/progress/cli.py:263
+#: /home/alice/Workspace/progress/src/progress/cli.py:255
 #, python-brace-format
 msgid "This report covered {count} projects with {commits} commits total"
 msgstr "本报告涵盖了 {count} 个项目，总计 {commits} 个提交"
 
-#: /home/alice/Workspace/progress/src/progress/cli.py:357
+#: /home/alice/Workspace/progress/src/progress/cli.py:350
 msgid "No repositories with new changes, skipping report generation"
 msgstr "没有仓库有新变更，跳过报告生成"
 
-#: /home/alice/Workspace/progress/src/progress/cli.py:360
+#: /home/alice/Workspace/progress/src/progress/cli.py:353
 msgid "All repository checks completed"
 msgstr "所有仓库检查完成"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:114
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:54
+#: /home/alice/Workspace/progress/src/progress/notification.py:120
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:57
 msgid "Failed Repositories"
 msgstr "失败的仓库"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:121
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:66
+#: /home/alice/Workspace/progress/src/progress/notification.py:127
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:69
 msgid "Skipped Repositories"
 msgstr "跳过的仓库"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:148
+#: /home/alice/Workspace/progress/src/progress/notification.py:140
 #: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:30
+msgid "Overview"
+msgstr "概览"
+
+#: /home/alice/Workspace/progress/src/progress/notification.py:155
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:38
 msgid "Total Repositories"
 msgstr "总仓库数"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:149
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:34
+#: /home/alice/Workspace/progress/src/progress/notification.py:156
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:42
 msgid "Total Commits"
 msgstr "总提交数"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:150
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:38
+#: /home/alice/Workspace/progress/src/progress/notification.py:157
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:46
 msgid "Successful"
 msgstr "成功"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:151
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:42
+#: /home/alice/Workspace/progress/src/progress/notification.py:158
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:50
 msgid "Failed"
 msgstr "失败"
 
-#: /home/alice/Workspace/progress/src/progress/notification.py:191
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:78
+#: /home/alice/Workspace/progress/src/progress/notification.py:198
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:81
 msgid "View Detailed Report"
 msgstr "查看详细报告"
 
@@ -91,17 +92,17 @@ msgstr "Diff 已截断"
 msgid "Click to view detailed analysis"
 msgstr "点击查看详细分析"
 
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:48
-msgid "Report Summary"
-msgstr "报告摘要"
-
-#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:83
+#: /home/alice/Workspace/progress/src/progress/templates/email_notification.j2:86
 msgid "This email was sent automatically by Progress, please do not reply."
 msgstr "此邮件由 Progress 自动发送，请勿回复。"
 
-#: /home/alice/Workspace/progress/src/progress/templates/aggregated_report.j2:17
+#: /home/alice/Workspace/progress/src/progress/templates/aggregated_report.j2:19
+msgid "More reports will follow in the next batch..."
+msgstr "更多报告将在下一批次中继续..."
+
+#: /home/alice/Workspace/progress/src/progress/templates/aggregated_report.j2:22
 msgid "This report is generated by"
 msgstr "报告生成工具："
 
-#~ msgid "Overview"
-#~ msgstr "概览"
+#~ msgid "Report Summary"
+#~ msgstr "报告摘要"
