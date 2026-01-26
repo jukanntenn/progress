@@ -1,6 +1,6 @@
 ---
 # Usage:
-# ANSIBLE_STDOUT_CALLBACK=yaml ansible-playbook -i ansible/hosts.yml ansible/main.yml --vault-password-file ~/.ansible-vault/progress.pwd
+# ANSIBLE_STDOUT_CALLBACK=yaml ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml --vault-password-file ~/.ansible-vault/progress.pwd
 
 - name: Deploy progress
   hosts: oect
