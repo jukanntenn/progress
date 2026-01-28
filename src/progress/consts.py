@@ -43,7 +43,7 @@ REPO_URL_PATTERNS = [
 ]
 
 # ==================== Database Configuration ====================
-DB_MAX_CONNECTIONS = 5
+DB_MAX_CONNECTIONS = 20
 DB_STALE_TIMEOUT = 300  # 5 minutes
 DB_JOURNAL_MODE = "wal"
 DB_SYNCHRONOUS = "NORMAL"

@@ -120,6 +120,14 @@ class AnalysisConfig(BaseModel):
     first_run_lookback_commits: int = Field(default=3, ge=1)
 
 
+class WebConfig(BaseModel):
+    """Web service configuration."""
+
+    enabled: bool = False
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=5000, ge=1, le=65535)
+
+
 class RepositoryConfig(BaseModel):
     """Repository configuration."""
 
@@ -152,6 +160,7 @@ class Config(BaseSettings):
     notification: NotificationConfig
     github: GitHubConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    web: WebConfig = Field(default_factory=WebConfig)
     repos: List[RepositoryConfig] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(

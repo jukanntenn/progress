@@ -31,6 +31,65 @@ setup_timezone() {
     log "Timezone set to: $tz"
 }
 
+# Start web service if enabled
+start_web_service() {
+    local web_enabled="false"
+
+    # Read web.enabled configuration from file
+    if [ -f "$CONFIG_FILE" ]; then
+        web_enabled=$(grep -A2 '^\[web\]' "$CONFIG_FILE" | grep '^[[:space:]]*enabled[[:space:]]*=' | cut -d'=' -f2 | tr -d '"\047' | cut -d'#' -f1 | xargs | tr '[:upper:]' '[:lower:]')
+        web_enabled=${web_enabled:-false}
+    fi
+
+    if [ "$web_enabled" = "true" ]; then
+        log "Starting web service..."
+        export PYTHONPATH=/app/src
+
+        # Read web host and port from config
+        local web_host=$(grep -A5 '^\[web\]' "$CONFIG_FILE" | grep '^[[:space:]]*host[[:space:]]*=' | cut -d'=' -f2 | tr -d '"\047' | cut -d'#' -f1 | xargs)
+        local web_port=$(grep -A5 '^\[web\]' "$CONFIG_FILE" | grep '^[[:space:]]*port[[:space:]]*=' | cut -d'=' -f2 | tr -d '"\047' | cut -d'#' -f1 | xargs)
+        web_host=${web_host:-0.0.0.0}
+        web_port=${web_port:-5000}
+
+        # Try gunicorn first, fallback to python
+        if command -v gunicorn >/dev/null 2>&1; then
+            log "Using gunicorn to start web service..."
+            gunicorn -w 2 -b "$web_host:$web_port" \
+                --access-logfile - \
+                --error-logfile - \
+                --log-level info \
+                --capture-output \
+                "progress.web:create_app()" &
+        else
+            log "Gunicorn not found, using Flask development server..."
+            cat > /tmp/run_web.py << 'EOFPYTHON'
+import sys
+sys.path.insert(0, '/app/src')
+
+from progress.config import Config
+from progress.web import create_app
+
+config = Config.load_from_file('/app/config.toml')
+app = create_app(config)
+app.run(host='0.0.0.0', port=5000, debug=False)
+EOFPYTHON
+            python /tmp/run_web.py &
+        fi
+
+        local web_pid=$!
+        sleep 2
+
+        # Check if web service is still running
+        if kill -0 $web_pid 2>/dev/null; then
+            log "Web service started on http://$web_host:$web_port (PID: $web_pid)"
+        else
+            log "Error: Web service failed to start. Check logs above for errors."
+        fi
+    else
+        log "Web service is disabled"
+    fi
+}
+
 # Configure SSH to automatically accept new host keys (solves SSH connection issues in Docker containers)
 log "Configuring SSH client..."
 mkdir -p ~/.ssh
@@ -40,6 +99,9 @@ log "SSH configuration completed"
 
 # Setup timezone
 setup_timezone
+
+# Start web service if enabled
+start_web_service
 
 # Create supercronic configuration directory
 mkdir -p /etc/supercronic

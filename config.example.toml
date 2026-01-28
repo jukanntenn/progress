@@ -91,6 +91,17 @@ timeout = 600
 # This is independent from the top-level language setting
 language = "zh"
 
+# ========== Web Service Configuration ==========
+[web]
+# Enable or disable web service (optional, default: false)
+# When enabled, a web server will start alongside the scheduled tasks
+enabled = false
+# Web service host address (optional, default: 0.0.0.0)
+# Use 0.0.0.0 to listen on all interfaces
+host = "0.0.0.0"
+# Web service port (optional, default: 5000)
+port = 5000
+
 # ========== Repository Configuration ==========
 [[repos]]
 # GitHub repository format: owner/repo

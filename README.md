@@ -9,6 +9,7 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 - **Multi-repo Monitoring** - Monitor multiple GitHub repositories simultaneously and track code changes
 - **AI-Powered Analysis** - Use Claude Code CLI to analyze code changes and generate Markdown analysis reports
 - **Notifications** - Support for Feishu and email notifications to deliver analysis reports timely
+- **Web Service** - Built-in web interface for browsing aggregated reports and RSS feed support
 - **Docker Deployment** - Containerized deployment with Docker, ready to run in as fast as one minute
 
 ## Requirements
@@ -244,6 +245,16 @@ timeout = 600
 # This is independent from the top-level language setting
 language = "zh"
 
+[web]
+# Enable or disable web service (optional, default: false)
+# When enabled, a web server will start alongside the scheduled tasks
+enabled = false
+# Web service host address (optional, default: 0.0.0.0)
+# Use 0.0.0.0 to listen on all interfaces
+host = "0.0.0.0"
+# Web service port (optional, default: 5000)
+port = 5000
+
 # Repository configuration (at least one required)
 [[repos]]
 # GitHub repository format: owner/repo (recommended format, concise and clear)
@@ -304,6 +315,9 @@ enabled = false  # Temporarily disabled
 - `analysis.concurrency` - Concurrent analysis count, default 1
 - `analysis.timeout` - Analysis timeout, default 600 seconds
 - `analysis.language` - AI analysis output language, default en
+- `web.enabled` - Enable or disable web service, default false
+- `web.host` - Web service host address, default 0.0.0.0
+- `web.port` - Web service port, default 5000
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
 - `repos[].protocol` - Repository-level protocol configuration, default https
@@ -453,3 +467,57 @@ After configuration is complete, restart the container for the changes to take e
 docker-compose down
 docker-compose up -d
 ```
+
+## Web Service
+
+Progress includes a built-in web service that allows you to browse aggregated reports and subscribe via RSS.
+
+### Enabling Web Service
+
+To enable the web service, add the `[web]` section to your `config.toml`:
+
+```toml
+[web]
+enabled = true
+host = "0.0.0.0"
+port = 5000
+```
+
+### Accessing the Web Interface
+
+Once enabled, the web service will automatically start when the container launches. You can access:
+
+- **Report List**: `http://your-host:5000/` - Browse all aggregated reports with pagination (50 reports per page)
+- **Report Detail**: `http://your-host:5000/report/<id>` - View full content of a specific report
+- **RSS Feed**: `http://your-host:5000/rss` - Subscribe to RSS feed for the latest reports
+
+### Docker Compose Configuration
+
+When using Docker, you'll need to expose the web service port:
+
+```yaml
+services:
+  progress:
+    image: jukanntenn/progress:latest
+    container_name: progress
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./claude_settings.json:/root/.claude/settings.json:ro
+      - ./data:/app/data
+    ports:
+      - "5000:5000"  # Expose web service port
+    environment:
+      - PROGRESS_SCHEDULE_CRON=0 8 * * *
+    restart: always
+```
+
+### Using RSS
+
+You can subscribe to the RSS feed using any RSS reader:
+
+1. Copy the RSS URL: `http://your-host:5000/rss`
+2. Add it to your favorite RSS reader (e.g., Feedly, Inoreader, NetNewsWire)
+3. Receive updates when new aggregated reports are generated
+
+The RSS feed includes the 50 most recent reports.
+

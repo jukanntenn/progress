@@ -7,6 +7,10 @@ services:
       - ./claude_settings.json:/root/.claude/settings.json
       - ./data:/app/data
 
+    # Uncomment the following line to enable web service access
+    # ports:
+    #   - "5000:5000"
+
     environment:
       - PROGRESS_SCHEDULE_CRON=0 8 * * * # Daily at 8 AM
 

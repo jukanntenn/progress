@@ -9,6 +9,7 @@ Progress 是一个 GitHub 项目跟踪工具，能够追踪多个仓库的代码
 - **多仓库监控** - 可同时监控多个 GitHub 仓库，跟踪代码变更
 - **AI 智能分析** - 使用 Claude Code CLI 分析代码变更，生成 Markdown 分析报告
 - **通知功能** - 支持飞书和邮件通知，及时推送分析报告
+- **Web 服务** - 内置 Web 界面浏览聚合报告，支持 RSS 订阅
 - **Docker 部署** - Docker 容器化部署，最快一分钟拉起
 
 ## 环境要求
@@ -244,6 +245,16 @@ timeout = 600
 # 与顶层 language 配置相互独立
 language = "zh"
 
+[web]
+# 启用或禁用 Web 服务（可选，默认：false）
+# 启用后，Web 服务器将随定时任务一起启动
+enabled = false
+# Web 服务主机地址（可选，默认：0.0.0.0）
+# 使用 0.0.0.0 监听所有网络接口
+host = "0.0.0.0"
+# Web 服务端口（可选，默认：5000）
+port = 5000
+
 # 仓库配置（至少配置一个）
 [[repos]]
 # GitHub 仓库格式：owner/repo（推荐格式，简洁明了）
@@ -306,6 +317,9 @@ enabled = false  # 暂时禁用
 - `analysis.concurrency` - 并发分析数，默认 1
 - `analysis.timeout` - 分析超时时间，默认 600 秒
 - `analysis.language` - AI 分析输出语言，默认 en
+- `web.enabled` - 启用或禁用 Web 服务，默认 false
+- `web.host` - Web 服务主机地址，默认 0.0.0.0
+- `web.port` - Web 服务端口，默认 5000
 - `repos[].branch` - 仓库分支，默认 main
 - `repos[].enabled` - 是否启用，默认 true
 - `repos[].protocol` - 仓库级协议配置，默认 https
@@ -458,3 +472,57 @@ services:
 docker-compose down
 docker-compose up -d
 ```
+
+## Web 服务
+
+Progress 包含内置的 Web 服务，允许您浏览聚合报告并通过 RSS 订阅。
+
+### 启用 Web 服务
+
+在 `config.toml` 中添加 `[web]` 部分来启用 Web 服务：
+
+```toml
+[web]
+enabled = true
+host = "0.0.0.0"
+port = 5000
+```
+
+### 访问 Web 界面
+
+启用后，Web 服务将在容器启动时自动启动。您可以访问：
+
+- **报告列表**：`http://your-host:5000/` - 浏览所有聚合报告，支持分页（每页 50 条）
+- **报告详情**：`http://your-host:5000/report/<id>` - 查看特定报告的完整内容
+- **RSS 订阅**：`http://your-host:5000/rss` - 订阅 RSS 获取最新报告
+
+### Docker Compose 配置
+
+使用 Docker 时，需要暴露 Web 服务端口：
+
+```yaml
+services:
+  progress:
+    image: jukanntenn/progress:latest
+    container_name: progress
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./claude_settings.json:/root/.claude/settings.json:ro
+      - ./data:/app/data
+    ports:
+      - "5000:5000"  # 暴露 Web 服务端口
+    environment:
+      - PROGRESS_SCHEDULE_CRON=0 8 * * *
+    restart: always
+```
+
+### 使用 RSS
+
+您可以使用任何 RSS 阅读器订阅 RSS：
+
+1. 复制 RSS URL：`http://your-host:5000/rss`
+2. 添加到您喜欢的 RSS 阅读器（例如 Feedly、Inoreader、NetNewsWire）
+3. 当生成新的聚合报告时接收更新
+
+RSS 订阅源包含最近 50 条报告。
+

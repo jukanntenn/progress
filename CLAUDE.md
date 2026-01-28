@@ -59,12 +59,17 @@ progress/
 │       ├── repo.py        # Repository management
 │       ├── repository.py  # Extended repository operations
 │       ├── reporter.py    # Markdown report generator
-│       └── utils.py       # Utility functions
+│       ├── utils.py       # Utility functions
+│       └── web.py         # Web service (Flask)
 │       ├── templates/     # Jinja2 template files
 │       │   ├── repository_report.j2
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
-│       │   └── email_notification.j2
+│       │   ├── email_notification.j2
+│       │   └── web/       # Web UI templates
+│       │       ├── list.html
+│       │       ├── detail.html
+│       │       └── 404.html
 │       └── locales/       # Localization files
 │           ├── progress.pot
 │           └── zh-hans/
@@ -91,6 +96,9 @@ progress/
 - Programming Language: Python 3.12+
 - Package and Project Manager: uv 0.9+
 - CLI Framework: Click 8.3+
+- Web Framework: Flask 3.0+
+- RSS Generation: feedgen
+- Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)
 - Containerized development and deployment: Docker
 - GitHub Interaction: GitHub CLI (gh)
 - AI Assistant: Claude Code

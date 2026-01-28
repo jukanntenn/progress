@@ -5,11 +5,16 @@ description = "Progress is a GitHub project tracking tool that traces multi-repo
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.1",
+    "flask>=3.0.0",
+    "feedgen>=0.9.0",
+    "gunicorn>=23.0.0",
     "jinja2>=3.1.0",
+    "markdown-it-py>=3.0.0",
     "peewee>=3.18.3",
     "requests>=2.32.5",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
+    "mdit-py-plugins>=0.4.0",
 ]
 
 [project.optional-dependencies]
