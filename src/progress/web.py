@@ -89,15 +89,20 @@ def index():
     for report in reports:
         created_at_str = ""
         if report.created_at:
-            if isinstance(report.created_at, str):
-                created_at_str = report.created_at
-            elif isinstance(report.created_at, datetime):
-                created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
+            if isinstance(report.created_at, datetime):
+                created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+            elif isinstance(report.created_at, str):
+                try:
+                    dt = datetime.fromisoformat(report.created_at)
+                    created_at_str = dt.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    created_at_str = report.created_at
 
         report_list.append({
             "id": report.id,
             "title": report.title,
             "created_at": created_at_str,
+            "markpost_url": report.markpost_url,
         })
 
     total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
@@ -135,16 +140,21 @@ def detail(report_id: int):
     timezone = current_app.config["timezone"]
     created_at_str = ""
     if report.created_at:
-        if isinstance(report.created_at, str):
-            created_at_str = report.created_at
-        elif isinstance(report.created_at, datetime):
-            created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
+        if isinstance(report.created_at, datetime):
+            created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+        elif isinstance(report.created_at, str):
+            try:
+                dt = datetime.fromisoformat(report.created_at)
+                created_at_str = dt.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                created_at_str = report.created_at
 
     return render_template(
         "detail.html",
         report=report,
         content_html=content_html,
         created_at=created_at_str,
+        markpost_url=report.markpost_url,
     )
 
 
@@ -172,7 +182,7 @@ def rss():
         fe.title(report.title or "Untitled Report")
         fe.link(href=f"{request.url_root}report/{report.id}")
 
-        content = report.content or ""
+        content = render_markdown(report.content or "")
         # Use content() instead of description() for better encoding support
         # This creates a <content:encoded> element which handles UTF-8 properly
         fe.content(content)
