@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path as PathlibPath
 
@@ -126,7 +127,7 @@ def write_config_file(content: str, app=None):
     with open(temp_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    temp_path.replace(path)
+    shutil.move(str(temp_path), str(path))
 
 
 def config_to_dict(toml_content: str) -> dict:
