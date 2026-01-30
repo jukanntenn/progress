@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration Editor - Progress</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                            950: '#0b0f19',
+                        },
+                        blue: {
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script type="module">
+        import { parse, stringify } from 'https://cdn.jsdelivr.net/npm/smol-toml@1.6.0/+esm';
+        window.TOML = { parse, stringify };
+    </script>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen">
+    <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="/" class="text-xl font-bold text-gray-900 dark:text-white">
+                    <i class="fa-solid fa-gauge-high mr-2"></i>Progress
+                </a>
+                <div class="flex items-center gap-3">
+                    <button onclick="resetConfig()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                        <i class="fa-solid fa-rotate-left mr-2"></i>Reset
+                    </button>
+                    <button onclick="saveConfig()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                        <i class="fa-solid fa-floppy-disk mr-2"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div id="editor-container" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+
+            <div class="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <button id="view-toggle" onclick="toggleView()" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fa-solid fa-file-code text-gray-500"></i>
+                        <span id="toggle-text">Switch to TOML</span>
+                    </button>
+                </div>
+                <div id="editor-status" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span>Valid TOML</span>
+                </div>
+            </div>
+
+            <div id="visual-editor" class="view-panel">
+                <div class="px-6 py-3 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    <div class="flex gap-2" id="section-nav">
+                        <button class="section-btn active px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white" data-section="general">
+                            <i class="fa-solid fa-sliders mr-1"></i>General
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="markpost">
+                            <i class="fa-solid fa-paper-plane mr-1"></i>Markpost
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="notification">
+                            <i class="fa-solid fa-bell mr-1"></i>Notification
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="github">
+                            <i class="fa-brands fa-github mr-1"></i>GitHub
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="analysis">
+                            <i class="fa-solid fa-robot mr-1"></i>Analysis
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="web">
+                            <i class="fa-solid fa-globe mr-1"></i>Web
+                        </button>
+                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="repos">
+                            <i class="fa-solid fa-database mr-1"></i>Repositories
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6 max-h-[calc(100vh-300px)] overflow-y-auto" id="forms-container">
+                    {% include "web/_config_editor.html" %}
+                </div>
+            </div>
+
+            <div id="toml-editor-panel" class="view-panel hidden">
+                <textarea
+                    id="toml-editor"
+                    class="w-full h-[calc(100vh-250px)] p-6 font-mono text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-0 resize-none focus:outline-none"
+                    spellcheck="false"
+                >{{ toml_content }}</textarea>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <!-- Feishu Channel Modal -->
+    <div id="modal-feishu" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Feishu Channel</h3>
+                <button onclick="closeModal('modal-feishu')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL</label>
+                    <input type="url" id="feishu-webhook" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timeout (seconds)</label>
+                    <input type="number" id="feishu-timeout" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" value="30" min="1">
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="feishu-enabled" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Enabled</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeModal('modal-feishu')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                <button onclick="confirmAddFeishu()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Channel Modal -->
+    <div id="modal-email" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Email Channel</h3>
+                <button onclick="closeModal('modal-email')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Host</label>
+                    <input type="text" id="email-host" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="smtp.example.com">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label>
+                        <input type="number" id="email-port" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" value="465" min="1" max="65535">
+                    </div>
+                    <div class="flex items-end">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="email-ssl" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Use SSL</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <input type="text" id="email-user" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input type="password" id="email-password" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From Address</label>
+                    <input type="email" id="email-from" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="progress@example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Recipients (comma separated)</label>
+                    <input type="text" id="email-recipients" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="user1@example.com, user2@example.com">
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="email-enabled" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Enabled</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeModal('modal-email')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                <button onclick="confirmAddEmail()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Repository Modal -->
+    <div id="modal-repo" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Repository</h3>
+                <button onclick="closeModal('modal-repo')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repository URL</label>
+                    <input type="text" id="repo-url" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="owner/repo or https://github.com/owner/repo">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Branch</label>
+                    <input type="text" id="repo-branch" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="main" value="main">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Protocol</label>
+                    <select id="repo-protocol" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500">
+                        <option value="https">HTTPS</option>
+                        <option value="ssh">SSH</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="repo-enabled" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Enabled</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeModal('modal-repo')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                <button onclick="confirmAddRepo()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let originalTOML = {{ toml_content | tojson }};
+        let currentTOML = originalTOML;
+        let commentsData = {};
+        let currentView = 'visual';
+        let modifiedConfig = null;
+
+        const tomlEditor = document.getElementById('toml-editor');
+        const tomlStatus = document.getElementById('editor-status');
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+            toast.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg text-sm opacity-0 transform translate-y-4 transition-all duration-300`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-4');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function parseTOML(tomlContent) {
+            try {
+                const parsed = TOML.parse(tomlContent);
+                updateStatus('valid');
+                return parsed;
+            } catch (e) {
+                console.error('TOML parse error:', e);
+                updateStatus('error', e.message);
+                return null;
+            }
+        }
+
+        function updateStatus(status, message = '') {
+            const indicator = tomlStatus.querySelector('span:first-child');
+            const text = tomlStatus.querySelector('span:last-child');
+
+            const colors = {
+                valid: 'bg-green-500',
+                error: 'bg-red-500',
+                modified: 'bg-yellow-500'
+            };
+
+            indicator.className = `w-2 h-2 rounded-full ${colors[status]}`;
+
+            if (status === 'valid') {
+                text.textContent = 'Valid TOML';
+            } else if (status === 'error') {
+                text.textContent = 'Syntax Error: ' + message;
+            } else {
+                text.textContent = 'Unsaved changes';
+            }
+        }
+
+        function getNestedValue(obj, path) {
+            return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+        }
+
+        function setNestedValue(obj, path, value) {
+            const parts = path.split('.');
+            const last = parts.pop();
+            const target = parts.reduce((acc, part) => {
+                if (!acc[part]) acc[part] = {};
+                return acc[part];
+            }, obj);
+            target[last] = value;
+        }
+
+        function getElementValue(element) {
+            if (element.type === 'checkbox') {
+                return element.checked;
+            } else if (element.type === 'number') {
+                return parseFloat(element.value);
+            } else {
+                return element.value;
+            }
+        }
+
+        function toggleView() {
+            const visualPanel = document.getElementById('visual-editor');
+            const tomlPanel = document.getElementById('toml-editor-panel');
+            const toggleText = document.getElementById('toggle-text');
+            const toggleIcon = document.querySelector('#view-toggle i');
+
+            if (currentView === 'visual') {
+                currentView = 'toml';
+                visualPanel.classList.add('hidden');
+                tomlPanel.classList.remove('hidden');
+                toggleText.textContent = 'Switch to Visual';
+                toggleIcon.className = 'fa-solid fa-eye text-gray-500';
+                tomlEditor.value = currentTOML;
+            } else {
+                currentView = 'visual';
+                tomlPanel.classList.add('hidden');
+                visualPanel.classList.remove('hidden');
+                toggleText.textContent = 'Switch to TOML';
+                toggleIcon.className = 'fa-solid fa-file-code text-gray-500';
+                currentTOML = tomlEditor.value;
+                syncTOMLToUI();
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+
+                if (data.success) {
+                    originalTOML = data.toml;
+                    currentTOML = data.toml;
+                    commentsData = data.comments || {};
+
+                    populateComments();
+                    syncTOMLToUI();
+                }
+            } catch (e) {
+                console.error('Load error:', e);
+                showToast('Failed to load configuration', 'error');
+            }
+        }
+
+        function populateComments() {
+            Object.keys(commentsData).forEach(path => {
+                const helpElement = document.querySelector(`[data-help-for="${path}"]`);
+                if (helpElement) {
+                    const span = helpElement.querySelector('span');
+                    if (span) {
+                        span.textContent = commentsData[path];
+                    }
+                }
+            });
+        }
+
+        function syncTOMLToUI() {
+            modifiedConfig = null;
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            document.querySelectorAll('[data-path]').forEach(element => {
+                const path = element.dataset.path;
+                const value = getNestedValue(parsed, path);
+
+                if (element.type === 'checkbox') {
+                    element.checked = !!value;
+                } else if (element.tagName === 'SELECT') {
+                    element.value = value || '';
+                } else {
+                    element.value = value !== undefined ? value : '';
+                }
+            });
+
+            renderNotificationChannels();
+            renderRepositories();
+        }
+
+        function syncUIToConfig(parsed) {
+            document.querySelectorAll('[data-path]').forEach(element => {
+                const path = element.dataset.path;
+                let value;
+
+                if (element.type === 'checkbox') {
+                    value = element.checked;
+                    setNestedValue(parsed, path, value);
+                } else if (element.type === 'number') {
+                    if (element.value) {
+                        value = parseInt(element.value, 10);
+                        setNestedValue(parsed, path, value);
+                    } else {
+                        removeNestedValue(parsed, path);
+                    }
+                } else if (element.value) {
+                    value = element.value;
+                    setNestedValue(parsed, path, value);
+                } else {
+                    removeNestedValue(parsed, path);
+                }
+            });
+
+            return parsed;
+        }
+
+        function removeNestedValue(obj, path) {
+            const parts = path.split('.');
+            const last = parts.pop();
+            const target = parts.reduce((acc, part) => acc && acc[part], obj);
+            if (target && target.hasOwnProperty(last)) {
+                delete target[last];
+            }
+        }
+
+        function renderNotificationChannels() {
+            const parsed = modifiedConfig || parseTOML(currentTOML);
+
+            if (!parsed || !parsed.notification || !parsed.notification.channels || !Array.isArray(parsed.notification.channels) || parsed.notification.channels.length === 0) {
+                const container = document.getElementById('notification-channels-list');
+                container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No channels configured yet.</p>';
+                return;
+            }
+
+            const channels = parsed.notification.channels;
+            const container = document.getElementById('notification-channels-list');
+
+            container.innerHTML = channels.map((channel, index) => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div class="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                        <span class="font-semibold text-gray-900 dark:text-white">${channel.type === 'feishu' ? 'Feishu' : 'Email'}</span>
+                        <div class="flex gap-1">
+                            <button onclick="moveChannel(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
+                            <button onclick="moveChannel(${index}, 1)" ${index === channels.length - 1 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
+                            <button onclick="deleteChannel(${index})" class="px-2 py-1 text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20">🗑</button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        ${channel.type === 'feishu' ? `
+                            <p class="mb-1"><strong>Webhook:</strong> ${channel.webhook_url || 'N/A'}</p>
+                            <p class="mb-1"><strong>Timeout:</strong> ${channel.timeout || 30}s</p>
+                            <p><strong>Enabled:</strong> ${channel.enabled ? 'Yes' : 'No'}</p>
+                        ` : `
+                            <p class="mb-1"><strong>Host:</strong> ${channel.host || 'N/A'}:${channel.port || 25}</p>
+                            <p class="mb-1"><strong>From:</strong> ${channel.from_addr || 'N/A'}</p>
+                            <p class="mb-1"><strong>Recipients:</strong> ${Array.isArray(channel.recipient) ? channel.recipient.join(', ') : 'N/A'}</p>
+                            <p><strong>Enabled:</strong> ${channel.enabled ? 'Yes' : 'No'}</p>
+                        `}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderRepositories() {
+            const parsed = modifiedConfig || parseTOML(currentTOML);
+
+            if (!parsed || !parsed.repos || !Array.isArray(parsed.repos) || parsed.repos.length === 0) {
+                const container = document.getElementById('repos-list');
+                container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No repositories configured yet.</p>';
+                return;
+            }
+
+            const repos = parsed.repos;
+            const container = document.getElementById('repos-list');
+
+            container.innerHTML = repos.map((repo, index) => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div class="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                        <span class="font-semibold text-gray-900 dark:text-white">${repo.url || 'N/A'}</span>
+                        <div class="flex gap-1">
+                            <button onclick="moveRepo(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
+                            <button onclick="moveRepo(${index}, 1)" ${index === repos.length - 1 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
+                            <button onclick="deleteRepo(${index})" class="px-2 py-1 text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20">🗑</button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        <p class="mb-1"><strong>Branch:</strong> ${repo.branch || 'main'}</p>
+                        <p class="mb-1"><strong>Protocol:</strong> ${repo.protocol || 'https'}</p>
+                        <p><strong>Enabled:</strong> ${repo.enabled !== false ? 'Yes' : 'No'}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        async function saveConfig() {
+            let responseData;
+
+            if (currentView === 'toml') {
+                const tomlContent = tomlEditor.value;
+
+                try {
+                    const response = await fetch('/api/config/validate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ toml: tomlContent })
+                    });
+
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        showToast('Validation failed: ' + result.error, 'error');
+                        return;
+                    }
+                } catch (e) {
+                    showToast('Validation error: ' + e.message, 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ toml: tomlContent })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        responseData = result;
+                    } else {
+                        showToast('Save failed: ' + result.error, 'error');
+                        return;
+                    }
+                } catch (e) {
+                    showToast('Save error: ' + e.message, 'error');
+                    return;
+                }
+            } else {
+                let parsed = modifiedConfig || parseTOML(currentTOML);
+                if (!parsed) {
+                    showToast('Cannot parse current TOML', 'error');
+                    return;
+                }
+
+                parsed = syncUIToConfig(parsed);
+
+                try {
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: parsed })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        responseData = result;
+                    } else {
+                        showToast('Save failed: ' + result.error, 'error');
+                        return;
+                    }
+                } catch (e) {
+                    showToast('Save error: ' + e.message, 'error');
+                    return;
+                }
+            }
+
+            showToast('Configuration saved successfully!', 'success');
+            originalTOML = responseData.toml;
+            currentTOML = responseData.toml;
+            tomlEditor.value = responseData.toml;
+            modifiedConfig = null;
+            updateStatus('valid');
+        }
+
+        function resetConfig() {
+            if (confirm('Reset to original configuration? Unsaved changes will be lost.')) {
+                currentTOML = originalTOML;
+                modifiedConfig = null;
+                tomlEditor.value = originalTOML;
+                syncTOMLToUI();
+                showToast('Configuration reset', 'info');
+            }
+        }
+
+        function moveChannel(index, direction) {
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            const channels = parsed.notification.channels;
+            const newIndex = index + direction;
+
+            if (newIndex < 0 || newIndex >= channels.length) return;
+
+            [channels[index], channels[newIndex]] = [channels[newIndex], channels[index]];
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            renderNotificationChannels();
+        }
+
+        async function deleteChannel(index) {
+            if (!confirm('Delete this channel?')) return;
+
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            parsed.notification.channels.splice(index, 1);
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            showToast('Channel deleted (click Save to apply changes)', 'info');
+            renderNotificationChannels();
+        }
+
+        function openAddFeishuModal() {
+            openModal('modal-feishu');
+        }
+
+        function openAddEmailModal() {
+            openModal('modal-email');
+        }
+
+        async function confirmAddFeishu() {
+            const webhook = document.getElementById('feishu-webhook').value;
+            const timeout = parseInt(document.getElementById('feishu-timeout').value);
+            const enabled = document.getElementById('feishu-enabled').checked;
+
+            if (!webhook) {
+                showToast('Webhook URL is required', 'error');
+                return;
+            }
+
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            if (!parsed.notification) parsed.notification = {};
+            if (!parsed.notification.channels) parsed.notification.channels = [];
+
+            parsed.notification.channels.push({
+                type: 'feishu',
+                webhook_url: webhook,
+                timeout: timeout,
+                enabled: enabled
+            });
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            closeModal('modal-feishu');
+            renderNotificationChannels();
+
+            document.getElementById('feishu-webhook').value = '';
+            document.getElementById('feishu-timeout').value = '30';
+            document.getElementById('feishu-enabled').checked = true;
+        }
+
+        async function confirmAddEmail() {
+            const host = document.getElementById('email-host').value;
+            const port = parseInt(document.getElementById('email-port').value);
+            const ssl = document.getElementById('email-ssl').checked;
+            const user = document.getElementById('email-user').value;
+            const password = document.getElementById('email-password').value;
+            const fromAddr = document.getElementById('email-from').value;
+            const recipients = document.getElementById('email-recipients').value.split(',').map(r => r.trim()).filter(r => r);
+            const enabled = document.getElementById('email-enabled').checked;
+
+            if (!host || !recipients.length) {
+                showToast('Host and recipients are required', 'error');
+                return;
+            }
+
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            if (!parsed.notification) parsed.notification = {};
+            if (!parsed.notification.channels) parsed.notification.channels = [];
+
+            parsed.notification.channels.push({
+                type: 'email',
+                enabled: enabled,
+                host: host,
+                port: port,
+                user: user,
+                password: password,
+                from_addr: fromAddr || 'progress@example.com',
+                recipient: recipients,
+                starttls: false,
+                ssl: ssl
+            });
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            closeModal('modal-email');
+            renderNotificationChannels();
+
+            document.getElementById('email-host').value = '';
+            document.getElementById('email-port').value = '465';
+            document.getElementById('email-user').value = '';
+            document.getElementById('email-password').value = '';
+            document.getElementById('email-from').value = '';
+            document.getElementById('email-recipients').value = '';
+            document.getElementById('email-enabled').checked = true;
+        }
+
+        function moveRepo(index, direction) {
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            const repos = parsed.repos;
+            const newIndex = index + direction;
+
+            if (newIndex < 0 || newIndex >= repos.length) return;
+
+            [repos[index], repos[newIndex]] = [repos[newIndex], repos[index]];
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            renderRepositories();
+        }
+
+        async function deleteRepo(index) {
+            if (!confirm('Delete this repository?')) return;
+
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            parsed.repos.splice(index, 1);
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            showToast('Repository deleted (click Save to apply changes)', 'info');
+            renderRepositories();
+        }
+
+        function openAddRepoModal() {
+            openModal('modal-repo');
+        }
+
+        async function confirmAddRepo() {
+            const url = document.getElementById('repo-url').value;
+            const branch = document.getElementById('repo-branch').value || 'main';
+            const protocol = document.getElementById('repo-protocol').value;
+            const enabled = document.getElementById('repo-enabled').checked;
+
+            if (!url) {
+                showToast('Repository URL is required', 'error');
+                return;
+            }
+
+            const parsed = parseTOML(currentTOML);
+            if (!parsed) return;
+
+            if (!parsed.repos) parsed.repos = [];
+
+            parsed.repos.push({
+                url: url,
+                branch: branch,
+                protocol: protocol,
+                enabled: enabled
+            });
+
+            modifiedConfig = parsed;
+            updateStatus('modified');
+            closeModal('modal-repo');
+            renderRepositories();
+
+            document.getElementById('repo-url').value = '';
+            document.getElementById('repo-branch').value = 'main';
+            document.getElementById('repo-protocol').value = 'https';
+            document.getElementById('repo-enabled').checked = true;
+        }
+
+        function initEventListeners() {
+            tomlEditor.addEventListener('input', () => {
+                currentTOML = tomlEditor.value;
+                parseTOML(currentTOML);
+            });
+
+            document.querySelectorAll('[data-path]').forEach(element => {
+                element.addEventListener('input', () => {
+                    if (currentView === 'visual') {
+                        updateStatus('modified');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.section-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.section-btn').forEach(b => {
+                        b.classList.remove('bg-blue-600', 'text-white');
+                        b.classList.add('text-gray-600', 'dark:text-gray-400');
+                    });
+                    btn.classList.remove('text-gray-600', 'dark:text-gray-400');
+                    btn.classList.add('bg-blue-600', 'text-white');
+
+                    const section = btn.dataset.section;
+                    document.querySelectorAll('.config-section').forEach(s => s.classList.add('hidden'));
+                    const targetSection = document.getElementById('section-' + section);
+                    if (targetSection) {
+                        targetSection.classList.remove('hidden');
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    saveConfig();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            loadConfig();
+        });
+    </script>
+</body>
+</html>

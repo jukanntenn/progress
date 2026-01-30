@@ -1,0 +1,325 @@
+{% if current_language %}
+{% set lang = current_language %}
+{% else %}
+{% set lang = 'en' %}
+{% endif %}
+
+{% if current_timezone %}
+{% set tz = current_timezone %}
+{% else %}
+{% set tz = 'UTC' %}
+{% endif %}
+
+<div id="section-general" class="config-section">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-sliders mr-2"></i>General Settings
+    </h3>
+
+    <div class="mb-5">
+        <label for="ctrl-language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-language mr-1 text-gray-400"></i>Language
+        </label>
+        <select id="ctrl-language" data-path="language"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
+            <option value="zh-hans" {% if lang == 'zh-hans' %}selected{% endif %}>简体中文</option>
+        </select>
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="language">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Interface language</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-globe mr-1 text-gray-400"></i>Timezone
+        </label>
+        <select id="ctrl-timezone" data-path="timezone"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="UTC" {% if tz == 'UTC' %}selected{% endif %}>UTC</option>
+            <option value="Asia/Shanghai" {% if tz == 'Asia/Shanghai' %}selected{% endif %}>Asia/Shanghai</option>
+            <option value="America/New_York" {% if tz == 'America/New_York' %}selected{% endif %}>America/New_York</option>
+            <option value="America/Los_Angeles" {% if tz == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles</option>
+            <option value="Europe/London" {% if tz == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+            <option value="Europe/Paris" {% if tz == 'Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
+            <option value="Asia/Tokyo" {% if tz == 'Asia/Tokyo' %}selected{% endif %}>Asia/Tokyo</option>
+        </select>
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="timezone">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>IANA timezone identifier</span>
+        </div>
+    </div>
+</div>
+
+<div id="section-markpost" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-paper-plane mr-2"></i>Markpost Settings
+    </h3>
+
+    <div class="mb-5">
+        <label for="ctrl-markpost-url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-link mr-1 text-gray-400"></i>Markpost URL
+        </label>
+        <input type="url" id="ctrl-markpost-url" data-path="markpost.url"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="https://example.com/api/base_url/post_key">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="markpost.url">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Full URL including base_url and post_key</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-markpost-timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-clock mr-1 text-gray-400"></i>Timeout
+        </label>
+        <input type="number" id="ctrl-markpost-timeout" data-path="markpost.timeout"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="30" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="markpost.timeout">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>HTTP request timeout in seconds (default: 30)</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-markpost-max-batch-size" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-database mr-1 text-gray-400"></i>Max Batch Size
+        </label>
+        <input type="number" id="ctrl-markpost-max-batch-size" data-path="markpost.max_batch_size"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="1048576" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="markpost.max_batch_size">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Maximum batch size for uploads in bytes (default: 1048576)</span>
+        </div>
+    </div>
+</div>
+
+<div id="section-notification" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-bell mr-2"></i>Notification Channels
+    </h3>
+
+    <div id="notification-channels-list" class="flex flex-col gap-3 mb-4">
+        <p class="text-sm text-gray-500 dark:text-gray-400">No channels configured yet.</p>
+    </div>
+
+    <div class="flex gap-2">
+        <button onclick="openAddFeishuModal()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+            <i class="fa-solid fa-plus mr-1"></i>Add Feishu
+        </button>
+        <button onclick="openAddEmailModal()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            <i class="fa-solid fa-plus mr-1"></i>Add Email
+        </button>
+    </div>
+</div>
+
+<div id="section-github" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-brands fa-github mr-2"></i>GitHub Settings
+    </h3>
+
+    <div class="mb-5">
+        <label for="ctrl-github-token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-key mr-1 text-gray-400"></i>GitHub Token
+        </label>
+        <div class="relative">
+            <input type="password" id="ctrl-github-token" data-path="github.gh_token"
+                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
+                placeholder="ghp_xxxxxxxxxxxx">
+            <button type="button" onclick="togglePasswordVisibility('ctrl-github-token')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-eye"></i>
+            </button>
+        </div>
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.gh_token">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>GitHub CLI personal access token</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-github-protocol" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-network-wired mr-1 text-gray-400"></i>Protocol
+        </label>
+        <select id="ctrl-github-protocol" data-path="github.protocol"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="https">https</option>
+            <option value="ssh">ssh</option>
+        </select>
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.protocol">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Global protocol configuration (default: https)</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-github-proxy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-globe mr-1 text-gray-400"></i>Proxy
+        </label>
+        <input type="text" id="ctrl-github-proxy" data-path="github.proxy"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="http://127.0.0.1:7890 or socks5://127.0.0.1:1080">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.proxy">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Global proxy configuration (optional)</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-github-git-timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-clock mr-1 text-gray-400"></i>Git Timeout
+        </label>
+        <input type="number" id="ctrl-github-git-timeout" data-path="github.git_timeout"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="300" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.git_timeout">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Git command timeout in seconds (default: 300)</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-github-gh-timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-clock mr-1 text-gray-400"></i>GitHub CLI Timeout
+        </label>
+        <input type="number" id="ctrl-github-gh-timeout" data-path="github.gh_timeout"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="300" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.gh_timeout">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>GitHub CLI command timeout in seconds (default: 300)</span>
+        </div>
+    </div>
+</div>
+
+<div id="section-analysis" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-robot mr-2"></i>AI Analysis Settings
+    </h3>
+
+    <div class="mb-5">
+        <label for="ctrl-analysis-max-diff-length" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-ruler mr-1 text-gray-400"></i>Max Diff Length
+        </label>
+        <input type="number" id="ctrl-analysis-max-diff-length" data-path="analysis.max_diff_length"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="100000" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.max_diff_length">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Maximum diff length in characters</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-analysis-concurrency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>Concurrency
+        </label>
+        <input type="number" id="ctrl-analysis-concurrency" data-path="analysis.concurrency"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="1" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.concurrency">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Number of concurrent analysis tasks (1 for serial)</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-analysis-timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-clock mr-1 text-gray-400"></i>Timeout
+        </label>
+        <input type="number" id="ctrl-analysis-timeout" data-path="analysis.timeout"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="600" min="1">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.timeout">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Analysis timeout in seconds</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-analysis-language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-language mr-1 text-gray-400"></i>Language
+        </label>
+        <input type="text" id="ctrl-analysis-language" data-path="analysis.language"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="en">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.language">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>AI analysis output language (e.g., en, zh, ja, ko)</span>
+        </div>
+    </div>
+</div>
+
+<div id="section-web" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-globe mr-2"></i>Web Service Settings
+    </h3>
+
+    <div class="mb-5">
+        <label class="flex items-center">
+            <input type="checkbox" id="ctrl-web-enabled" data-path="web.enabled" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">Enable Web Service</span>
+        </label>
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="web.enabled">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Enable the web interface</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-web-host" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-network-wired mr-1 text-gray-400"></i>Host
+        </label>
+        <input type="text" id="ctrl-web-host" data-path="web.host"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="0.0.0.0">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="web.host">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Host address to bind to</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <label for="ctrl-web-port" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <i class="fa-solid fa-plug mr-1 text-gray-400"></i>Port
+        </label>
+        <input type="number" id="ctrl-web-port" data-path="web.port"
+            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="5000" min="1" max="65535">
+        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="web.port">
+            <i class="fa-regular fa-circle-question mr-1"></i>
+            <span>Port number to listen on</span>
+        </div>
+    </div>
+</div>
+
+<div id="section-repos" class="config-section hidden">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+        <i class="fa-solid fa-database mr-2"></i>Repositories
+    </h3>
+
+    <div id="repos-list" class="flex flex-col gap-3 mb-4">
+        <p class="text-sm text-gray-500 dark:text-gray-400">No repositories configured yet.</p>
+    </div>
+
+    <button onclick="openAddRepoModal()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        <i class="fa-solid fa-plus mr-1"></i>Add Repository
+    </button>
+</div>
+
+<script>
+    function togglePasswordVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        const button = input.nextElementSibling;
+        const icon = button.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye';
+        }
+    }
+</script>

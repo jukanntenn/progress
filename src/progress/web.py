@@ -3,8 +3,10 @@
 import logging
 import os
 from datetime import datetime
+from pathlib import Path as PathlibPath
 
-from flask import Blueprint, Flask, current_app, render_template, request
+import tomlkit
+from flask import Blueprint, Flask, current_app, jsonify, render_template, request
 from feedgen.feed import FeedGenerator
 from markdown_it import MarkdownIt
 from mdit_py_plugins.front_matter import front_matter_plugin
@@ -12,6 +14,7 @@ from mdit_py_plugins.footnote import footnote_plugin
 
 from .consts import DATABASE_PATH
 from .db import close_db, create_tables, init_db
+from .errors import ConfigException
 from .models import Report
 
 logger = logging.getLogger(__name__)
@@ -69,6 +72,99 @@ def render_markdown(content: str) -> str:
     if not content:
         return ""
     return mdit.render(content)
+
+
+def get_config_path(app=None):
+    """Get the configuration file path from app config, environment, or default."""
+    if app and "config_file" in app.config:
+        return app.config["config_file"]
+
+    env_path = os.environ.get("CONFIG_FILE")
+    if env_path:
+        return env_path
+
+    common_paths = [
+        "config/simple.toml",
+        "config/docker.toml",
+        "config/full.toml",
+        "/app/config.toml",
+        "config.toml",
+    ]
+
+    for path in common_paths:
+        if PathlibPath(path).is_file():
+            return path
+
+    return "/app/config.toml"
+
+
+def read_config_file(app=None):
+    """Read configuration file and return content and path."""
+    config_path = get_config_path(app)
+    path = PathlibPath(config_path)
+
+    if not path.exists():
+        raise ConfigException(f"Configuration file not found: {config_path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    return content, config_path
+
+
+def write_config_file(content: str, app=None):
+    """Write configuration file atomically with validation."""
+    config_path = get_config_path(app)
+    path = PathlibPath(config_path)
+
+    try:
+        tomlkit.loads(content)
+    except Exception as e:
+        raise ConfigException(f"Invalid TOML syntax: {str(e)}")
+
+    temp_path = path.with_suffix(".tmp")
+    with open(temp_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    temp_path.replace(path)
+
+
+def config_to_dict(toml_content: str) -> dict:
+    """Parse TOML content to dictionary."""
+    return tomlkit.loads(toml_content)
+
+
+def extract_comments(toml_content: str) -> dict:
+    """Extract comments from TOML content and associate with config keys.
+
+    Returns:
+        Dict mapping config paths to their comments.
+    """
+    doc = tomlkit.loads(toml_content)
+    comments = {}
+
+    def extract_from_table(table, prefix=""):
+        for key, item in table.items():
+            path = f"{prefix}.{key}" if prefix else key
+
+            if hasattr(item, "trivia") and item.trivia.comment:
+                comments[path] = item.trivia.comment.strip()
+
+            if isinstance(item, tomlkit.items.Table):
+                extract_from_table(item, path)
+            elif isinstance(item, tomlkit.items.InlineTable):
+                for k, v in item.items():
+                    nested_path = f"{path}.{k}"
+                    if hasattr(v, "trivia") and v.trivia.comment:
+                        comments[nested_path] = v.trivia.comment.strip()
+
+    for key, value in doc.items():
+        if hasattr(value, "trivia") and value.trivia.comment:
+            comments[key] = value.trivia.comment.strip()
+        if hasattr(value, "items"):
+            extract_from_table(value, key)
+
+    return comments
 
 
 @bp.route("/")
@@ -199,3 +295,134 @@ def rss():
     response = current_app.response_class(rss_feed, mimetype="application/rss+xml")
     response.headers.add("Content-Type", "application/rss+xml; charset=utf-8")
     return response
+
+
+@bp.route("/config")
+def config_page():
+    """Render configuration editor page."""
+    try:
+        toml_content, config_path = read_config_file(current_app)
+    except ConfigException as e:
+        return render_template("404.html", error=str(e)), 404
+
+    config = current_app.config["config"]
+
+    return render_template(
+        "web/config.html",
+        toml_content=toml_content,
+        config_path=config_path,
+        current_language=config.language,
+        current_timezone=config.timezone,
+    )
+
+
+@bp.route("/api/config")
+def get_config():
+    """GET API endpoint - returns current configuration as JSON with comments."""
+    try:
+        toml_content, config_path = read_config_file(current_app)
+        config_dict = config_to_dict(toml_content)
+        comments = extract_comments(toml_content)
+
+        return jsonify({
+            "success": True,
+            "data": config_dict,
+            "toml": toml_content,
+            "path": config_path,
+            "comments": comments
+        })
+    except ConfigException as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@bp.route("/api/config", methods=["POST"])
+def save_config():
+    """POST API endpoint - saves configuration from TOML or JSON data."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+
+    if "toml" in data:
+        toml_content = data["toml"]
+    elif "config" in data:
+        config_dict = data["config"]
+
+        toml_content, _ = read_config_file(current_app)
+        doc = tomlkit.loads(toml_content)
+
+        _update_toml_document(doc, config_dict)
+
+        toml_content = doc.as_string()
+    else:
+        return jsonify({"success": False, "error": "Missing 'toml' or 'config' field"}), 400
+
+    try:
+        write_config_file(toml_content, current_app)
+        return jsonify({
+            "success": True,
+            "message": "Configuration saved successfully",
+            "toml": toml_content
+        })
+    except ConfigException as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+def _update_toml_document(doc, config_dict):
+    """Update a tomlkit document with new values while preserving structure."""
+    from tomlkit.items import AoT
+
+    for key, value in config_dict.items():
+        if isinstance(value, dict) and key not in doc:
+            doc[key] = tomlkit.table()
+            _update_toml_document(doc[key], value)
+        elif isinstance(value, dict):
+            _update_toml_document(doc[key], value)
+        elif isinstance(value, list):
+            aot = AoT([])
+            for item in value:
+                if isinstance(item, dict):
+                    table = tomlkit.table()
+                    for k, v in item.items():
+                        table[k] = v
+                    aot.append(table)
+                else:
+                    aot.append(item)
+            doc[key] = aot
+        else:
+            doc[key] = value
+
+    _remove_empty_values(doc)
+
+
+def _remove_empty_values(table):
+    """Recursively remove empty string values from a tomlkit table."""
+    keys_to_remove = []
+
+    for key, value in table.items():
+        if isinstance(value, tomlkit.items.Table):
+            _remove_empty_values(value)
+        elif isinstance(value, str) and value == "":
+            keys_to_remove.append(key)
+
+    for key in keys_to_remove:
+        del table[key]
+
+
+@bp.route("/api/config/validate", methods=["POST"])
+def validate_config():
+    """Validate configuration without saving."""
+    data = request.get_json()
+
+    if not data or "toml" not in data:
+        return jsonify({"success": False, "error": "Missing TOML content"}), 400
+
+    toml_content = data["toml"]
+
+    try:
+        config_dict = config_to_dict(toml_content)
+        return jsonify(
+            {"success": True, "message": "Configuration is valid", "data": config_dict}
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
