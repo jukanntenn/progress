@@ -35,6 +35,7 @@ progress/
 ├── devops/                # DevOps related files
 ├── guides/                # Guide documentation
 │   ├── config.md         # Configuration guide
+│   ├── dev.md            # Development guide
 │   ├── i18n.md           # Internationalization guide
 │   └── testing.md        # Testing guide
 ├── scripts/               # Utility scripts
@@ -114,5 +115,6 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 - Prior to running any external tool (e.g., gh, claude) within the code, it is recommended to verify its usage by using the help parameter (e.g., `gh repo clone --help`)
 - English shall be used for comments, documentation, log messages and exception information in code except for those intended to be targeted to other languages (e.g., Chinese documentation / prompt files)
 - For adding or modifying configuration items, refer to `guides/config.md`
+- For development server usage, refer to `guides/dev.md`
 - For writing test code, refer to `guides/testing.md`
 - For i18n, refer to `guides/i18n.md`

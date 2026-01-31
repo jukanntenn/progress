@@ -251,6 +251,8 @@
         let commentsData = {};
         let currentView = 'visual';
         let modifiedConfig = null;
+        let editingChannelIndex = null;
+        let editingRepoIndex = null;
 
         const tomlEditor = document.getElementById('toml-editor');
         const tomlStatus = document.getElementById('editor-status');
@@ -464,6 +466,7 @@
                     <div class="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                         <span class="font-semibold text-gray-900 dark:text-white">${channel.type === 'feishu' ? 'Feishu' : 'Email'}</span>
                         <div class="flex gap-1">
+                            <button onclick="editChannel(${index})" class="px-2 py-1 text-xs border border-blue-300 dark:border-blue-800 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20">✎</button>
                             <button onclick="moveChannel(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
                             <button onclick="moveChannel(${index}, 1)" ${index === channels.length - 1 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
                             <button onclick="deleteChannel(${index})" class="px-2 py-1 text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20">🗑</button>
@@ -502,6 +505,7 @@
                     <div class="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                         <span class="font-semibold text-gray-900 dark:text-white">${repo.url || 'N/A'}</span>
                         <div class="flex gap-1">
+                            <button onclick="editRepo(${index})" class="px-2 py-1 text-xs border border-blue-300 dark:border-blue-800 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20">✎</button>
                             <button onclick="moveRepo(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
                             <button onclick="moveRepo(${index}, 1)" ${index === repos.length - 1 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
                             <button onclick="deleteRepo(${index})" class="px-2 py-1 text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20">🗑</button>
@@ -647,11 +651,54 @@
             renderNotificationChannels();
         }
 
+        function editChannel(index) {
+            const parsed = parseTOML(currentTOML);
+            if (!parsed || !parsed.notification || !parsed.notification.channels) return;
+
+            const channel = parsed.notification.channels[index];
+
+            if (channel.type === 'feishu') {
+                document.getElementById('modal-feishu').querySelector('h3').textContent = 'Edit Feishu Channel';
+                document.getElementById('feishu-webhook').value = channel.webhook_url || '';
+                document.getElementById('feishu-timeout').value = channel.timeout || 30;
+                document.getElementById('feishu-enabled').checked = channel.enabled !== false;
+                editingChannelIndex = index;
+                openModal('modal-feishu');
+            } else if (channel.type === 'email') {
+                document.getElementById('modal-email').querySelector('h3').textContent = 'Edit Email Channel';
+                document.getElementById('email-host').value = channel.host || '';
+                document.getElementById('email-port').value = channel.port || 465;
+                document.getElementById('email-ssl').checked = channel.ssl || false;
+                document.getElementById('email-user').value = channel.user || '';
+                document.getElementById('email-password').value = channel.password || '';
+                document.getElementById('email-from').value = channel.from_addr || '';
+                document.getElementById('email-recipients').value = Array.isArray(channel.recipient) ? channel.recipient.join(', ') : '';
+                document.getElementById('email-enabled').checked = channel.enabled !== false;
+                editingChannelIndex = index;
+                openModal('modal-email');
+            }
+        }
+
         function openAddFeishuModal() {
+            document.getElementById('modal-feishu').querySelector('h3').textContent = 'Add Feishu Channel';
+            document.getElementById('feishu-webhook').value = '';
+            document.getElementById('feishu-timeout').value = '30';
+            document.getElementById('feishu-enabled').checked = true;
+            editingChannelIndex = null;
             openModal('modal-feishu');
         }
 
         function openAddEmailModal() {
+            document.getElementById('modal-email').querySelector('h3').textContent = 'Add Email Channel';
+            document.getElementById('email-host').value = '';
+            document.getElementById('email-port').value = '465';
+            document.getElementById('email-ssl').checked = true;
+            document.getElementById('email-user').value = '';
+            document.getElementById('email-password').value = '';
+            document.getElementById('email-from').value = '';
+            document.getElementById('email-recipients').value = '';
+            document.getElementById('email-enabled').checked = true;
+            editingChannelIndex = null;
             openModal('modal-email');
         }
 
@@ -671,12 +718,19 @@
             if (!parsed.notification) parsed.notification = {};
             if (!parsed.notification.channels) parsed.notification.channels = [];
 
-            parsed.notification.channels.push({
+            const channelData = {
                 type: 'feishu',
                 webhook_url: webhook,
                 timeout: timeout,
                 enabled: enabled
-            });
+            };
+
+            if (editingChannelIndex !== null) {
+                parsed.notification.channels[editingChannelIndex] = channelData;
+                editingChannelIndex = null;
+            } else {
+                parsed.notification.channels.push(channelData);
+            }
 
             modifiedConfig = parsed;
             updateStatus('modified');
@@ -709,7 +763,7 @@
             if (!parsed.notification) parsed.notification = {};
             if (!parsed.notification.channels) parsed.notification.channels = [];
 
-            parsed.notification.channels.push({
+            const channelData = {
                 type: 'email',
                 enabled: enabled,
                 host: host,
@@ -720,7 +774,14 @@
                 recipient: recipients,
                 starttls: false,
                 ssl: ssl
-            });
+            };
+
+            if (editingChannelIndex !== null) {
+                parsed.notification.channels[editingChannelIndex] = channelData;
+                editingChannelIndex = null;
+            } else {
+                parsed.notification.channels.push(channelData);
+            }
 
             modifiedConfig = parsed;
             updateStatus('modified');
@@ -766,7 +827,28 @@
             renderRepositories();
         }
 
+        function editRepo(index) {
+            const parsed = parseTOML(currentTOML);
+            if (!parsed || !parsed.repos) return;
+
+            const repo = parsed.repos[index];
+
+            document.getElementById('modal-repo').querySelector('h3').textContent = 'Edit Repository';
+            document.getElementById('repo-url').value = repo.url || '';
+            document.getElementById('repo-branch').value = repo.branch || 'main';
+            document.getElementById('repo-protocol').value = repo.protocol || 'https';
+            document.getElementById('repo-enabled').checked = repo.enabled !== false;
+            editingRepoIndex = index;
+            openModal('modal-repo');
+        }
+
         function openAddRepoModal() {
+            document.getElementById('modal-repo').querySelector('h3').textContent = 'Add Repository';
+            document.getElementById('repo-url').value = '';
+            document.getElementById('repo-branch').value = 'main';
+            document.getElementById('repo-protocol').value = 'https';
+            document.getElementById('repo-enabled').checked = true;
+            editingRepoIndex = null;
             openModal('modal-repo');
         }
 
@@ -786,12 +868,19 @@
 
             if (!parsed.repos) parsed.repos = [];
 
-            parsed.repos.push({
+            const repoData = {
                 url: url,
                 branch: branch,
                 protocol: protocol,
                 enabled: enabled
-            });
+            };
+
+            if (editingRepoIndex !== null) {
+                parsed.repos[editingRepoIndex] = repoData;
+                editingRepoIndex = null;
+            } else {
+                parsed.repos.push(repoData);
+            }
 
             modifiedConfig = parsed;
             updateStatus('modified');

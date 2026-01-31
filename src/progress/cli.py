@@ -17,6 +17,7 @@ from .notification import NotificationManager, NotificationMessage
 from .reporter import MarkdownReporter
 from .repository import RepositoryManager
 from .utils import get_now
+from .web import create_app
 
 logger = logging.getLogger(__name__)
 
@@ -311,12 +312,29 @@ def process_reports(
             logger.warning(f"  - {error}")
 
 
-@click.command()
+@click.group()
 @click.option("--config", "-c", default="config.toml", help="Configuration file path")
-def main(config: str):
+@click.pass_context
+def cli(ctx, config: str):
     """Progress Tracker - GitHub code change tracking tool."""
+    ctx.ensure_object(dict)
+    ctx.obj['config_path'] = config
     setup_log()
 
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(check)
+
+
+@cli.command(name="check")
+@click.pass_context
+def check(ctx):
+    """Run repository checks and generate reports."""
+    config = ctx.obj['config_path']
+    _run_check_command(config)
+
+
+def _run_check_command(config: str):
+    """Run the main check command logic."""
     try:
         logger.info(f"Loading configuration file: {config}")
         cfg = Config.load_from_file(config)
@@ -360,6 +378,53 @@ def main(config: str):
         raise click.ClickException(str(e))
     finally:
         close_db()
+
+
+@cli.command(name="serve")
+@click.option("--host", "-h", default=None, help="Override host from config")
+@click.option("--port", "-p", default=None, type=int, help="Override port from config")
+@click.option("--debug/--no-debug", default=None, help="Enable/disable debug mode (auto-enable in dev)")
+@click.pass_context
+def serve(ctx, host, port, debug):
+    """Start development server with hot reload."""
+    config_path = ctx.obj['config_path']
+
+    try:
+        logger.info(f"Loading configuration file: {config_path}")
+        cfg = Config.load_from_file(config_path)
+
+        initialize(ui_language=cfg.language)
+
+        host = host or cfg.web.host
+        port = port or cfg.web.port
+
+        if debug is None:
+            debug = True
+
+        if debug:
+            logger.warning("Debug mode is enabled. This should NOT be used in production.")
+            if not hasattr(cfg.web, 'debug') or not cfg.web.debug:
+                logger.warning("Consider setting [web] debug = true in config.toml for development.")
+
+        app = create_app(cfg)
+
+        logger.info(f"Starting development server on {host}:{port}")
+        logger.info(f"Debug mode: {'enabled' if debug else 'disabled'}")
+        logger.info(f"Hot reload: {'enabled' if debug else 'disabled'}")
+
+        app.run(host=host, port=port, debug=debug, use_reloader=debug)
+
+    except ProgressException as e:
+        logger.error(f"Application error: {e}", exc_info=True)
+        raise click.ClickException(str(e))
+    except Exception as e:
+        logger.error(f"Program execution failed: {e}", exc_info=True)
+        raise click.ClickException(str(e))
+
+
+def main():
+    """Legacy main function for backward compatibility."""
+    cli(obj={})
 
 
 if __name__ == "__main__":

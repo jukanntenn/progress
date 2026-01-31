@@ -126,6 +126,8 @@ class WebConfig(BaseModel):
     enabled: bool = False
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=5000, ge=1, le=65535)
+    debug: bool = Field(default=False)
+    reload: bool = Field(default=True)
 
 
 class RepositoryConfig(BaseModel):

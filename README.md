@@ -254,6 +254,13 @@ enabled = false
 host = "0.0.0.0"
 # Web service port (optional, default: 5000)
 port = 5000
+# Debug mode (optional, default: false)
+# WARNING: Debug mode should NEVER be enabled in production
+# For development, use 'progress serve' which auto-enables debug mode
+debug = false
+# Auto-reload (optional, default: true)
+# Controls whether the dev server auto-reloads on file changes
+reload = true
 
 # Repository configuration (at least one required)
 [[repos]]
@@ -318,6 +325,8 @@ enabled = false  # Temporarily disabled
 - `web.enabled` - Enable or disable web service, default false
 - `web.host` - Web service host address, default 0.0.0.0
 - `web.port` - Web service port, default 5000
+- `web.debug` - Debug mode (development only), default false
+- `web.reload` - Auto-reload on file changes (development only), default true
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
 - `repos[].protocol` - Repository-level protocol configuration, default https
@@ -520,4 +529,42 @@ You can subscribe to the RSS feed using any RSS reader:
 3. Receive updates when new aggregated reports are generated
 
 The RSS feed includes the 50 most recent reports.
+
+## Development Server
+
+Progress includes a built-in development server with hot reload support for convenient web interface development.
+
+### Starting the Development Server
+
+To start the development server:
+
+```bash
+# Start dev server with hot reload (default: 0.0.0.0:5000)
+uv run progress serve
+
+# Custom host/port
+uv run progress serve --host 127.0.0.1 --port 8000
+
+# Disable debug mode
+uv run progress serve --no-debug
+
+# With custom config file
+uv run progress -c custom.toml serve
+```
+
+### Development Server Features
+
+- **Hot Reload**: Automatically restarts the server when you modify Python files
+- **Debug Mode**: Enabled by default with interactive debugger and detailed error pages
+- **Config Override**: Override host, port, and debug settings via command-line options
+
+### Production Deployment
+
+For production deployments, continue using Docker with gunicorn as documented in the [Web Service](#web-service) section. The development server (`progress serve`) is intended for local development only.
+
+### Security Note
+
+The development server enables debug mode by default, which should NEVER be used in production. The production Docker deployment uses gunicorn and is not affected by these development settings.
+
+
 

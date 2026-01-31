@@ -101,6 +101,14 @@ enabled = false
 host = "0.0.0.0"
 # Web service port (optional, default: 5000)
 port = 5000
+# Debug mode (optional, default: false)
+# WARNING: Debug mode should NEVER be enabled in production
+# For development, use 'progress serve' which auto-enables debug mode
+debug = false
+# Auto-reload (optional, default: true)
+# Controls whether the dev server auto-reloads on file changes
+# Only applicable when using 'progress serve' in development
+reload = true
 
 # ========== Repository Configuration ==========
 [[repos]]
