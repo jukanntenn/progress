@@ -11,7 +11,14 @@ from .consts import CMD_GH, GH_MAX_RETRIES, parse_repo_name
 from .db import UTC
 from .enums import Protocol
 from .errors import GitException
-from .github import GitClient, parse_protocol_from_url, resolve_repo_url, sanitize_repo_name
+from .github import (
+    GitClient,
+    gh_release_get_commit,
+    gh_release_list,
+    parse_protocol_from_url,
+    resolve_repo_url,
+    sanitize_repo_name,
+)
 from .models import Repository
 from .utils import get_now, retry, run_command, sanitize
 
@@ -290,6 +297,172 @@ class Repo:
             self.model.last_commit_hash = current_commit
             self.model.last_check_time = get_now(UTC)
             self.model.save()
+
+    def update_releases(self, release_tag: str, commit_hash: str) -> None:
+        """Update repository release tracking state after analysis.
+
+        Args:
+            release_tag: Release tag name (e.g., "v5.0.0")
+            commit_hash: Commit hash the release tag points to
+        """
+        from . import db
+
+        database = db.database
+        with database.atomic():
+            self.model.last_release_tag = release_tag
+            self.model.last_release_commit_hash = commit_hash
+            self.model.last_release_check_time = get_now(UTC)
+            self.model.save()
+
+    def check_releases(self) -> Optional[dict]:
+        """Check for new GitHub releases.
+
+        Returns:
+            Dict with release data, or None if no new releases:
+            - is_first_check: bool
+            - latest_release: dict with tag, name, notes, published_at, commit_hash
+            - intermediate_releases: list of dicts
+            - diff_from: str (previous tag)
+            - diff_to: str (latest tag)
+            - diff_content: str (git diff)
+        """
+        try:
+            releases = gh_release_list(self.slug)
+        except GitException as e:
+            logger.warning(f"Failed to check releases for {self.slug}: {e}")
+            return None
+
+        if not releases:
+            logger.debug(f"No releases found for {self.slug}")
+            return None
+
+        if self.model.last_release_tag is None:
+            return self._handle_first_release_check(releases)
+        else:
+            return self._handle_incremental_release_check(releases)
+
+    def _handle_first_release_check(self, releases: List[dict]) -> dict:
+        """Handle first-time release check.
+
+        Args:
+            releases: List of release dicts from gh_release_list
+
+        Returns:
+            Dict with release data (no diff content)
+        """
+        from .github import gh_release_get_commit, gh_release_get_body
+
+        latest = releases[0]
+        try:
+            commit_hash = gh_release_get_commit(self.slug, latest["tagName"])
+        except GitException as e:
+            logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
+            commit_hash = None
+
+        try:
+            notes = gh_release_get_body(self.slug, latest["tagName"])
+        except GitException as e:
+            logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
+            notes = ""
+
+        return {
+            "is_first_check": True,
+            "latest_release": {
+                "tag": latest["tagName"],
+                "name": latest["name"],
+                "notes": notes,
+                "published_at": latest["publishedAt"],
+                "commit_hash": commit_hash,
+            },
+            "intermediate_releases": [],
+            "diff_content": None,
+        }
+
+    def _handle_incremental_release_check(self, releases: List[dict]) -> Optional[dict]:
+        """Handle incremental release check.
+
+        Args:
+            releases: List of release dicts from gh_release_list
+
+        Returns:
+            Dict with release data including diff, or None if no new releases
+        """
+        last_check_time = self.model.last_release_check_time
+
+        from datetime import datetime
+
+        new_releases = []
+        for r in releases:
+            published_at_str = r.get("publishedAt")
+            if published_at_str:
+                try:
+                    published_at = datetime.fromisoformat(published_at_str.replace("Z", "+00:00"))
+                    if last_check_time and published_at > last_check_time:
+                        new_releases.append(r)
+                except (ValueError, TypeError):
+                    logger.debug(f"Could not parse publishedAt: {published_at_str}")
+                    continue
+
+        if not new_releases:
+            return None
+
+        from .github import gh_release_get_commit, gh_release_get_body
+
+        new_releases_asc = sorted(new_releases, key=lambda r: r["publishedAt"])
+        latest = new_releases_asc[-1]
+
+        try:
+            commit_hash = gh_release_get_commit(self.slug, latest["tagName"])
+        except GitException as e:
+            logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
+            commit_hash = None
+
+        try:
+            notes = gh_release_get_body(self.slug, latest["tagName"])
+        except GitException as e:
+            logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
+            notes = ""
+
+        diff_content = None
+        last_commit_hash = self.model.last_release_commit_hash
+        if commit_hash and last_commit_hash:
+            try:
+                diff_content = self.git.get_commit_diff(
+                    self.repo_path, str(last_commit_hash), commit_hash
+                )
+            except GitException as e:
+                logger.warning(f"Failed to generate diff for releases: {e}")
+                diff_content = None
+
+        intermediate = new_releases_asc[:-1]
+        intermediate_with_notes = []
+        for r in intermediate:
+            try:
+                r_notes = gh_release_get_body(self.slug, r["tagName"])
+            except GitException as e:
+                logger.warning(f"Failed to get release notes for {r['tagName']}: {e}")
+                r_notes = ""
+            intermediate_with_notes.append({
+                "tag": r["tagName"],
+                "name": r["name"],
+                "notes": r_notes,
+                "published_at": r["publishedAt"],
+            })
+
+        return {
+            "is_first_check": False,
+            "latest_release": {
+                "tag": latest["tagName"],
+                "name": latest["name"],
+                "notes": notes,
+                "published_at": latest["publishedAt"],
+                "commit_hash": commit_hash,
+            },
+            "intermediate_releases": intermediate_with_notes,
+            "diff_from": str(self.model.last_release_tag) if self.model.last_release_tag else None,
+            "diff_to": latest["tagName"],
+            "diff_content": diff_content,
+        }
 
     def get_commit_messages(
         self, old_commit: Optional[str], new_commit: str

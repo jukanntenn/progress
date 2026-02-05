@@ -9,7 +9,8 @@ from .config import Config
 from .consts import DATABASE_PATH
 from .db import close_db, create_tables, init_db, save_report
 from .errors import ProgressException
-from .i18n import initialize, gettext as _
+from .i18n import gettext as _
+from .i18n import initialize
 from .log import setup as setup_log
 from .markpost import MarkpostClient
 from .models import Repository
@@ -254,9 +255,7 @@ def process_reports(
             batch_commit_count = sum(r.commit_count for r in batch.reports)
             summary_text = _(
                 "This report covered {count} projects with {commits} commits total"
-            ).format(
-                count=len(batch.reports), commits=batch_commit_count
-            )
+            ).format(count=len(batch.reports), commits=batch_commit_count)
 
             batch_repo_statuses = {
                 name: status
@@ -312,13 +311,13 @@ def process_reports(
             logger.warning(f"  - {error}")
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option("--config", "-c", default="config.toml", help="Configuration file path")
 @click.pass_context
 def cli(ctx, config: str):
     """Progress Tracker - GitHub code change tracking tool."""
     ctx.ensure_object(dict)
-    ctx.obj['config_path'] = config
+    ctx.obj["config_path"] = config
     setup_log()
 
     if ctx.invoked_subcommand is None:
@@ -329,7 +328,7 @@ def cli(ctx, config: str):
 @click.pass_context
 def check(ctx):
     """Run repository checks and generate reports."""
-    config = ctx.obj['config_path']
+    config = ctx.obj["config_path"]
     _run_check_command(config)
 
 
@@ -341,7 +340,9 @@ def _run_check_command(config: str):
 
         initialize(ui_language=cfg.language)
 
-        notification_manager, markpost_client, repo_manager, reporter = initialize_components(cfg)
+        notification_manager, markpost_client, repo_manager, reporter = (
+            initialize_components(cfg)
+        )
 
         sync_result = repo_manager.sync(cfg.repos)
         logger.info(f"Sync completed: {sync_result}")
@@ -383,11 +384,15 @@ def _run_check_command(config: str):
 @cli.command(name="serve")
 @click.option("--host", "-h", default=None, help="Override host from config")
 @click.option("--port", "-p", default=None, type=int, help="Override port from config")
-@click.option("--debug/--no-debug", default=None, help="Enable/disable debug mode (auto-enable in dev)")
+@click.option(
+    "--debug/--no-debug",
+    default=None,
+    help="Enable/disable debug mode (auto-enable in dev)",
+)
 @click.pass_context
 def serve(ctx, host, port, debug):
     """Start development server with hot reload."""
-    config_path = ctx.obj['config_path']
+    config_path = ctx.obj["config_path"]
 
     try:
         logger.info(f"Loading configuration file: {config_path}")
@@ -402,9 +407,13 @@ def serve(ctx, host, port, debug):
             debug = True
 
         if debug:
-            logger.warning("Debug mode is enabled. This should NOT be used in production.")
-            if not hasattr(cfg.web, 'debug') or not cfg.web.debug:
-                logger.warning("Consider setting [web] debug = true in config.toml for development.")
+            logger.warning(
+                "Debug mode is enabled. This should NOT be used in production."
+            )
+            if not hasattr(cfg.web, "debug") or not cfg.web.debug:
+                logger.warning(
+                    "Consider setting [web] debug = true in config.toml for development."
+                )
 
         app = create_app(cfg)
 

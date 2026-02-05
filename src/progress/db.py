@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from peewee import CharField
+from peewee import CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
@@ -84,6 +84,30 @@ def migrate_database():
         database.execute_sql("DROP TABLE reports")
         database.execute_sql("ALTER TABLE reports_new RENAME TO reports")
         logger.info("Migration completed: 'repo' column is now nullable")
+
+    cursor = database.execute_sql("PRAGMA table_info(repositories)")
+    repo_existing_columns = {row[1] for row in cursor.fetchall()}
+
+    if "last_release_tag" not in repo_existing_columns:
+        logger.info("Migrating: Adding release tracking columns to repositories table")
+        migrate(
+            migrator.add_column(
+                "repositories",
+                "last_release_tag",
+                CharField(null=True),
+            ),
+            migrator.add_column(
+                "repositories",
+                "last_release_commit_hash",
+                CharField(null=True),
+            ),
+            migrator.add_column(
+                "repositories",
+                "last_release_check_time",
+                DateTimeField(null=True),
+            ),
+        )
+        logger.info("Migration completed: release tracking columns added")
 
 
 def create_tables():

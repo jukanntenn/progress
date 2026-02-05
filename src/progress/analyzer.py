@@ -93,6 +93,99 @@ class ClaudeCodeAnalyzer:
 
             return summary, detail, truncated, original_length, len(diff)
 
+    def analyze_releases(
+        self,
+        repo_name: str,
+        branch: str,
+        release_data: dict,
+    ) -> tuple[str, str]:
+        """Analyze GitHub releases and return summary and detail.
+
+        Args:
+            repo_name: Repository name
+            branch: Branch name
+            release_data: Release data dict from repo.check_releases()
+
+        Returns:
+            (summary, detail) tuple
+        """
+        prompt = self._build_release_analysis_prompt(
+            repo_name,
+            branch,
+            release_data,
+        )
+        logger.info(f"Analyzing releases for {repo_name}...")
+        summary, detail = self._run_claude_release_analysis(prompt)
+        return summary, detail
+
+    def _build_release_analysis_prompt(
+        self,
+        repo_name: str,
+        branch: str,
+        release_data: dict,
+    ) -> str:
+        """Build release analysis prompt."""
+        template = self.jinja_env.get_template("release_analysis_prompt.j2")
+        return template.render(
+            repo_name=repo_name,
+            branch=branch,
+            release_data=release_data,
+            is_first_check=release_data.get("is_first_check", False),
+            language=self.language,
+        )
+
+    def _run_claude_release_analysis(self, prompt: str) -> tuple[str, str]:
+        """Execute claude-code CLI release analysis.
+
+        Args:
+            prompt: Analysis prompt
+
+        Returns:
+            (summary, detail) tuple
+
+        Raises:
+            AnalysisException: If analysis fails or JSON is invalid
+        """
+        cmd = [self.claude_code_path, "-p", prompt]
+        output = ""
+
+        try:
+            output = run_command(
+                cmd,
+                timeout=self.timeout,
+                check=False,
+            )
+
+            logger.debug(f"Claude release output length: {len(output)}")
+
+            json_str = self._extract_json(output)
+            data = json.loads(json_str)
+
+            summary = data.get("summary", "")
+            detail = data.get("detail", "")
+
+            if not summary or not detail:
+                logger.error("JSON response missing required fields")
+                raise AnalysisException("Invalid JSON response: missing 'summary' or 'detail' field")
+
+            return summary, detail
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude output: {e}")
+            logger.debug(f"Raw output: {output}")
+            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+        except Exception as e:
+            from .errors import CommandException
+            if isinstance(e, CommandException):
+                logger.error(f"Claude Code release analysis failed: {e}")
+                raise AnalysisException(str(e)) from e
+            if isinstance(e, FileNotFoundError):
+                logger.error(f"Claude Code executable not found: {e}")
+                raise AnalysisException(
+                    f"Claude Code executable not found: {self.claude_code_path}"
+                ) from e
+            raise
+
     def generate_title_and_summary(self, aggregated_report: str) -> tuple[str, str]:
         """Generate title and summary from aggregated report.
 

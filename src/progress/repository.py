@@ -57,6 +57,9 @@ class RepositoryReport:
     truncated: bool
     original_diff_length: int
     analyzed_diff_length: int
+    release_data: dict | None = None
+    release_summary: str = ""
+    release_detail: str = ""
 
     @property
     def content(self) -> str:
@@ -210,7 +213,7 @@ class RepositoryManager:
             return None
 
     def check(self, repo: Repository) -> RepositoryReport | None:
-        """Check code changes for a single repository.
+        """Check code changes and releases for a single repository.
 
         Args:
             repo: Repository object
@@ -232,37 +235,85 @@ class RepositoryManager:
         # Clone or update repository
         repo_obj.clone_or_update()
 
+        # Check releases (independent from commits)
+        release_data = None
+        release_summary = ""
+        release_detail = ""
+        try:
+            release_data = repo_obj.check_releases()
+            if release_data:
+                self.logger.info("Found new releases, analyzing...")
+                release_summary, release_detail = self.analyzer.analyze_releases(
+                    str(repo.name), str(repo.branch), release_data
+                )
+                latest = release_data["latest_release"]
+                commit_hash = latest.get("commit_hash")
+                if commit_hash:
+                    repo_obj.update_releases(latest["tag"], commit_hash)
+        except Exception as e:
+            self.logger.warning(f"Release analysis failed for {repo.name}: {e}")
+            if release_data:
+                from .i18n import gettext as _
+                latest = release_data["latest_release"]
+                tag = latest.get("tag", "unknown")
+                notes = latest.get("notes", "")
+                release_summary = _("**New release {tag} is available.**\n\n").format(tag=tag)
+                if notes:
+                    release_summary += _("**Release Notes:**\n\n{notes}\n\n").format(notes=notes[:500])
+                release_summary += _("*AI analysis was not available. View release notes on GitHub for full details.*")
+                release_detail = _("**Release Information:**\n\n")
+                release_detail += f"- **Tag:** {tag}\n"
+                release_detail += f"- **Name:** {latest.get('name', tag)}\n"
+                release_detail += f"- **Published:** {latest.get('published_at', 'unknown')}\n"
+                if notes:
+                    release_detail += f"\n**Release Notes:**\n\n{notes}\n"
+                if release_data.get("intermediate_releases"):
+                    release_detail += f"\n**Intermediate Releases:** {len(release_data['intermediate_releases'])} additional release(s)\n"
+
         # Get diff data, returns None if no new commits
         diff_data = repo_obj.get_diff()
-        if diff_data is None:
-            self.logger.debug("No new commits, skipping")
+        if diff_data is None and not release_data:
+            self.logger.debug("No new commits or releases, skipping")
             return None
 
-        diff, previous_commit, commit_count, commit_messages, _ = diff_data
+        # Initialize with empty values
+        diff = ""
+        previous_commit = None
+        commit_count = 0
+        commit_messages = []
+        analysis_summary = ""
+        analysis_detail = ""
+        truncated = False
+        original_length = 0
+        analyzed_length = 0
+        current_commit = None
 
-        if not diff.strip():
-            self.logger.warning("Diff is empty, skipping analysis")
-            repo_obj.update(repo_obj.get_current_commit())
-            return None
+        if diff_data:
+            diff, previous_commit, commit_count, commit_messages, _ = diff_data
 
-        self.logger.info(f"Found {commit_count} new commits")
-        self.logger.info("Analyzing code changes...")
-        analysis_summary, analysis_detail, truncated, original_length, analyzed_length = (
-            self.analyzer.analyze_diff(repo.name, repo.branch, diff, commit_messages)
-        )
+            if diff.strip():
+                self.logger.info(f"Found {commit_count} new commits")
+                self.logger.info("Analyzing code changes...")
+                analysis_summary, analysis_detail, truncated, original_length, analyzed_length = (
+                    self.analyzer.analyze_diff(str(repo.name), str(repo.branch), diff, commit_messages)
+                )
+                current_commit = repo_obj.get_current_commit()
+                repo_obj.update(current_commit)
+            else:
+                self.logger.warning("Diff is empty, skipping commit analysis")
 
-        current_commit = repo_obj.get_current_commit()
-        repo_obj.update(current_commit)
+        if not current_commit:
+            current_commit = repo_obj.get_current_commit()
 
         self.logger.info(f"Repository {repo.name} check completed")
 
         return RepositoryReport(
-            repo_name=repo.name,
+            repo_name=str(repo.name),
             repo_slug=repo_obj.slug,
             repo_web_url=repo_obj.link,
-            branch=repo.branch,
+            branch=str(repo.branch),
             commit_count=commit_count,
-            current_commit=current_commit,
+            current_commit=current_commit or "",
             previous_commit=previous_commit,
             commit_messages=commit_messages,
             analysis_summary=analysis_summary,
@@ -270,6 +321,9 @@ class RepositoryManager:
             truncated=truncated,
             original_diff_length=original_length,
             analyzed_diff_length=analyzed_length,
+            release_data=release_data,
+            release_summary=release_summary,
+            release_detail=release_detail,
         )
 
     def check_all(

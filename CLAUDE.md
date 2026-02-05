@@ -66,6 +66,7 @@ progress/
 │       │   ├── repository_report.j2
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
+│       │   ├── release_analysis_prompt.j2
 │       │   ├── email_notification.j2
 │       │   └── web/       # Web UI templates
 │       │       ├── list.html

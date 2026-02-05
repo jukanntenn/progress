@@ -7,6 +7,7 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 ## Features
 
 - **Multi-repo Monitoring** - Monitor multiple GitHub repositories simultaneously and track code changes
+- **Release Tracking** - Automatically track GitHub releases and analyze changes between versions
 - **AI-Powered Analysis** - Use Claude Code CLI to analyze code changes and generate Markdown analysis reports
 - **Notifications** - Support for Feishu and email notifications to deliver analysis reports timely
 - **Web Service** - Built-in web interface for browsing aggregated reports and RSS feed support

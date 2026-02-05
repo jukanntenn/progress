@@ -197,7 +197,7 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         def analyze_diff(self, repo_name, branch, diff, commit_messages):
             assert diff == "diff"
             assert commit_messages == ["m"]
-            return ("report", False, 4, 4)
+            return ("report", "detail", False, 4, 4)
 
     repo = SimpleNamespace(
         id=1,
@@ -264,7 +264,7 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         def analyze_diff(self, repo_name, branch, diff, commit_messages):
             assert diff == "patches"
             assert commit_messages == ["m1", "m2"]
-            return ("report", False, 7, 7)
+            return ("report", "detail", False, 7, 7)
 
     repo = SimpleNamespace(
         id=1,

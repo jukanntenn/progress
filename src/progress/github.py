@@ -8,6 +8,7 @@ import subprocess
 import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
+import json
 
 from .consts import (
     CMD_GH,
@@ -406,5 +407,151 @@ class GitClient:
         """
         cmd = [CMD_GIT, "-C", str(repo_path)] + args
         return run_command(cmd, timeout=self.timeout)
+
+
+def gh_release_list(
+    repo_slug: str,
+    exclude_drafts: bool = True,
+    exclude_pre_releases: bool = True,
+    limit: int = 100,
+) -> List[dict]:
+    """List GitHub releases for a repository.
+
+    Security: All parameters are safely passed as list arguments to subprocess,
+    preventing command injection. Release data from GitHub is treated as
+    read-only and not executed or interpolated into commands.
+
+    Args:
+        repo_slug: Repository slug in format "owner/repo"
+        exclude_drafts: Whether to exclude draft releases
+        exclude_pre_releases: Whether to exclude pre-releases
+        limit: Maximum number of releases to fetch
+
+    Returns:
+        List of release dicts with keys: tagName, name, body, publishedAt, targetCommitish
+
+    Raises:
+        GitException: If gh command fails
+    """
+    cmd = [
+        CMD_GH,
+        "release",
+        "list",
+        "--repo",
+        repo_slug,
+        "--limit",
+        str(limit),
+        "--json",
+        "tagName,name,publishedAt",
+    ]
+
+    if exclude_drafts:
+        cmd.append("--exclude-drafts")
+    if exclude_pre_releases:
+        cmd.append("--exclude-pre-releases")
+
+    try:
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        releases = json.loads(output) if output.strip() else []
+        logger.debug(f"Found {len(releases)} releases for {repo_slug}")
+        return releases
+    except RuntimeError as e:
+        error_str = str(e).lower()
+        if "no releases found" in error_str or "not found" in error_str:
+            logger.debug(f"No releases found for {repo_slug}")
+            return []
+        if "rate limit" in error_str or "api rate limit" in error_str:
+            logger.warning(f"GitHub API rate limit reached while checking {repo_slug}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}")
+        if "repository not found" in error_str or "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
+            logger.warning(f"Repository {repo_slug} not found or access denied")
+            raise GitException(f"Repository {repo_slug} not found or access denied: {e}")
+        raise GitException(f"Failed to list releases for {repo_slug}: {e}")
+
+
+def gh_release_get_commit(repo_slug: str, tag_name: str) -> str:
+    """Get the commit hash that a release tag points to.
+
+    Args:
+        repo_slug: Repository slug in format "owner/repo"
+        tag_name: Release tag name (e.g., "v5.0.0")
+
+    Returns:
+        Commit hash string
+
+    Raises:
+        GitException: If gh command fails or release not found
+    """
+    cmd = [
+        CMD_GH,
+        "release",
+        "view",
+        tag_name,
+        "--repo",
+        repo_slug,
+        "--json",
+        "targetCommitish",
+        "--jq",
+        ".targetCommitish",
+    ]
+
+    try:
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        commit_hash = output.strip()
+        if not commit_hash:
+            raise GitException(f"No commit hash found for release {tag_name}")
+        logger.debug(f"Release {tag_name} points to commit {commit_hash}")
+        return commit_hash
+    except RuntimeError as e:
+        error_str = str(e).lower()
+        if "rate limit" in error_str or "api rate limit" in error_str:
+            logger.warning(f"GitHub API rate limit reached while getting {tag_name}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}")
+        if "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
+            logger.warning(f"Release {tag_name} not found or access denied")
+            raise GitException(f"Release {tag_name} not found or access denied: {e}")
+        raise GitException(f"Failed to get commit hash for release {tag_name}: {e}")
+
+
+def gh_release_get_body(repo_slug: str, tag_name: str) -> str:
+    """Get the release notes/body for a release.
+
+    Args:
+        repo_slug: Repository slug in format "owner/repo"
+        tag_name: Release tag name (e.g., "v5.0.0")
+
+    Returns:
+        Release notes/body string
+
+    Raises:
+        GitException: If gh command fails or release not found
+    """
+    cmd = [
+        CMD_GH,
+        "release",
+        "view",
+        tag_name,
+        "--repo",
+        repo_slug,
+        "--json",
+        "body",
+        "--jq",
+        ".body",
+    ]
+
+    try:
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        body = output.strip()
+        logger.debug(f"Fetched release notes for {tag_name}")
+        return body
+    except RuntimeError as e:
+        error_str = str(e).lower()
+        if "rate limit" in error_str or "api rate limit" in error_str:
+            logger.warning(f"GitHub API rate limit reached while getting {tag_name}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}")
+        if "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
+            logger.warning(f"Release {tag_name} not found or access denied")
+            raise GitException(f"Release {tag_name} not found or access denied: {e}")
+        raise GitException(f"Failed to get release notes for {tag_name}: {e}")
 
 

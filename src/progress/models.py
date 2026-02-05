@@ -40,6 +40,9 @@ class Repository(BaseModel):
     enabled = BooleanField(default=True)
     created_at = DateTimeField(default=lambda: datetime.now(UTC))
     updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+    last_release_tag = CharField(null=True)
+    last_release_commit_hash = CharField(null=True)
+    last_release_check_time = DateTimeField(null=True)
 
     class Meta:
         table_name = "repositories"

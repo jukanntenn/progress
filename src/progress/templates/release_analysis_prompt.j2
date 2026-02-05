@@ -1,0 +1,103 @@
+You are analyzing a GitHub release for a repository.
+
+**Repository**: {{ repo_name }}
+**Branch**: {{ branch }}
+
+{% if is_first_check %}
+## First Release Check
+
+This is the first time checking releases for this repository.
+
+**Release**: {{ release_data.latest_release.tag }}
+{% if release_data.latest_release.name %}**Name**: {{ release_data.latest_release.name }}{% endif %}
+**Published**: {{ release_data.latest_release.published_at }}
+
+### Release Notes
+
+{{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
+
+{% else %}
+## New Release Detected
+
+**Latest Release**: {{ release_data.latest_release.tag }}
+{% if release_data.latest_release.name %}**Name**: {{ release_data.latest_release.name }}{% endif %}
+**Published**: {{ release_data.latest_release.published_at }}
+**Previous Release**: {{ release_data.diff_from }}
+
+### Release Notes
+
+{{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
+
+{% if release_data.intermediate_releases %}
+### Other Releases Since Last Check
+
+{% for r in release_data.intermediate_releases %}
+**{{ r.tag }}** ({{ r.published_at }})
+{% if r.name %}Name: {{ r.name }}{% endif %}
+Notes: {{ r.notes if r.notes else "No notes provided." }}
+
+{% endfor %}
+{% endif %}
+
+{% if release_data.diff_content %}
+### Code Changes
+
+The following diff shows all code changes between {{ release_data.diff_from }} and {{ release_data.diff_to }}:
+
+```
+{{ release_data.diff_content }}
+```
+{% endif %}
+{% endif %}
+
+## Your Task
+
+Analyze this release and provide:
+
+1. **Executive Summary** (2-3 sentences): What's the main purpose of this release?
+
+2. **Key Changes**: Categorize changes into:
+   - 🎁 **New Features**: What new capabilities are added?
+   - 🐛 **Bug Fixes**: What issues are resolved?
+   - ⚠️ **Breaking Changes**: What changes could break existing functionality?
+   - 🔧 **Improvements**: What has been improved?
+   - 📚 **Documentation**: What documentation changes are included?
+
+3. **Upgrade Guidance**:
+   - Should users upgrade? Why/why not?
+   - Are there any migration steps needed?
+   - What are the risks or concerns?
+
+4. **Impact Assessment**: Low/Medium/High impact for users depending on this project.
+
+{% if not is_first_check %}
+5. **Cumulative Changes Summary**: If there were multiple releases, provide a brief summary of what changed across all of them.
+{% endif %}
+
+{% if language %}
+**Important**: Write your analysis in {{ language }}.
+{% endif %}
+
+## Output Format
+
+**CRITICAL**: You MUST respond with a valid JSON object only. Do not include any markdown formatting, code blocks, or explanatory text outside the JSON structure.
+
+Your response must be in this exact JSON format:
+
+```json
+{
+  "summary": "A 2-3 sentence executive summary of the release",
+  "detail": "Full detailed analysis including key changes, upgrade guidance, and impact assessment in markdown format"
+}
+```
+
+Requirements:
+- `summary`: A concise 2-3 sentence overview suitable for quick reading
+- `detail`: Comprehensive markdown analysis with all sections (key changes categorized with emojis, upgrade guidance, impact assessment, etc.)
+- Both fields must be non-empty strings
+- Output ONLY the JSON object, nothing else
+- Do not wrap the JSON in markdown code blocks
+- Do not add any explanatory text before or after the JSON
+
+Example:
+{"summary":"This release adds dark mode support and fixes 5 critical bugs.","detail":"## 🎦 New Features\n\n- **Dark Mode**: Full dark theme support across all pages\n\n## 🐛 Bug Fixes\n\n- Fixed login issue with Safari browsers\n- Resolved memory leak in dashboard\n..."}
