@@ -327,7 +327,7 @@ class Repo:
             - diff_content: str (git diff)
         """
         try:
-            releases = gh_release_list(self.slug)
+            releases = gh_release_list(self.slug, gh_token=self.gh_token)
         except GitException as e:
             logger.warning(f"Failed to check releases for {self.slug}: {e}")
             return None
@@ -354,13 +354,13 @@ class Repo:
 
         latest = releases[0]
         try:
-            commit_hash = gh_release_get_commit(self.slug, latest["tagName"])
+            commit_hash = gh_release_get_commit(self.slug, latest["tagName"], gh_token=self.gh_token)
         except GitException as e:
             logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
             commit_hash = None
 
         try:
-            notes = gh_release_get_body(self.slug, latest["tagName"])
+            notes = gh_release_get_body(self.slug, latest["tagName"], gh_token=self.gh_token)
         except GitException as e:
             logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
             notes = ""
@@ -412,13 +412,13 @@ class Repo:
         latest = new_releases_asc[-1]
 
         try:
-            commit_hash = gh_release_get_commit(self.slug, latest["tagName"])
+            commit_hash = gh_release_get_commit(self.slug, latest["tagName"], gh_token=self.gh_token)
         except GitException as e:
             logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
             commit_hash = None
 
         try:
-            notes = gh_release_get_body(self.slug, latest["tagName"])
+            notes = gh_release_get_body(self.slug, latest["tagName"], gh_token=self.gh_token)
         except GitException as e:
             logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
             notes = ""
@@ -438,7 +438,7 @@ class Repo:
         intermediate_with_notes = []
         for r in intermediate:
             try:
-                r_notes = gh_release_get_body(self.slug, r["tagName"])
+                r_notes = gh_release_get_body(self.slug, r["tagName"], gh_token=self.gh_token)
             except GitException as e:
                 logger.warning(f"Failed to get release notes for {r['tagName']}: {e}")
                 r_notes = ""

@@ -414,6 +414,7 @@ def gh_release_list(
     exclude_drafts: bool = True,
     exclude_pre_releases: bool = True,
     limit: int = 100,
+    gh_token: Optional[str] = None,
 ) -> List[dict]:
     """List GitHub releases for a repository.
 
@@ -426,6 +427,7 @@ def gh_release_list(
         exclude_drafts: Whether to exclude draft releases
         exclude_pre_releases: Whether to exclude pre-releases
         limit: Maximum number of releases to fetch
+        gh_token: GitHub token for authentication (optional)
 
     Returns:
         List of release dicts with keys: tagName, name, body, publishedAt, targetCommitish
@@ -450,8 +452,14 @@ def gh_release_list(
     if exclude_pre_releases:
         cmd.append("--exclude-pre-releases")
 
+    env = None
+    if gh_token:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = gh_token
+        logger.debug(f"Using GH_TOKEN for release list: {gh_token[:8]}...")
+
     try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
         releases = json.loads(output) if output.strip() else []
         logger.debug(f"Found {len(releases)} releases for {repo_slug}")
         return releases
@@ -469,12 +477,13 @@ def gh_release_list(
         raise GitException(f"Failed to list releases for {repo_slug}: {e}")
 
 
-def gh_release_get_commit(repo_slug: str, tag_name: str) -> str:
+def gh_release_get_commit(repo_slug: str, tag_name: str, gh_token: Optional[str] = None) -> str:
     """Get the commit hash that a release tag points to.
 
     Args:
         repo_slug: Repository slug in format "owner/repo"
         tag_name: Release tag name (e.g., "v5.0.0")
+        gh_token: GitHub token for authentication (optional)
 
     Returns:
         Commit hash string
@@ -495,8 +504,14 @@ def gh_release_get_commit(repo_slug: str, tag_name: str) -> str:
         ".targetCommitish",
     ]
 
+    env = None
+    if gh_token:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = gh_token
+        logger.debug(f"Using GH_TOKEN for release view: {gh_token[:8]}...")
+
     try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
         commit_hash = output.strip()
         if not commit_hash:
             raise GitException(f"No commit hash found for release {tag_name}")
@@ -513,12 +528,13 @@ def gh_release_get_commit(repo_slug: str, tag_name: str) -> str:
         raise GitException(f"Failed to get commit hash for release {tag_name}: {e}")
 
 
-def gh_release_get_body(repo_slug: str, tag_name: str) -> str:
+def gh_release_get_body(repo_slug: str, tag_name: str, gh_token: Optional[str] = None) -> str:
     """Get the release notes/body for a release.
 
     Args:
         repo_slug: Repository slug in format "owner/repo"
         tag_name: Release tag name (e.g., "v5.0.0")
+        gh_token: GitHub token for authentication (optional)
 
     Returns:
         Release notes/body string
@@ -539,8 +555,14 @@ def gh_release_get_body(repo_slug: str, tag_name: str) -> str:
         ".body",
     ]
 
+    env = None
+    if gh_token:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = gh_token
+        logger.debug(f"Using GH_TOKEN for release body: {gh_token[:8]}...")
+
     try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND)
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
         body = output.strip()
         logger.debug(f"Fetched release notes for {tag_name}")
         return body

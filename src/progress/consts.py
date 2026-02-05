@@ -94,7 +94,10 @@ def parse_repo_name(url: str) -> str:
         return f"{ssh_match.group(1)}/{ssh_match.group(2)}"
 
     if "/" in url:
-        parts = url.rstrip(GIT_SUFFIX).split("/")
+        # Remove .git suffix if present (use removesuffix, not rstrip)
+        if url.endswith(GIT_SUFFIX):
+            url = url[:-4]
+        parts = url.split("/")
         if len(parts) >= 2:
             return f"{parts[-2]}/{parts[-1]}"
 

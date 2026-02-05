@@ -299,3 +299,38 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         assert report.previous_commit == "o" * 40
         assert report.current_commit == "n" * 40
         assert report.commit_count == 2
+
+
+class TestParseRepoName:
+    """Test parse_repo_name function."""
+
+    @pytest.mark.parametrize(
+        "input_url,expected",
+        [
+            # Short format (owner/repo)
+            ("OpenListTeam/OpenList", "OpenListTeam/OpenList"),
+            ("vitejs/vite", "vitejs/vite"),
+            # Short format with .git suffix
+            ("OpenListTeam/OpenList.git", "OpenListTeam/OpenList"),
+            ("vitejs/vite.git", "vitejs/vite"),
+            # HTTPS format
+            ("https://github.com/OpenListTeam/OpenList.git", "OpenListTeam/OpenList"),
+            ("https://github.com/vitejs/vite", "vitejs/vite"),
+            # SSH format
+            ("git@github.com:OpenListTeam/OpenList.git", "OpenListTeam/OpenList"),
+            ("git@github.com:vitejs/vite", "vitejs/vite"),
+            # Repo names ending with characters from .git set
+            # Regression test for rstrip bug where 't' in "OpenList" was removed
+            ("owner/test", "owner/test"),
+            ("owner/git", "owner/git"),
+            # Edge cases with multiple dots in name (not suffix)
+            ("owner/vue.js", "owner/vue.js"),
+        ],
+    )
+    def test_parse_repo_name(self, input_url, expected):
+        """Test parse_repo_name extracts owner/repo correctly."""
+        from progress.consts import parse_repo_name
+
+        result = parse_repo_name(input_url)
+        assert result == expected, f"Failed for {input_url}: got {result}, expected {expected}"
+

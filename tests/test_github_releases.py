@@ -158,6 +158,18 @@ class TestGhReleaseList:
             assert "--limit" in called_cmd
             assert "100" in called_cmd
 
+    def test_gh_token_passed_to_command(self):
+        """Test that gh_token is passed to run_command via env."""
+        with patch('progress.github.run_command') as mock_cmd:
+            mock_cmd.return_value = '[]'
+            gh_release_list("owner/repo", gh_token="test_token_123")
+
+            mock_cmd.assert_called_once()
+            call_kwargs = mock_cmd.call_args[1]
+            assert 'env' in call_kwargs
+            assert call_kwargs['env'] is not None
+            assert call_kwargs['env']['GH_TOKEN'] == "test_token_123"
+
 
 class TestGhReleaseGetCommit:
     """Test gh_release_get_commit function."""
@@ -231,3 +243,15 @@ class TestGhReleaseGetCommit:
             assert "v2.0.0" in called_cmd
             assert "--repo" in called_cmd
             assert "owner/repo" in called_cmd
+
+    def test_gh_token_passed_to_command(self):
+        """Test that gh_token is passed to run_command via env."""
+        with patch('progress.github.run_command') as mock_cmd:
+            mock_cmd.return_value = "abc123"
+            gh_release_get_commit("owner/repo", "v1.0.0", gh_token="my_token")
+
+            mock_cmd.assert_called_once()
+            call_kwargs = mock_cmd.call_args[1]
+            assert 'env' in call_kwargs
+            assert call_kwargs['env'] is not None
+            assert call_kwargs['env']['GH_TOKEN'] == "my_token"
