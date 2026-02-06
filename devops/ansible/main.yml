@@ -33,11 +33,11 @@
         dest: "{{ compose_file }}"
         mode: "0644"
 
-    - name: Copy config.toml
-      template:
-        src: config.toml.j2
-        dest: "{{ config_file }}"
-        mode: "0600"
+    # - name: Copy config.toml
+    #   template:
+    #     src: config.toml.j2
+    #     dest: "{{ config_file }}"
+    #     mode: "0600"
 
     - name: Copy claude_settings.json
       template:

@@ -3,7 +3,7 @@ services:
     image: jukanntenn/progress:latest
     container_name: progress
     volumes:
-      - ./config.toml:/app/config.toml:ro
+      - ./config.toml:/app/config.toml:rw
       - ./data:/app/data
       - ./claude_settings.json:/root/.claude/settings.json:ro
     environment:
