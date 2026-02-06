@@ -296,6 +296,17 @@ protocol = "ssh"
 url = "mycompany/private-repo"
 branch = "develop"
 enabled = false  # Temporarily disabled
+
+# Owner monitoring configuration (optional)
+[[owners]]
+type = "organization"  # "user" or "organization"
+name = "bytedance"
+enabled = true
+
+[[owners]]
+type = "user"
+name = "torvalds"
+enabled = true
 ```
 
 #### Configuration Item Description
@@ -331,6 +342,10 @@ enabled = false  # Temporarily disabled
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
 - `repos[].protocol` - Repository-level protocol configuration, default https
+- `owners` - Owner monitoring configuration (optional)
+- `owners[].type` - Owner type, "user" or "organization"
+- `owners[].name` - Owner name (cannot be empty)
+- `owners[].enabled` - Whether enabled, default true
 
 ### Environment Variables
 
@@ -566,6 +581,5 @@ For production deployments, continue using Docker with gunicorn as documented in
 ### Security Note
 
 The development server enables debug mode by default, which should NEVER be used in production. The production Docker deployment uses gunicorn and is not affected by these development settings.
-
 
 

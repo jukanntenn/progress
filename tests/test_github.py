@@ -6,8 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from progress.github import sanitize_repo_name, GitClient, resolve_repo_url
+from progress.github import gh_api_get_readme, gh_repo_list
 from progress.enums import Protocol
 from progress.repository import RepositoryManager
+from progress.errors import CommandException, GitException
 
 
 # ========== Test Cases ==========
@@ -61,6 +63,50 @@ def test_git_client_initialization():
     """Test: GitClient initialization"""
     client = GitClient("/tmp/test_workspace")
     assert client.workspace_dir.name == "test_workspace"
+
+
+def test_gh_repo_list_parses_json(monkeypatch):
+    def fake_run_command(cmd, timeout=None, env=None, **kwargs):
+        assert cmd[:3] == ["gh", "repo", "list"]
+        return """[{"nameWithOwner":"o/r","description":"d","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-02T00:00:00Z"}]"""
+
+    monkeypatch.setattr("progress.github.run_command", fake_run_command)
+    repos = gh_repo_list("o")
+    assert repos[0]["nameWithOwner"] == "o/r"
+
+
+def test_gh_repo_list_invalid_owner_returns_empty(monkeypatch):
+    def fake_run_command(*args, **kwargs):
+        raise CommandException("Could not resolve to a User")
+
+    monkeypatch.setattr("progress.github.run_command", fake_run_command)
+    assert gh_repo_list("does-not-exist") == []
+
+
+def test_gh_repo_list_other_errors_raise(monkeypatch):
+    def fake_run_command(*args, **kwargs):
+        raise CommandException("Some unexpected error")
+
+    monkeypatch.setattr("progress.github.run_command", fake_run_command)
+    with pytest.raises(GitException):
+        gh_repo_list("o")
+
+
+def test_gh_api_get_readme_decodes_base64(monkeypatch):
+    def fake_run_command(cmd, timeout=None, env=None, **kwargs):
+        assert cmd[:2] == ["gh", "api"]
+        return '{"content":"SGVsbG8=","encoding":"base64"}'
+
+    monkeypatch.setattr("progress.github.run_command", fake_run_command)
+    assert gh_api_get_readme("o", "r") == "Hello"
+
+
+def test_gh_api_get_readme_404_returns_none(monkeypatch):
+    def fake_run_command(*args, **kwargs):
+        raise CommandException("404 Not Found")
+
+    monkeypatch.setattr("progress.github.run_command", fake_run_command)
+    assert gh_api_get_readme("o", "r") is None
 
 
 @pytest.mark.parametrize(
@@ -333,4 +379,3 @@ class TestParseRepoName:
 
         result = parse_repo_name(input_url)
         assert result == expected, f"Failed for {input_url}: got {result}, expected {expected}"
-

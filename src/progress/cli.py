@@ -13,8 +13,9 @@ from .i18n import gettext as _
 from .i18n import initialize
 from .log import setup as setup_log
 from .markpost import MarkpostClient
-from .models import Repository
+from .models import DiscoveredRepository, Repository
 from .notification import NotificationManager, NotificationMessage
+from .owner import OwnerManager
 from .reporter import MarkdownReporter
 from .repository import RepositoryManager
 from .utils import get_now
@@ -311,6 +312,96 @@ def process_reports(
             logger.warning(f"  - {error}")
 
 
+def _send_entity_notification(
+    notification_manager: NotificationManager,
+    markpost_client: MarkpostClient,
+    analyzer: ClaudeCodeAnalyzer,
+    new_repos: list[dict],
+    timezone,
+) -> None:
+    now = get_now(timezone)
+    lines: list[str] = [
+        f"# New repositories discovered ({now.strftime('%Y-%m-%d %H:%M')})",
+        "",
+    ]
+
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for r in new_repos:
+        key = (r.get("owner_type") or "", r.get("owner_name") or "")
+        grouped.setdefault(key, []).append(r)
+
+    for (owner_type, owner_name), repos in sorted(grouped.items()):
+        lines.append(f"## {owner_name} ({owner_type})")
+        lines.append("")
+        for r in sorted(repos, key=lambda x: x.get("repo_name") or ""):
+            lines.append(f"### {r.get('repo_name')}")
+            lines.append("")
+            repo_url = r.get("repo_url")
+            if repo_url:
+                lines.append(f"- URL: {repo_url}")
+            if r.get("description"):
+                lines.append(f"- Description: {r.get('description')}")
+            created_at = r.get("created_at")
+            if created_at and hasattr(created_at, "isoformat"):
+                lines.append(f"- Created at: {created_at.isoformat()}")
+            if r.get("readme_was_truncated"):
+                lines.append("- README was truncated to 50KB for analysis")
+            lines.append("")
+
+            if not r.get("has_readme"):
+                lines.append("This repository does not have a README file.")
+                lines.append("")
+                continue
+
+            readme_summary = r.get("readme_summary")
+            if readme_summary:
+                lines.append("#### README Summary")
+                lines.append(str(readme_summary))
+                lines.append("")
+
+            readme_detail = r.get("readme_detail")
+            if readme_detail:
+                lines.append("#### README Detail")
+                lines.append(str(readme_detail))
+                lines.append("")
+
+    report_content = "\n".join(lines)
+
+    try:
+        title, summary = analyzer.generate_title_and_summary(report_content)
+    except Exception as e:
+        logger.warning(f"Failed to generate title/summary for owner monitoring: {e}")
+        title = _("Progress Report for Open Source Projects - {date}").format(
+            date=now.strftime("%Y-%m-%d %H:%M")
+        )
+        summary = ""
+
+    markpost_url = markpost_client.upload(report_content, title=title)
+
+    repo_statuses = {
+        (r.get("name_with_owner") or r.get("repo_name") or str(r.get("id"))): "success"
+        for r in new_repos
+    }
+
+    notification_manager.send(
+        NotificationMessage(
+            title=title,
+            summary=summary or f"Discovered {len(new_repos)} new repositories",
+            total_commits=len(new_repos),
+            markpost_url=markpost_url,
+            repo_statuses=repo_statuses,
+        )
+    )
+
+    for r in new_repos:
+        record_id = r.get("id")
+        if record_id:
+            record = DiscoveredRepository.get_by_id(record_id)
+            if record:
+                record.notified = True
+                record.save()
+
+
 @click.group(invoke_without_command=True)
 @click.option("--config", "-c", default="config.toml", help="Configuration file path")
 @click.pass_context
@@ -368,6 +459,53 @@ def _run_check_command(config: str):
             logger.info(
                 _("No repositories with new changes, skipping report generation")
             )
+
+        owner_manager = OwnerManager(cfg.github.gh_token)
+        owner_sync_result = owner_manager.sync_owners(cfg.owners)
+        logger.info(f"Owner sync completed: {owner_sync_result}")
+
+        new_repos = owner_manager.check_all()
+        if new_repos:
+            for repo_info in new_repos:
+                if not repo_info.get("has_readme") or not repo_info.get("readme_content"):
+                    continue
+
+                try:
+                    repo_name = repo_info.get("name_with_owner") or repo_info.get("repo_name") or ""
+                    description = repo_info.get("description") or ""
+                    readme_content = repo_info.get("readme_content") or ""
+
+                    summary, detail = repo_manager.analyzer.analyze_readme(
+                        repo_name,
+                        description,
+                        readme_content,
+                    )
+                    repo_info["readme_summary"] = summary
+                    repo_info["readme_detail"] = detail
+
+                    record_id = repo_info.get("id")
+                    if record_id:
+                        record = DiscoveredRepository.get_by_id(record_id)
+                        if record:
+                            record.readme_summary = summary
+                            record.readme_detail = detail
+                            record.save()
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to analyze README for {repo_info.get('name_with_owner')}: {e}"
+                    )
+                    repo_info["readme_summary"] = "README analysis unavailable"
+                    repo_info["readme_detail"] = "README analysis failed or timed out."
+
+            _send_entity_notification(
+                notification_manager,
+                markpost_client,
+                repo_manager.analyzer,
+                new_repos,
+                cfg.get_timezone(),
+            )
+        else:
+            logger.info("No new repositories discovered, skipping owner notifications")
 
         logger.info(_("All repository checks completed"))
 

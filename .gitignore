@@ -228,3 +228,5 @@ config.toml
 # gettext backups
 **/*.po~
 **/*.pot~
+
+openspec/

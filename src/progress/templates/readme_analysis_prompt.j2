@@ -1,0 +1,24 @@
+Repository: {{ repo_name }}
+
+{% if description %}Description: {{ description }}
+{% endif %}
+
+Your task: Analyze the README content below and output a JSON object with summary and detail.
+
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST output ONLY a valid JSON object (no markdown, no code blocks, no explanations)
+2. The JSON must have exactly two fields: "summary" and "detail"
+3. DO NOT output any text before or after the JSON
+
+Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output.
+
+Required JSON structure:
+{
+  "summary": "[A brief 1-2 paragraph summary of what this project does, based on the README]",
+  "detail": "[Detailed, structured analysis in Markdown: purpose, main features, usage, installation, configuration, and any notable caveats mentioned in the README]"
+}
+
+README content:
+
+{{ readme_content }}
+

@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import threading
+import base64
 from pathlib import Path
 from typing import List, Optional, Tuple
 import json
@@ -27,6 +28,24 @@ from .errors import GitException
 from .utils import retry, run_command, sanitize
 
 logger = logging.getLogger(__name__)
+
+
+def _get_env_with_token(gh_token: Optional[str]) -> dict | None:
+    """Create environment dict with GH_TOKEN if provided.
+
+    Args:
+        gh_token: GitHub token (optional)
+
+    Returns:
+        Environment dict with token set, or None
+    """
+    if not gh_token:
+        return None
+
+    env = os.environ.copy()
+    env["GH_TOKEN"] = gh_token
+    logger.debug(f"Using GH_TOKEN: {gh_token[:8]}...")
+    return env
 
 
 def parse_protocol_from_url(url: str) -> Protocol | None:
@@ -94,13 +113,15 @@ def _parse_owner_repo(url: str) -> tuple[str, str]:
     if url.startswith("https://"):
         match = re.match(r"https://github\.com/([^/]+)/([^/.]+)", url)
         if match:
-            return match.groups()
+            owner, repo = match.groups()
+            return owner, repo
         raise ValueError(f"Invalid HTTPS URL: {url}")
 
     if url.startswith("git@"):
         match = re.match(r"git@github\.com:([^/]+)/([^/.]+)", url)
         if match:
-            return match.groups()
+            owner, repo = match.groups()
+            return owner, repo
         raise ValueError(f"Invalid SSH URL: {url}")
 
     if "/" in url:
@@ -452,11 +473,7 @@ def gh_release_list(
     if exclude_pre_releases:
         cmd.append("--exclude-pre-releases")
 
-    env = None
-    if gh_token:
-        env = os.environ.copy()
-        env["GH_TOKEN"] = gh_token
-        logger.debug(f"Using GH_TOKEN for release list: {gh_token[:8]}...")
+    env = _get_env_with_token(gh_token)
 
     try:
         output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
@@ -465,13 +482,13 @@ def gh_release_list(
         return releases
     except RuntimeError as e:
         error_str = str(e).lower()
-        if "no releases found" in error_str or "not found" in error_str:
+        if "no releases found" in error_str:
             logger.debug(f"No releases found for {repo_slug}")
             return []
         if "rate limit" in error_str or "api rate limit" in error_str:
             logger.warning(f"GitHub API rate limit reached while checking {repo_slug}")
             raise GitException(f"GitHub API rate limit exceeded: {e}")
-        if "repository not found" in error_str or "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
+        if "repository not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
             logger.warning(f"Repository {repo_slug} not found or access denied")
             raise GitException(f"Repository {repo_slug} not found or access denied: {e}")
         raise GitException(f"Failed to list releases for {repo_slug}: {e}")
@@ -504,11 +521,7 @@ def gh_release_get_commit(repo_slug: str, tag_name: str, gh_token: Optional[str]
         ".targetCommitish",
     ]
 
-    env = None
-    if gh_token:
-        env = os.environ.copy()
-        env["GH_TOKEN"] = gh_token
-        logger.debug(f"Using GH_TOKEN for release view: {gh_token[:8]}...")
+    env = _get_env_with_token(gh_token)
 
     try:
         output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
@@ -555,11 +568,7 @@ def gh_release_get_body(repo_slug: str, tag_name: str, gh_token: Optional[str] =
         ".body",
     ]
 
-    env = None
-    if gh_token:
-        env = os.environ.copy()
-        env["GH_TOKEN"] = gh_token
-        logger.debug(f"Using GH_TOKEN for release body: {gh_token[:8]}...")
+    env = _get_env_with_token(gh_token)
 
     try:
         output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
@@ -576,4 +585,72 @@ def gh_release_get_body(repo_slug: str, tag_name: str, gh_token: Optional[str] =
             raise GitException(f"Release {tag_name} not found or access denied: {e}")
         raise GitException(f"Failed to get release notes for {tag_name}: {e}")
 
+
+def gh_repo_list(
+    owner: str,
+    limit: int = 100,
+    source: bool = True,
+    gh_token: Optional[str] = None,
+) -> List[dict]:
+    cmd = [
+        CMD_GH,
+        "repo",
+        "list",
+        owner,
+        "--limit",
+        str(limit),
+        "--json",
+        "nameWithOwner,description,createdAt,updatedAt",
+    ]
+    if source:
+        cmd.append("--source")
+
+    env = _get_env_with_token(gh_token)
+
+    try:
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
+        return json.loads(output) if output.strip() else []
+    except Exception as e:
+        from .errors import CommandException
+
+        error_str = str(e).lower()
+        if isinstance(e, CommandException):
+            if "could not resolve" in error_str or "not found" in error_str:
+                logger.warning(f"Owner {owner} not found")
+                return []
+            if "rate limit" in error_str or "api rate limit" in error_str:
+                logger.warning(f"GitHub API rate limit reached while listing repos for {owner}")
+                raise GitException(f"GitHub API rate limit exceeded: {e}") from e
+            raise GitException(f"Failed to list repositories for {owner}: {e}") from e
+        raise
+
+
+def gh_api_get_readme(
+    owner: str,
+    repo: str,
+    gh_token: Optional[str] = None,
+) -> str | None:
+    cmd = [CMD_GH, "api", f"repos/{owner}/{repo}/readme"]
+
+    env = _get_env_with_token(gh_token)
+
+    try:
+        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
+        data = json.loads(output) if output.strip() else {}
+        content_b64 = data.get("content")
+        if not content_b64:
+            return None
+        try:
+            return base64.b64decode(content_b64).decode("utf-8", errors="replace")
+        except Exception as decode_error:
+            raise GitException(f"Failed to decode README content: {decode_error}") from decode_error
+    except Exception as e:
+        from .errors import CommandException
+
+        error_str = str(e).lower()
+        if isinstance(e, CommandException):
+            if "404" in error_str or "not found" in error_str:
+                return None
+            raise GitException(f"Failed to fetch README for {owner}/{repo}: {e}") from e
+        raise
 

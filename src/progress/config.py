@@ -152,6 +152,19 @@ class RepositoryConfig(BaseModel):
         return v
 
 
+class OwnerConfig(BaseModel):
+    type: Literal["user", "organization"]
+    name: str
+    enabled: bool = True
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Owner name cannot be empty")
+        return v.strip()
+
+
 class Config(BaseSettings):
     """Application configuration."""
 
@@ -164,6 +177,7 @@ class Config(BaseSettings):
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     repos: List[RepositoryConfig] = Field(default_factory=list)
+    owners: List[OwnerConfig] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(
         env_prefix="PROGRESS_",

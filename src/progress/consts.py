@@ -31,6 +31,7 @@ GH_RETRY_DELAY = 5  # seconds
 
 # ==================== Template Names ====================
 TEMPLATE_ANALYSIS_PROMPT = "analysis_prompt.j2"
+TEMPLATE_README_ANALYSIS_PROMPT = "readme_analysis_prompt.j2"
 TEMPLATE_REPOSITORY_REPORT = "repository_report.j2"
 TEMPLATE_AGGREGATED_REPORT = "aggregated_report.j2"
 TEMPLATE_EMAIL_NOTIFICATION = "email_notification.j2"

@@ -9,7 +9,8 @@ from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
 from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
-from .models import Report, Repository, database_proxy
+from .migration_add_owner_monitoring import apply as migrate_owner_monitoring
+from .models import DiscoveredRepository, GitHubOwner, Report, Repository, database_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ def init_db(db_path: str):
 def migrate_database():
     """Migrate database schema to latest version."""
     migrator = SqliteMigrator(database)
+
+    migrate_owner_monitoring(database)
 
     cursor = database.execute_sql("PRAGMA table_info(reports)")
     existing_columns = {row[1] for row in cursor.fetchall()}
@@ -112,7 +115,10 @@ def migrate_database():
 
 def create_tables():
     """Create database tables and migrate schema."""
-    database.create_tables([Repository, Report], safe=True)
+    database.create_tables(
+        [Repository, Report, GitHubOwner, DiscoveredRepository],
+        safe=True,
+    )
     migrate_database()
 
     logger.info("Database tables created")

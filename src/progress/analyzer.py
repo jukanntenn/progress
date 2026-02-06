@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .consts import (
     CMD_CLAUDE,
     TEMPLATE_ANALYSIS_PROMPT,
+    TEMPLATE_README_ANALYSIS_PROMPT,
     TIMEOUT_CLAUDE_ANALYSIS,
 )
 from .errors import AnalysisException
@@ -118,6 +119,56 @@ class ClaudeCodeAnalyzer:
         summary, detail = self._run_claude_release_analysis(prompt)
         return summary, detail
 
+    def analyze_readme(
+        self,
+        repo_name: str,
+        description: str | None,
+        readme_content: str,
+    ) -> tuple[str, str]:
+        template = self.jinja_env.get_template(TEMPLATE_README_ANALYSIS_PROMPT)
+        prompt = template.render(
+            repo_name=repo_name,
+            description=description,
+            readme_content=readme_content,
+            language=self.language,
+        )
+        logger.info(f"Analyzing README for {repo_name}...")
+        return self._run_claude_readme_analysis(prompt)
+
+    def _run_claude_readme_analysis(self, prompt: str) -> tuple[str, str]:
+        output = ""
+        try:
+            output = run_command(
+                [self.claude_code_path, "-p", prompt],
+                timeout=self.timeout,
+                check=False,
+            )
+
+            logger.debug(f"Claude README output length: {len(output)}")
+
+            json_str = self._extract_json(output)
+            data = json.loads(json_str)
+
+            summary = data.get("summary", "")
+            detail = data.get("detail", "")
+
+            if not summary or not detail:
+                raise AnalysisException(
+                    "Invalid JSON response: missing 'summary' or 'detail' field"
+                )
+
+            return summary, detail
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude output: {e}")
+            logger.debug(f"Raw output: {output}")
+            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+        except AnalysisException:
+            raise
+        except Exception as e:
+            logger.error(f"Claude Code README analysis failed: {e}")
+            raise AnalysisException(str(e)) from e
+
     def _build_release_analysis_prompt(
         self,
         repo_name: str,
@@ -146,12 +197,10 @@ class ClaudeCodeAnalyzer:
         Raises:
             AnalysisException: If analysis fails or JSON is invalid
         """
-        cmd = [self.claude_code_path, "-p", prompt]
         output = ""
-
         try:
             output = run_command(
-                cmd,
+                [self.claude_code_path, "-p", prompt],
                 timeout=self.timeout,
                 check=False,
             )
@@ -174,17 +223,11 @@ class ClaudeCodeAnalyzer:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
             raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
-        except Exception as e:
-            from .errors import CommandException
-            if isinstance(e, CommandException):
-                logger.error(f"Claude Code release analysis failed: {e}")
-                raise AnalysisException(str(e)) from e
-            if isinstance(e, FileNotFoundError):
-                logger.error(f"Claude Code executable not found: {e}")
-                raise AnalysisException(
-                    f"Claude Code executable not found: {self.claude_code_path}"
-                ) from e
+        except AnalysisException:
             raise
+        except Exception as e:
+            logger.error(f"Claude Code release analysis failed: {e}")
+            raise AnalysisException(str(e)) from e
 
     def generate_title_and_summary(self, aggregated_report: str) -> tuple[str, str]:
         """Generate title and summary from aggregated report.
@@ -235,12 +278,11 @@ Here is the aggregated report:
             logger.info(f"Generated title: {title}")
             return title, summary
 
-        except Exception as e:
-            from .errors import CommandException
-            if isinstance(e, CommandException):
-                logger.error(f"Failed to generate title and summary: {e}")
-                raise AnalysisException(str(e)) from e
+        except AnalysisException:
             raise
+        except Exception as e:
+            logger.error(f"Failed to generate title and summary: {e}")
+            raise AnalysisException(str(e)) from e
 
     def _build_analysis_prompt(
         self,
@@ -276,12 +318,10 @@ Here is the aggregated report:
         Raises:
             AnalysisException: If analysis fails or JSON is invalid
         """
-        cmd = [self.claude_code_path, "-p", prompt]
         output = ""
-
         try:
             output = run_command(
-                cmd,
+                [self.claude_code_path, "-p", prompt],
                 input=diff,
                 timeout=self.timeout,
                 check=False,
@@ -305,17 +345,11 @@ Here is the aggregated report:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
             raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
-        except Exception as e:
-            from .errors import CommandException
-            if isinstance(e, CommandException):
-                logger.error(f"Claude Code analysis failed: {e}")
-                raise AnalysisException(str(e)) from e
-            if isinstance(e, FileNotFoundError):
-                logger.error(f"Claude Code executable not found: {e}")
-                raise AnalysisException(
-                    f"Claude Code executable not found: {self.claude_code_path}"
-                ) from e
+        except AnalysisException:
             raise
+        except Exception as e:
+            logger.error(f"Claude Code analysis failed: {e}")
+            raise AnalysisException(str(e)) from e
 
     def _extract_json(self, output: str) -> str:
         """Extract JSON from output, handling markdown code blocks.
