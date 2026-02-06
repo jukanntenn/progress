@@ -86,12 +86,16 @@ class OwnerManager:
         parsed.sort(key=lambda x: x[0])
         newest_created_at, _ = parsed[-1]
 
-        if owner.last_tracked_repo is None:
+        last_tracked = owner.last_tracked_repo
+        if isinstance(last_tracked, str):
+            last_tracked = datetime.fromisoformat(last_tracked)
+
+        if last_tracked is None:
             candidates = [parsed[-1][1]]
         else:
             candidates = [
                 r for created_at, r in parsed
-                if created_at > owner.last_tracked_repo
+                if created_at > last_tracked
             ]
 
         if not candidates:
