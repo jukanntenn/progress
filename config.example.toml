@@ -208,3 +208,22 @@ branch = "main"
 enabled = true
 proposal_dir = "final"
 file_pattern = "*.rst"
+
+# ========== Changelog Tracker Configuration ==========
+# Track software release changelogs from arbitrary URLs.
+#
+# Supported parser types:
+# - markdown_heading: Markdown changelog with headings like "## 1.2.3"
+# - html_chinese_version: HTML changelog with patterns like "uTools v7.5.1"
+
+[[changelog_trackers]]
+name = "Vite"
+url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
+parser_type = "markdown_heading"
+enabled = true
+
+[[changelog_trackers]]
+name = "uTools"
+url = "https://www.u-tools.cn/docs/guide/changelog.html"
+parser_type = "html_chinese_version"
+enabled = false

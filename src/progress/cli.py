@@ -7,6 +7,7 @@ import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .analyzer import ClaudeCodeAnalyzer
+from .changelog_tracker import ChangelogTrackerManager
 from .config import Config
 from .consts import DATABASE_PATH
 from .db import close_db, create_tables, init_db, save_report
@@ -460,6 +461,59 @@ def _send_proposal_event_notification(
     )
 
 
+def _send_changelog_update_notification(
+    notification_manager: NotificationManager,
+    markpost_client: MarkpostClient,
+    updates,
+    all_results,
+    timezone,
+) -> None:
+    now = get_now(timezone)
+    template_dir = Path(__file__).parent / "templates"
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=select_autoescape(),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template("changelog_updates_report.j2")
+
+    report_content = template.render(
+        now=now.strftime("%Y-%m-%d %H:%M"),
+        updates=updates,
+    )
+
+    title = f"Changelog Updates - {now.strftime('%Y-%m-%d %H:%M')}"
+    markpost_url = markpost_client.upload(report_content, title=title)
+
+    total_new_versions = sum(len(u.new_entries) for u in updates)
+    parts = [f"{u.name} ({len(u.new_entries)})" for u in updates]
+    summary = f"{len(updates)} trackers updated, {total_new_versions} new versions: " + ", ".join(
+        parts[:10]
+    )
+    if len(parts) > 10:
+        summary += f", ... and {len(parts) - 10} more"
+
+    repo_statuses = {}
+    for r in all_results:
+        if r.status == "success" and r.new_entries:
+            repo_statuses[r.name] = "success"
+        elif r.status == "failed":
+            repo_statuses[r.name] = "failed"
+        else:
+            repo_statuses[r.name] = "skipped"
+
+    notification_manager.send(
+        NotificationMessage(
+            title=title,
+            summary=summary,
+            total_commits=total_new_versions,
+            markpost_url=markpost_url,
+            repo_statuses=repo_statuses,
+        )
+    )
+
+
 @click.group(invoke_without_command=True)
 @click.option("--config", "-c", default="config.toml", help="Configuration file path")
 @click.pass_context
@@ -498,6 +552,37 @@ def _run_check_command(config: str, trackers_only: bool = False):
         notification_manager, markpost_client, repo_manager, proposal_manager, reporter = (
             initialize_components(cfg)
         )
+
+        try:
+            changelog_manager = ChangelogTrackerManager.from_config(cfg)
+            changelog_sync = changelog_manager.sync(cfg.changelog_trackers)
+            logger.info(f"Changelog tracker sync completed: {changelog_sync}")
+
+            changelog_result = changelog_manager.check_all()
+            for r in changelog_result.results:
+                extra = []
+                if r.latest_version:
+                    extra.append(f"latest={r.latest_version}")
+                if r.error:
+                    extra.append(f"error={r.error}")
+                extra_str = f" ({', '.join(extra)})" if extra else ""
+                logger.info(f"Changelog tracker {r.name}: {r.status}{extra_str}")
+
+            updates = [
+                r
+                for r in changelog_result.results
+                if r.status == "success" and r.new_entries
+            ]
+            if updates:
+                _send_changelog_update_notification(
+                    notification_manager,
+                    markpost_client,
+                    updates,
+                    changelog_result.results,
+                    cfg.get_timezone(),
+                )
+        except Exception as e:
+            logger.warning(f"Changelog tracking startup check failed: {e}")
 
         if not trackers_only:
             sync_result = repo_manager.sync(cfg.repos)

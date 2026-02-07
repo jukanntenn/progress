@@ -10,6 +10,7 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 - **Release Tracking** - Automatically track GitHub releases and analyze changes between versions
 - **AI-Powered Analysis** - Use Claude Code CLI to analyze code changes and generate Markdown analysis reports
 - **Proposal Tracking** - Track proposal repositories (EIPs, Rust RFCs, PEPs, Django DEPs) and notify on high-priority events
+- **Changelog Tracking** - Monitor changelog URLs and notify when new versions are detected
 - **Notifications** - Support for Feishu and email notifications to deliver analysis reports timely
 - **Web Service** - Built-in web interface for browsing aggregated reports and RSS feed support
 - **Docker Deployment** - Containerized deployment with Docker, ready to run in as fast as one minute
@@ -582,4 +583,3 @@ For production deployments, continue using Docker with gunicorn as documented in
 ### Security Note
 
 The development server enables debug mode by default, which should NEVER be used in production. The production Docker deployment uses gunicorn and is not affected by these development settings.
-

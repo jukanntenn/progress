@@ -14,7 +14,7 @@ import requests
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .config import NotificationChannelConfig, NotificationConfig
-from .consts import TEMPLATE_EMAIL_NOTIFICATION
+from .consts import TEMPLATE_CHANGELOG_NOTIFICATION, TEMPLATE_EMAIL_NOTIFICATION
 from .errors import ProgressException
 from .i18n import gettext as _
 
@@ -82,6 +82,32 @@ class FeishuNotification:
             message.title, message.batch_index, message.total_batches
         )
         self._post_card(card, title=title_with_batch)
+
+    def send_changelog(
+        self,
+        subject: str,
+        name: str,
+        version: str,
+        description: str,
+        url: str,
+    ) -> None:
+        body = f"{subject}\n\n{description}\n\n{url}"
+        card = {
+            "msg_type": "interactive",
+            "card": {
+                "header": self._build_header(subject),
+                "elements": [
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": body,
+                        },
+                    }
+                ],
+            },
+        }
+        self._post_card(card, title=subject)
 
     def _build_card(self, message: NotificationMessage) -> dict[str, Any]:
         title_with_batch = self._add_batch_indicator(
@@ -255,6 +281,24 @@ class EmailNotification:
         )
         self._send_mime(mime_message, subject=title_with_batch)
 
+    def send_changelog(
+        self,
+        subject: str,
+        name: str,
+        version: str,
+        description: str,
+        url: str,
+    ) -> None:
+        html_content = self._render_changelog_html(
+            subject=subject,
+            name=name,
+            version=version,
+            description=description,
+            url=url,
+        )
+        mime_message = self._build_mime(subject=subject, html_content=html_content)
+        self._send_mime(mime_message, subject=subject)
+
     def _add_batch_indicator(
         self, title: str, batch_index: int | None, total_batches: int | None
     ) -> str:
@@ -276,6 +320,23 @@ class EmailNotification:
             failed_repos=list(stats.failed_repos),
             skipped_repos=list(stats.skipped_repos),
             markpost_url=message.markpost_url,
+        )
+
+    def _render_changelog_html(
+        self,
+        subject: str,
+        name: str,
+        version: str,
+        description: str,
+        url: str,
+    ) -> str:
+        template = self.jinja_env.get_template(TEMPLATE_CHANGELOG_NOTIFICATION)
+        return template.render(
+            subject=subject,
+            name=name,
+            version=version,
+            description=description,
+            url=url,
         )
 
     def _build_mime(self, subject: str, html_content: str) -> MIMEMultipart:
@@ -362,6 +423,42 @@ class NotificationManager:
         for channel in self._channels:
             try:
                 channel.send(message)
+            except Exception as e:
+                failures.append(e)
+
+        if failures:
+            reasons = "; ".join(str(e) for e in failures)
+            raise ProgressException(f"Failed to send notifications: {reasons}")
+
+    def send_changelog(
+        self,
+        name: str,
+        version: str,
+        description: str,
+        url: str,
+    ) -> None:
+        subject = f"New version detected: {name} {version}"
+        body = f"{subject}\n\n{description}\n\n{url}"
+
+        failures: list[Exception] = []
+        for channel in self._channels:
+            try:
+                if hasattr(channel, "send_changelog"):
+                    channel.send_changelog(
+                        subject=subject,
+                        name=name,
+                        version=version,
+                        description=description,
+                        url=url,
+                    )
+                else:
+                    channel.send(
+                        NotificationMessage(
+                            title=subject,
+                            summary=body,
+                            total_commits=0,
+                        )
+                    )
             except Exception as e:
                 failures.append(e)
 

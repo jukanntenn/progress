@@ -1,0 +1,16 @@
+# Changelog Updates ({{ now }})
+
+{% for item in updates %}
+## {{ item.name }}
+
+- URL: {{ item.url }}
+- Parser: {{ item.parser_type }}
+
+{% for e in item.new_entries %}
+### {{ e.version }}
+
+{{ e.description }}
+
+{% endfor %}
+{% endfor %}
+

@@ -55,6 +55,10 @@ class ProposalParseError(ProgressException):
     pass
 
 
+class ChangelogParseError(ProgressException):
+    pass
+
+
 class CommandException(ProgressException):
     """Raised when external command execution fails.
 

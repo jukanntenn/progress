@@ -187,6 +187,13 @@ class ProposalTrackerConfig(BaseModel):
         return v
 
 
+class ChangelogTrackerConfig(BaseModel):
+    name: str
+    url: HttpUrl
+    parser_type: Literal["markdown_heading", "html_chinese_version"]
+    enabled: bool = True
+
+
 class Config(BaseSettings):
     """Application configuration."""
 
@@ -201,6 +208,7 @@ class Config(BaseSettings):
     repos: List[RepositoryConfig] = Field(default_factory=list)
     owners: List[OwnerConfig] = Field(default_factory=list)
     proposal_trackers: List[ProposalTrackerConfig] = Field(default_factory=list)
+    changelog_trackers: List[ChangelogTrackerConfig] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(
         env_prefix="PROGRESS_",

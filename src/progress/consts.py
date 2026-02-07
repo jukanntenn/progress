@@ -35,6 +35,7 @@ TEMPLATE_README_ANALYSIS_PROMPT = "readme_analysis_prompt.j2"
 TEMPLATE_REPOSITORY_REPORT = "repository_report.j2"
 TEMPLATE_AGGREGATED_REPORT = "aggregated_report.j2"
 TEMPLATE_EMAIL_NOTIFICATION = "email_notification.j2"
+TEMPLATE_CHANGELOG_NOTIFICATION = "changelog_notification.j2"
 
 # ==================== URL Patterns ====================
 REPO_URL_PATTERNS = [

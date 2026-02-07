@@ -11,6 +11,7 @@ from playhouse.pool import PooledSqliteDatabase
 from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from .migration_add_owner_monitoring import apply as migrate_owner_monitoring
 from .models import (
+    ChangelogTracker,
     DjangoDEP,
     DiscoveredRepository,
     EIP,
@@ -135,6 +136,7 @@ def create_tables():
             GitHubOwner,
             DiscoveredRepository,
             ProposalTracker,
+            ChangelogTracker,
             EIP,
             RustRFC,
             PEP,
