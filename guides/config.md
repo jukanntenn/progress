@@ -29,3 +29,28 @@ type = "user"
 name = "torvalds"
 enabled = true
 ```
+
+## Proposal Tracking
+
+You can track proposal repositories (EIPs, Rust RFCs, PEPs, Django DEPs) using the `[[proposal_trackers]]` section.
+
+### Fields
+
+- `type` (required): one of `"eip"`, `"rust_rfc"`, `"pep"`, `"django_dep"`
+- `repo_url` (required): GitHub repository URL in the form `https://github.com/<owner>/<repo>(.git)`
+- `branch` (optional): branch to track (default: `main`)
+- `enabled` (optional): `true` or `false` (default: `true`)
+- `proposal_dir` (optional): subdirectory to scan within the repo (default: empty)
+- `file_pattern` (optional): filename glob pattern (default: empty)
+
+### Example
+
+```toml
+[[proposal_trackers]]
+type = "eip"
+repo_url = "https://github.com/ethereum/EIPs.git"
+branch = "master"
+enabled = true
+proposal_dir = "EIPS"
+file_pattern = "eip-*.md"
+```

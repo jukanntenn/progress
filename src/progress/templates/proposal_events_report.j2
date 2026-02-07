@@ -1,0 +1,23 @@
+# Proposal events ({{ now }})
+
+{% for tracker_type, items in grouped_events.items() %}
+## {{ tracker_type }}
+
+{% for e in items %}
+### {{ e.title }} ({{ e.tracker_type }} #{{ e.proposal_number }})
+
+- Event: {{ e.event_type }}
+{% if e.old_status is not none or e.new_status is not none %}- Status: {{ e.old_status or "" }}{% if e.new_status %} -> {{ e.new_status }}{% endif %}
+{% endif %}- Commit: {{ e.commit_hash }}
+- File: {{ e.file_path }}
+{% if e.analysis_summary %}
+#### Summary
+{{ e.analysis_summary }}
+{% endif %}
+{% if e.analysis_detail %}
+#### Detail
+{{ e.analysis_detail }}
+{% endif %}
+
+{% endfor %}
+{% endfor %}

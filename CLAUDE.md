@@ -37,6 +37,7 @@ progress/
 │   ├── config.md         # Configuration guide
 │   ├── dev.md            # Development guide
 │   ├── i18n.md           # Internationalization guide
+│   ├── proposal_tracking.md # Proposal tracking guide
 │   └── testing.md        # Testing guide
 ├── scripts/               # Utility scripts
 │   ├── compilemessages.sh # Compile localization messages
@@ -57,17 +58,26 @@ progress/
 │       ├── models.py      # Peewee ORM models
 │       ├── notification.py # Notifications
 │       ├── notifier.py    # Notifications (legacy)
+│       ├── proposal_parsers.py # Proposal parsing modules
+│       ├── proposal_tracking.py # Proposal tracking logic
 │       ├── repo.py        # Repository management
 │       ├── repository.py  # Extended repository operations
 │       ├── reporter.py    # Markdown report generator
 │       ├── utils.py       # Utility functions
 │       └── web.py         # Web service (Flask)
 │       ├── templates/     # Jinja2 template files
-│       │   ├── repository_report.j2
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
-│       │   ├── release_analysis_prompt.j2
 │       │   ├── email_notification.j2
+│       │   ├── release_analysis_prompt.j2
+│       │   ├── repository_report.j2
+│       │   ├── proposal_accepted_prompt.j2
+│       │   ├── proposal_content_modified_prompt.j2
+│       │   ├── proposal_events_report.j2
+│       │   ├── proposal_new_prompt.j2
+│       │   ├── proposal_rejected_prompt.j2
+│       │   ├── proposal_status_change_prompt.j2
+│       │   ├── proposal_withdrawn_prompt.j2
 │       │   └── web/       # Web UI templates
 │       │       ├── list.html
 │       │       ├── detail.html
@@ -82,8 +92,10 @@ progress/
     ├── test_analyzer.py
     ├── test_config.py
     ├── test_github.py
-    ├── test_repo.py
     ├── test_markpost.py
+    ├── test_proposal_parsers.py
+    ├── test_proposal_tracking.py
+    ├── test_repo.py
     └── test_utils.py
 ```
 
@@ -92,6 +104,12 @@ progress/
 - Install dependencies: `uv sync`
 - Run application: `uv run progress -c config.toml`
 - Run unit tests: `uv run pytest -v`
+
+## Proposal Tracking
+
+- Configure proposal trackers in `config.toml` using `[[proposal_trackers]]` entries.
+- Run proposal-only checks with `uv run progress check --trackers-only`.
+- Run proposal checks explicitly with `uv run progress track-proposals`.
 
 ## Tech Stack
 

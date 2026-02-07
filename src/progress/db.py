@@ -4,13 +4,25 @@ import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from peewee import CharField, DateTimeField
+from peewee import BooleanField, CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
 from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from .migration_add_owner_monitoring import apply as migrate_owner_monitoring
-from .models import DiscoveredRepository, GitHubOwner, Report, Repository, database_proxy
+from .models import (
+    DjangoDEP,
+    DiscoveredRepository,
+    EIP,
+    GitHubOwner,
+    PEP,
+    ProposalEvent,
+    ProposalTracker,
+    Report,
+    Repository,
+    RustRFC,
+    database_proxy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +125,22 @@ def migrate_database():
         logger.info("Migration completed: release tracking columns added")
 
 
+
 def create_tables():
     """Create database tables and migrate schema."""
     database.create_tables(
-        [Repository, Report, GitHubOwner, DiscoveredRepository],
+        [
+            Repository,
+            Report,
+            GitHubOwner,
+            DiscoveredRepository,
+            ProposalTracker,
+            EIP,
+            RustRFC,
+            PEP,
+            DjangoDEP,
+            ProposalEvent,
+        ],
         safe=True,
     )
     migrate_database()

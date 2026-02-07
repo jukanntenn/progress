@@ -51,6 +51,10 @@ class AnalysisException(ProgressException):
     pass
 
 
+class ProposalParseError(ProgressException):
+    pass
+
+
 class CommandException(ProgressException):
     """Raised when external command execution fails.
 

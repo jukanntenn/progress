@@ -1,0 +1,21 @@
+Your task: Analyze a proposal that was accepted/finalized and generate a short summary and a detailed explanation.
+
+Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output.
+
+You will receive the full proposal text via stdin.
+
+Proposal context:
+- Type: {{ proposal_type }}
+- Number: {{ proposal_number }}
+- Title: {{ title }}
+- Old status: {{ old_status }}
+- New status: {{ new_status }}
+
+CRITICAL FORMAT REQUIREMENTS:
+1. Output MUST be valid JSON
+2. Output MUST contain exactly two keys: "summary" and "detail"
+3. Do NOT output markdown code fences
+
+Content requirements:
+- summary: 2-4 sentences describing what was accepted and why it matters
+- detail: describe scope, impact, and any migration or implementation considerations

@@ -135,6 +135,127 @@ class ClaudeCodeAnalyzer:
         logger.info(f"Analyzing README for {repo_name}...")
         return self._run_claude_readme_analysis(prompt)
 
+    def analyze_proposal(
+        self,
+        proposal_type: str,
+        event_type: str,
+        proposal_number: int,
+        title: str,
+        old_status: str | None = None,
+        new_status: str | None = None,
+        proposal_text: str | None = None,
+        diff_text: str | None = None,
+    ) -> tuple[str, str]:
+        if event_type == "created":
+            return self.analyze_new_proposal(
+                proposal_type=proposal_type,
+                proposal_number=proposal_number,
+                title=title,
+                proposal_text=proposal_text or "",
+            )
+        if event_type in {"accepted", "rejected", "withdrawn", "status_changed"}:
+            return self.analyze_status_change(
+                proposal_type=proposal_type,
+                proposal_number=proposal_number,
+                title=title,
+                event_type=event_type,
+                old_status=old_status or "",
+                new_status=new_status or "",
+                proposal_text=proposal_text or "",
+            )
+        if event_type == "content_modified":
+            return self.analyze_content_modification(
+                proposal_type=proposal_type,
+                proposal_number=proposal_number,
+                title=title,
+                diff_text=diff_text or "",
+            )
+        return ("", "")
+
+    def analyze_new_proposal(
+        self,
+        proposal_type: str,
+        proposal_number: int,
+        title: str,
+        proposal_text: str,
+    ) -> tuple[str, str]:
+        template = self.jinja_env.get_template("proposal_new_prompt.j2")
+        prompt = template.render(
+            proposal_type=proposal_type,
+            proposal_number=proposal_number,
+            title=title,
+            language=self.language,
+        )
+        try:
+            return self._run_claude_text_analysis(prompt, proposal_text)
+        except Exception as e:
+            logger.warning(f"Proposal analysis failed: {e}")
+            return (
+                _(f"New proposal: {proposal_type} #{proposal_number}"),
+                _(f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"),
+            )
+
+    def analyze_status_change(
+        self,
+        proposal_type: str,
+        proposal_number: int,
+        title: str,
+        event_type: str,
+        old_status: str,
+        new_status: str,
+        proposal_text: str,
+    ) -> tuple[str, str]:
+        template_name = "proposal_status_change_prompt.j2"
+        if event_type == "accepted":
+            template_name = "proposal_accepted_prompt.j2"
+        elif event_type == "rejected":
+            template_name = "proposal_rejected_prompt.j2"
+        elif event_type == "withdrawn":
+            template_name = "proposal_withdrawn_prompt.j2"
+
+        template = self.jinja_env.get_template(template_name)
+        prompt = template.render(
+            proposal_type=proposal_type,
+            proposal_number=proposal_number,
+            title=title,
+            old_status=old_status,
+            new_status=new_status,
+            language=self.language,
+        )
+        try:
+            return self._run_claude_text_analysis(prompt, proposal_text)
+        except Exception as e:
+            logger.warning(f"Proposal analysis failed: {e}")
+            return (
+                _(f"Status changed: {proposal_type} #{proposal_number}"),
+                _(
+                    f"Analysis unavailable for {proposal_type} #{proposal_number}: {title} ({old_status} -> {new_status})"
+                ),
+            )
+
+    def analyze_content_modification(
+        self,
+        proposal_type: str,
+        proposal_number: int,
+        title: str,
+        diff_text: str,
+    ) -> tuple[str, str]:
+        template = self.jinja_env.get_template("proposal_content_modified_prompt.j2")
+        prompt = template.render(
+            proposal_type=proposal_type,
+            proposal_number=proposal_number,
+            title=title,
+            language=self.language,
+        )
+        try:
+            return self._run_claude_text_analysis(prompt, diff_text)
+        except Exception as e:
+            logger.warning(f"Proposal analysis failed: {e}")
+            return (
+                _(f"Content modified: {proposal_type} #{proposal_number}"),
+                _(f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"),
+            )
+
     def _run_claude_readme_analysis(self, prompt: str) -> tuple[str, str]:
         output = ""
         try:
@@ -167,6 +288,38 @@ class ClaudeCodeAnalyzer:
             raise
         except Exception as e:
             logger.error(f"Claude Code README analysis failed: {e}")
+            raise AnalysisException(str(e)) from e
+
+    def _run_claude_text_analysis(self, prompt: str, input_text: str) -> tuple[str, str]:
+        output = ""
+        try:
+            output = run_command(
+                [self.claude_code_path, "-p", prompt],
+                input=input_text,
+                timeout=self.timeout,
+                check=False,
+            )
+
+            json_str = self._extract_json(output)
+            data = json.loads(json_str)
+
+            summary = data.get("summary", "")
+            detail = data.get("detail", "")
+
+            if not summary or not detail:
+                raise AnalysisException(
+                    "Invalid JSON response: missing 'summary' or 'detail' field"
+                )
+
+            return summary, detail
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude output: {e}")
+            logger.debug(f"Raw output: {output}")
+            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+        except AnalysisException:
+            raise
+        except Exception as e:
+            logger.error(f"Claude Code analysis failed: {e}")
             raise AnalysisException(str(e)) from e
 
     def _build_release_analysis_prompt(

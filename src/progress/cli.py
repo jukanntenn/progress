@@ -1,8 +1,10 @@
 """CLI main entry point."""
 
 import logging
+from pathlib import Path
 
 import click
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .analyzer import ClaudeCodeAnalyzer
 from .config import Config
@@ -16,6 +18,7 @@ from .markpost import MarkpostClient
 from .models import DiscoveredRepository, Repository
 from .notification import NotificationManager, NotificationMessage
 from .owner import OwnerManager
+from .proposal_tracking import ProposalTrackerManager
 from .reporter import MarkdownReporter
 from .repository import RepositoryManager
 from .utils import get_now
@@ -41,7 +44,9 @@ def initialize_components(cfg):
 
     repo_manager = RepositoryManager(analyzer, reporter, cfg)
 
-    return notification_manager, markpost_client, repo_manager, reporter
+    proposal_manager = ProposalTrackerManager(analyzer, cfg)
+
+    return notification_manager, markpost_client, repo_manager, proposal_manager, reporter
 
 
 def add_batch_suffix(title: str, batch_index: int, total_batches: int) -> str:
@@ -402,6 +407,59 @@ def _send_entity_notification(
                 record.save()
 
 
+def _send_proposal_event_notification(
+    notification_manager: NotificationManager,
+    markpost_client: MarkpostClient,
+    analyzer: ClaudeCodeAnalyzer,
+    events,
+    timezone,
+) -> None:
+    now = get_now(timezone)
+    template_dir = Path(__file__).parent / "templates"
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=select_autoescape(),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template("proposal_events_report.j2")
+
+    grouped: dict[str, list] = {}
+    for e in events:
+        grouped.setdefault(e.tracker_type, []).append(e)
+
+    for k in grouped:
+        grouped[k] = sorted(grouped[k], key=lambda x: (x.proposal_number, x.event_type))
+
+    report_content = template.render(
+        now=now.strftime("%Y-%m-%d %H:%M"),
+        grouped_events=grouped,
+    )
+
+    try:
+        title, summary = analyzer.generate_title_and_summary(report_content)
+    except Exception as e:
+        logger.warning(f"Failed to generate title/summary for proposal events: {e}")
+        title = _("Progress Report for Open Source Projects - {date}").format(
+            date=now.strftime("%Y-%m-%d %H:%M")
+        )
+        summary = f"{len(events)} proposal events"
+
+    markpost_url = markpost_client.upload(report_content, title=title)
+    repo_statuses = {
+        f"{e.tracker_type}#{e.proposal_number}": "success" for e in events
+    }
+    notification_manager.send(
+        NotificationMessage(
+            title=title,
+            summary=summary,
+            total_commits=len(events),
+            markpost_url=markpost_url,
+            repo_statuses=repo_statuses,
+        )
+    )
+
+
 @click.group(invoke_without_command=True)
 @click.option("--config", "-c", default="config.toml", help="Configuration file path")
 @click.pass_context
@@ -416,14 +474,20 @@ def cli(ctx, config: str):
 
 
 @cli.command(name="check")
+@click.option(
+    "--trackers-only",
+    is_flag=True,
+    default=False,
+    help="Check only proposal trackers, skip repositories",
+)
 @click.pass_context
-def check(ctx):
+def check(ctx, trackers_only: bool):
     """Run repository checks and generate reports."""
     config = ctx.obj["config_path"]
-    _run_check_command(config)
+    _run_check_command(config, trackers_only=trackers_only)
 
 
-def _run_check_command(config: str):
+def _run_check_command(config: str, trackers_only: bool = False):
     """Run the main check command logic."""
     try:
         logger.info(f"Loading configuration file: {config}")
@@ -431,34 +495,60 @@ def _run_check_command(config: str):
 
         initialize(ui_language=cfg.language)
 
-        notification_manager, markpost_client, repo_manager, reporter = (
+        notification_manager, markpost_client, repo_manager, proposal_manager, reporter = (
             initialize_components(cfg)
         )
 
-        sync_result = repo_manager.sync(cfg.repos)
-        logger.info(f"Sync completed: {sync_result}")
+        if not trackers_only:
+            sync_result = repo_manager.sync(cfg.repos)
+            logger.info(f"Sync completed: {sync_result}")
 
-        repos = repo_manager.list_enabled()
-        logger.info(f"Starting to check {len(repos)} repositories")
+            repos = repo_manager.list_enabled()
+            logger.info(f"Starting to check {len(repos)} repositories")
 
-        check_result = repo_manager.check_all(
-            repos, concurrency=cfg.analysis.concurrency
-        )
-
-        if check_result.reports:
-            process_reports(
-                check_result,
-                reporter,
-                cfg.get_timezone(),
-                repo_manager.analyzer,
-                markpost_client,
-                notification_manager,
-                max_batch_size=cfg.markpost.max_batch_size,
+            check_result = repo_manager.check_all(
+                repos, concurrency=cfg.analysis.concurrency
             )
+
+            if check_result.reports:
+                process_reports(
+                    check_result,
+                    reporter,
+                    cfg.get_timezone(),
+                    repo_manager.analyzer,
+                    markpost_client,
+                    notification_manager,
+                    max_batch_size=cfg.markpost.max_batch_size,
+                )
+            else:
+                logger.info(
+                    _("No repositories with new changes, skipping report generation")
+                )
+
+        tracker_sync = proposal_manager.sync(cfg.proposal_trackers)
+        logger.info(f"Proposal tracker sync completed: {tracker_sync}")
+
+        enabled_trackers = proposal_manager.list_enabled()
+        if enabled_trackers:
+            tracker_result = proposal_manager.check_all(
+                enabled_trackers,
+                concurrency=cfg.analysis.concurrency,
+            )
+            high_priority = [
+                e for e in tracker_result.events if proposal_manager.is_high_priority_event(e.event_type)
+            ]
+            if high_priority:
+                _send_proposal_event_notification(
+                    notification_manager,
+                    markpost_client,
+                    repo_manager.analyzer,
+                    high_priority,
+                    cfg.get_timezone(),
+                )
+            else:
+                logger.info("No high-priority proposal events, skipping notifications")
         else:
-            logger.info(
-                _("No repositories with new changes, skipping report generation")
-            )
+            logger.info("No enabled proposal trackers")
 
         owner_manager = OwnerManager(cfg.github.gh_token)
         owner_sync_result = owner_manager.sync_owners(cfg.owners)
@@ -515,6 +605,142 @@ def _run_check_command(config: str):
     except Exception as e:
         logger.error(f"Program execution failed: {e}", exc_info=True)
         raise click.ClickException(str(e))
+    finally:
+        close_db()
+
+
+@cli.command(name="track-proposals")
+@click.pass_context
+def track_proposals(ctx):
+    config = ctx.obj["config_path"]
+    try:
+        cfg = Config.load_from_file(config)
+        initialize(ui_language=cfg.language)
+
+        notification_manager, markpost_client, repo_manager, proposal_manager, _ = (
+            initialize_components(cfg)
+        )
+        proposal_manager.sync(cfg.proposal_trackers)
+        enabled_trackers = proposal_manager.list_enabled()
+        result = proposal_manager.check_all(
+            enabled_trackers,
+            concurrency=cfg.analysis.concurrency,
+        )
+        high_priority = [
+            e for e in result.events if proposal_manager.is_high_priority_event(e.event_type)
+        ]
+        if high_priority:
+            _send_proposal_event_notification(
+                notification_manager,
+                markpost_client,
+                repo_manager.analyzer,
+                high_priority,
+                cfg.get_timezone(),
+            )
+    finally:
+        close_db()
+
+
+@cli.command(name="sync-proposal-trackers")
+@click.pass_context
+def sync_proposal_trackers(ctx):
+    config = ctx.obj["config_path"]
+    try:
+        cfg = Config.load_from_file(config)
+        initialize(ui_language=cfg.language)
+        _, _, _, proposal_manager, _ = initialize_components(cfg)
+        result = proposal_manager.sync(cfg.proposal_trackers)
+        click.echo(str(result))
+    finally:
+        close_db()
+
+
+@cli.command(name="list-proposals")
+@click.option(
+    "--type",
+    "proposal_type",
+    type=click.Choice(["eip", "rust_rfc", "pep", "django_dep"], case_sensitive=False),
+    default=None,
+)
+@click.pass_context
+def list_proposals(ctx, proposal_type: str | None):
+    config = ctx.obj["config_path"]
+    try:
+        cfg = Config.load_from_file(config)
+        initialize(ui_language=cfg.language)
+        init_db(DATABASE_PATH)
+        create_tables()
+
+        from .models import DjangoDEP, EIP, PEP, RustRFC
+
+        rows: list[str] = []
+        if proposal_type in (None, "eip"):
+            for p in EIP.select().order_by(EIP.eip_number):
+                rows.append(f"eip\t{p.eip_number}\t{p.status}\t{p.title}")
+        if proposal_type in (None, "rust_rfc"):
+            for p in RustRFC.select().order_by(RustRFC.rfc_number):
+                rows.append(f"rust_rfc\t{p.rfc_number}\t{p.status}\t{p.title}")
+        if proposal_type in (None, "pep"):
+            for p in PEP.select().order_by(PEP.pep_number):
+                rows.append(f"pep\t{p.pep_number}\t{p.status}\t{p.title}")
+        if proposal_type in (None, "django_dep"):
+            for p in DjangoDEP.select().order_by(DjangoDEP.dep_number):
+                rows.append(f"django_dep\t{p.dep_number}\t{p.status}\t{p.title}")
+
+        click.echo("type\tnumber\tstatus\ttitle")
+        for r in rows:
+            click.echo(r)
+    finally:
+        close_db()
+
+
+@cli.command(name="list-proposal-events")
+@click.option(
+    "--type",
+    "proposal_type",
+    type=click.Choice(["eip", "rust_rfc", "pep", "django_dep"], case_sensitive=False),
+    required=True,
+)
+@click.option("--number", type=int, required=True)
+@click.pass_context
+def list_proposal_events(ctx, proposal_type: str, number: int):
+    config = ctx.obj["config_path"]
+    try:
+        cfg = Config.load_from_file(config)
+        initialize(ui_language=cfg.language)
+        init_db(DATABASE_PATH)
+        create_tables()
+
+        from .models import DjangoDEP, EIP, PEP, ProposalEvent, RustRFC
+
+        proposal = None
+        if proposal_type == "eip":
+            proposal = EIP.select().where(EIP.eip_number == number).first()
+        elif proposal_type == "rust_rfc":
+            proposal = RustRFC.select().where(RustRFC.rfc_number == number).first()
+        elif proposal_type == "pep":
+            proposal = PEP.select().where(PEP.pep_number == number).first()
+        elif proposal_type == "django_dep":
+            proposal = DjangoDEP.select().where(DjangoDEP.dep_number == number).first()
+
+        if proposal is None:
+            raise click.ClickException("Proposal not found")
+
+        query = ProposalEvent.select().order_by(ProposalEvent.detected_at)
+        if proposal_type == "eip":
+            query = query.where(ProposalEvent.eip == proposal)
+        elif proposal_type == "rust_rfc":
+            query = query.where(ProposalEvent.rust_rfc == proposal)
+        elif proposal_type == "pep":
+            query = query.where(ProposalEvent.pep == proposal)
+        elif proposal_type == "django_dep":
+            query = query.where(ProposalEvent.django_dep == proposal)
+
+        click.echo("detected_at\tevent_type\told_status\tnew_status\tcommit")
+        for e in query:
+            click.echo(
+                f"{e.detected_at.isoformat()}\t{e.event_type}\t{e.old_status or ''}\t{e.new_status or ''}\t{e.commit_hash}"
+            )
     finally:
         close_db()
 

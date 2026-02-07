@@ -160,3 +160,51 @@ enabled = true
 type = "organization"
 name = "microsoft"
 enabled = false
+
+# ========== Proposal Tracker Configuration ==========
+# Track proposal systems like EIPs, Rust RFCs, PEPs, and Django DEPs.
+
+[[proposal_trackers]]
+# Ethereum EIPs
+type = "eip"
+repo_url = "https://github.com/ethereum/EIPs.git"
+branch = "master"
+enabled = true
+proposal_dir = "EIPS"
+file_pattern = "eip-*.md"
+
+[[proposal_trackers]]
+# Ethereum ERCs (same repo, different directory/pattern)
+type = "eip"
+repo_url = "https://github.com/ethereum/EIPs.git"
+branch = "master"
+enabled = false
+proposal_dir = "ERCS"
+file_pattern = "erc-*.md"
+
+[[proposal_trackers]]
+# Rust RFCs
+type = "rust_rfc"
+repo_url = "https://github.com/rust-lang/rfcs.git"
+branch = "master"
+enabled = true
+proposal_dir = "text"
+file_pattern = "*.md"
+
+[[proposal_trackers]]
+# Python PEPs
+type = "pep"
+repo_url = "https://github.com/python/peps.git"
+branch = "main"
+enabled = true
+proposal_dir = "peps"
+file_pattern = "pep-*.rst"
+
+[[proposal_trackers]]
+# Django DEPs
+type = "django_dep"
+repo_url = "https://github.com/django/deps.git"
+branch = "main"
+enabled = true
+proposal_dir = "final"
+file_pattern = "*.rst"

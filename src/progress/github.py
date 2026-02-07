@@ -270,6 +270,56 @@ class GitClient:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
         return self._run_git_command(["diff", commit_range], repo_path)
 
+    def get_changed_files(
+        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+    ) -> list[str]:
+        commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
+        result = self._run_git_command(["diff", "--name-only", commit_range], repo_path)
+        return [line.strip() for line in result.splitlines() if line.strip()]
+
+    def get_changed_file_statuses(
+        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+    ) -> list[tuple[str, str]]:
+        commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
+        result = self._run_git_command(["diff", "--name-status", commit_range], repo_path)
+        items: list[tuple[str, str]] = []
+        for line in result.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split("\t", 1)
+            if len(parts) != 2:
+                continue
+            items.append((parts[0].strip(), parts[1].strip()))
+        return items
+
+    def get_file_diff(
+        self,
+        repo_path: Path,
+        old_commit: Optional[str],
+        new_commit: str,
+        file_path: str,
+    ) -> str:
+        commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
+        return self._run_git_command(["diff", commit_range, "--", file_path], repo_path)
+
+    def get_file_creation_date(self, repo_path: Path, file_path: str) -> Optional[str]:
+        try:
+            result = self._run_git_command(
+                [
+                    "log",
+                    "--diff-filter=A",
+                    "--format=%ai",
+                    "-1",
+                    "--",
+                    file_path,
+                ],
+                repo_path,
+            )
+            return result.strip() if result.strip() else None
+        except RuntimeError:
+            return None
+
     def get_commit_messages(
         self, repo_path: Path, old_commit: Optional[str], new_commit: str
     ) -> List[str]:
@@ -488,9 +538,12 @@ def gh_release_list(
         if "rate limit" in error_str or "api rate limit" in error_str:
             logger.warning(f"GitHub API rate limit reached while checking {repo_slug}")
             raise GitException(f"GitHub API rate limit exceeded: {e}")
-        if "repository not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
-            logger.warning(f"Repository {repo_slug} not found or access denied")
-            raise GitException(f"Repository {repo_slug} not found or access denied: {e}")
+        if "repository not found" in error_str:
+            logger.debug(f"Repository {repo_slug} not found")
+            return []
+        if "access denied" in error_str or "forbidden" in error_str:
+            logger.warning(f"Repository {repo_slug} access denied")
+            raise GitException(f"Repository {repo_slug} access denied: {e}")
         raise GitException(f"Failed to list releases for {repo_slug}: {e}")
 
 
@@ -653,4 +706,3 @@ def gh_api_get_readme(
                 return None
             raise GitException(f"Failed to fetch README for {owner}/{repo}: {e}") from e
         raise
-
