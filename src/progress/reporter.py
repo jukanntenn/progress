@@ -40,6 +40,7 @@ class MarkdownReporter:
             lstrip_blocks=True,
         )
         self.jinja_env.globals["_"] = _
+        self.jinja_env.filters["escape_html"] = _escape_html
 
     def generate_repository_report(
         self, report, timezone: ZoneInfo = ZoneInfo("UTC")
