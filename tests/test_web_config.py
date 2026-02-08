@@ -267,11 +267,13 @@ def test_api_timezones(client):
     assert response.status_code == 200
 
     data = json.loads(response.data)
-    assert isinstance(data, list)
-    assert len(data) > 0
-    assert "UTC" in data
-    assert "America/New_York" in data
-    assert "Asia/Shanghai" in data
+    assert isinstance(data, dict)
+    assert data["success"] is True
+    assert isinstance(data["timezones"], list)
+    assert len(data["timezones"]) > 0
+    assert "UTC" in data["timezones"]
+    assert "America/New_York" in data["timezones"]
+    assert "Asia/Shanghai" in data["timezones"]
 
 def test_api_timezones_sorted(client):
     """Test that /api/timezones returns sorted timezones."""
@@ -279,4 +281,5 @@ def test_api_timezones_sorted(client):
     assert response.status_code == 200
 
     data = json.loads(response.data)
-    assert data == sorted(data)
+    timezones = data["timezones"]
+    assert timezones == sorted(timezones)
