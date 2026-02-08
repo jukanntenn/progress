@@ -1,0 +1,39 @@
+language = "en"
+timezone = "UTC"
+
+[markpost]
+url = "https://example.com/api/base_url/post_key"
+timeout = 30
+
+[notification]
+[[notification.channels]]
+type = "feishu"
+enabled = false
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+timeout = 30
+
+[github]
+gh_token = "ghp_test_token_for_demo"
+protocol = "https"
+
+[analysis]
+max_diff_length = 100000
+concurrency = 1
+timeout = 600
+language = "en"
+
+[web]
+enabled = true
+host = "127.0.0.1"
+port = 5000
+debug = true
+
+[[repos]]
+url = "vitejs/vite"
+branch = "main"
+enabled = true
+
+[[repos]]
+url = "vuejs/core"
+branch = "main"
+enabled = true
