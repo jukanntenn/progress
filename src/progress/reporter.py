@@ -13,6 +13,20 @@ from .i18n import gettext as _
 logger = logging.getLogger(__name__)
 
 
+def _escape_html(text: str) -> str:
+    """Escape HTML tags in text.
+
+    Args:
+        text: Text to escape
+
+    Returns:
+        HTML-escaped text
+    """
+    from html import escape
+
+    return escape(text)
+
+
 class MarkdownReporter:
     """Generate Markdown format reports with Jinja2 templates and i18n."""
 
