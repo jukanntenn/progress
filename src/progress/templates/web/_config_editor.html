@@ -24,10 +24,7 @@
             <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
             <option value="zh-hans" {% if lang == 'zh-hans' %}selected{% endif %}>简体中文</option>
         </select>
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="language">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Interface language</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Select your preferred interface language for the web UI</p>
     </div>
 
     <div class="mb-5">
@@ -41,10 +38,7 @@
             <div id="timezone-dropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
             </div>
         </div>
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="timezone">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>IANA timezone identifier</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Select your timezone for scheduling and timestamp display</p>
     </div>
 </div>
 
@@ -60,10 +54,7 @@
         <input type="url" id="ctrl-markpost-url" data-path="markpost.url"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="https://example.com/api/base_url/post_key">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="markpost.url">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Full URL including base_url and post_key</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Full Markpost API URL including base_url and post_key (e.g., https://example.com/api/base_url/post_key)</p>
     </div>
 
     <div class="mb-5">
@@ -73,10 +64,7 @@
         <input type="number" id="ctrl-markpost-timeout" data-path="markpost.timeout"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="30" min="1">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="markpost.timeout">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>HTTP request timeout in seconds (default: 30)</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">HTTP request timeout in seconds. Increase this if you experience timeout issues (default: 30)</p>
     </div>
 
     <div class="mb-5">
@@ -129,10 +117,7 @@
                 <i class="fa-solid fa-eye"></i>
             </button>
         </div>
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.gh_token">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>GitHub CLI personal access token</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">GitHub personal access token for API access. Create one at: github.com/settings/tokens</p>
     </div>
 
     <div class="mb-5">
@@ -144,10 +129,7 @@
             <option value="https">https</option>
             <option value="ssh">ssh</option>
         </select>
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.protocol">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Global protocol configuration (default: https)</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Protocol to use for Git operations. HTTPS works with most networks, SSH requires key setup (default: https)</p>
     </div>
 
     <div class="mb-5">
@@ -157,10 +139,7 @@
         <input type="text" id="ctrl-github-proxy" data-path="github.proxy"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="http://127.0.0.1:7890 or socks5://127.0.0.1:1080">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="github.proxy">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Global proxy configuration (optional)</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Proxy server for Git and GitHub CLI operations. Use format: http://host:port or socks5://host:port (optional)</p>
     </div>
 
     <div class="mb-5">
@@ -202,10 +181,7 @@
         <input type="number" id="ctrl-analysis-max-diff-length" data-path="analysis.max_diff_length"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="100000" min="1">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.max_diff_length">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Maximum diff length in characters</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Maximum diff length in characters to send for AI analysis. Larger diffs may be truncated (default: 100000)</p>
     </div>
 
     <div class="mb-5">
@@ -215,10 +191,7 @@
         <input type="number" id="ctrl-analysis-concurrency" data-path="analysis.concurrency"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="1" min="1">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.concurrency">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>Number of concurrent analysis tasks (1 for serial)</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Number of concurrent analysis tasks. Increase for faster processing on powerful machines, or use 1 for serial processing (default: 1)</p>
     </div>
 
     <div class="mb-5">
@@ -241,10 +214,7 @@
         <input type="text" id="ctrl-analysis-language" data-path="analysis.language"
             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="en">
-        <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="analysis.language">
-            <i class="fa-regular fa-circle-question mr-1"></i>
-            <span>AI analysis output language (e.g., en, zh, ja, ko)</span>
-        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Language for AI-generated analysis reports. Supports common language codes like en, zh, ja, ko (default: en)</p>
     </div>
 </div>
 
