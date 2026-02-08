@@ -485,13 +485,11 @@
             const container = document.getElementById('repos-list');
 
             container.innerHTML = repos.map((repo, index) => `
-                <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                <div class="repo-item cursor-move border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" data-repo-index="${index}">
                     <div class="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                         <span class="font-semibold text-gray-900 dark:text-white">${repo.url || 'N/A'}</span>
                         <div class="flex gap-1">
                             <button onclick="editRepo(${index})" class="px-2 py-1 text-xs border border-blue-300 dark:border-blue-800 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20">✎</button>
-                            <button onclick="moveRepo(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
-                            <button onclick="moveRepo(${index}, 1)" ${index === repos.length - 1 ? 'disabled' : ''} class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
                             <button onclick="deleteRepo(${index})" class="px-2 py-1 text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20">🗑</button>
                         </div>
                     </div>
@@ -502,6 +500,8 @@
                     </div>
                 </div>
             `).join('');
+
+            initSortableRepos();
         }
 
         function openModal(id) {
@@ -781,22 +781,6 @@
             document.getElementById('email-enabled').checked = true;
         }
 
-        function moveRepo(index, direction) {
-            const parsed = parseTOML(currentTOML);
-            if (!parsed) return;
-
-            const repos = parsed.repos;
-            const newIndex = index + direction;
-
-            if (newIndex < 0 || newIndex >= repos.length) return;
-
-            [repos[index], repos[newIndex]] = [repos[newIndex], repos[index]];
-
-            modifiedConfig = parsed;
-            updateStatus('modified');
-            renderRepositories();
-        }
-
         async function deleteRepo(index) {
             if (!confirm('Delete this repository?')) return;
 
@@ -875,6 +859,41 @@
             document.getElementById('repo-branch').value = 'main';
             document.getElementById('repo-protocol').value = 'https';
             document.getElementById('repo-enabled').checked = true;
+        }
+
+        function initSortableRepos() {
+            const reposList = document.getElementById('repos-list');
+            if (!reposList) return;
+
+            const existingSortable = reposList.sortableInstance;
+            if (existingSortable) {
+                existingSortable.destroy();
+            }
+
+            const repoItems = reposList.querySelectorAll('.repo-item');
+            if (repoItems.length === 0) return;
+
+            reposList.sortableInstance = new Sortable(reposList, {
+                animation: 150,
+                handle: '.repo-item',
+                ghostClass: 'opacity-50',
+                onEnd: function(evt) {
+                    const parsed = modifiedConfig || parseTOML(currentTOML);
+                    if (!parsed || !parsed.repos) return;
+
+                    const repos = parsed.repos;
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+
+                    if (oldIndex === newIndex) return;
+
+                    repos.splice(newIndex, 0, repos.splice(oldIndex, 1)[0]);
+
+                    modifiedConfig = parsed;
+                    updateStatus('modified');
+                    renderRepositories();
+                }
+            });
         }
 
         function initEventListeners() {
