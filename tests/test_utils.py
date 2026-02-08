@@ -157,3 +157,40 @@ class TestRetry:
 
         with pytest.raises(RuntimeError, match="runtime error"):
             func()
+
+
+class TestStripGitSuffix:
+    """Test strip_git_suffix function."""
+
+    @pytest.mark.parametrize(
+        "input_name,expected",
+        [
+            # Basic .git suffix removal
+            ("owner/repo.git", "owner/repo"),
+            ("repo.git", "repo"),
+            ("owner/repo", "owner/repo"),
+            # Names ending with characters from .git set (regression tests)
+            ("OpenList", "OpenList"),      # Ends with 't'
+            ("vue.js", "vue.js"),          # Contains '.' and ends with 's'
+            ("mygit", "mygit"),            # Ends with 'git'
+            ("test.g", "test.g"),          # Ends with 'g'
+            ("test.i", "test.i"),          # Ends with 'i'
+            ("test.t", "test.t"),          # Ends with 't'
+            # Edge cases
+            ("", ""),
+            ("git", "git"),
+            (".git", ""),
+            ("a.git", "a"),
+            # Multiple .git suffixes (only last one removed)
+            ("repo.git.git", "repo.git"),
+            # Case sensitivity
+            ("repo.GIT", "repo.GIT"),      # Not removed (case-sensitive)
+            ("repo.Git", "repo.Git"),      # Not removed (case-sensitive)
+        ],
+    )
+    def test_strip_git_suffix(self, input_name, expected):
+        """Test strip_git_suffix removes only .git suffix."""
+        from progress.utils import strip_git_suffix
+
+        result = strip_git_suffix(input_name)
+        assert result == expected, f"Failed for {input_name!r}: got {result!r}, expected {expected!r}"
