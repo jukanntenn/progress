@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuration Editor - Progress</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
         tailwind.config = {
-            darkMode: 'class',
+            darkMode: 'media',
             theme: {
                 extend: {
                     colors: {
@@ -37,74 +36,53 @@
     <script type="module">
         import { parse, stringify } from 'https://cdn.jsdelivr.net/npm/smol-toml@1.6.0/+esm';
         window.TOML = { parse, stringify };
+        import Sortable from 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/modular/sortable.core.esm.js';
+        window.Sortable = Sortable;
     </script>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen">
     <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <a href="/" class="text-xl font-bold text-gray-900 dark:text-white">
-                    <i class="fa-solid fa-gauge-high mr-2"></i>Progress
-                </a>
-                <div class="flex items-center gap-3">
-                    <button onclick="resetConfig()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                        <i class="fa-solid fa-rotate-left mr-2"></i>Reset
-                    </button>
-                    <button onclick="saveConfig()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                        <i class="fa-solid fa-floppy-disk mr-2"></i>Save
-                    </button>
-                </div>
+        <div class="flex justify-between items-center h-16 px-6">
+            <a href="/" class="text-xl font-bold text-gray-900 dark:text-white">
+                Progress
+            </a>
+            <div class="flex items-center gap-3">
+                <button onclick="resetConfig()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    Reset
+                </button>
+                <button onclick="saveConfig()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                    Save
+                </button>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div id="editor-container" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="flex">
+        {% include "web/_config_sidebar.html" %}
 
-            <div class="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <button id="view-toggle" onclick="toggleView()" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <i class="fa-solid fa-file-code text-gray-500"></i>
-                        <span id="toggle-text">Switch to TOML</span>
-                    </button>
-                </div>
-                <div id="editor-status" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span>Valid TOML</span>
-                </div>
-            </div>
+        <main class="flex-1 p-6">
+            <div id="editor-container" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
 
-            <div id="visual-editor" class="view-panel">
-                <div class="px-6 py-3 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-                    <div class="flex gap-2" id="section-nav">
-                        <button class="section-btn active px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white" data-section="general">
-                            <i class="fa-solid fa-sliders mr-1"></i>General
+                <div class="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <button id="view-toggle" onclick="toggleView()" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                            </svg>
+                            <span id="toggle-text">Switch to TOML</span>
                         </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="markpost">
-                            <i class="fa-solid fa-paper-plane mr-1"></i>Markpost
-                        </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="notification">
-                            <i class="fa-solid fa-bell mr-1"></i>Notification
-                        </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="github">
-                            <i class="fa-brands fa-github mr-1"></i>GitHub
-                        </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="analysis">
-                            <i class="fa-solid fa-robot mr-1"></i>Analysis
-                        </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="web">
-                            <i class="fa-solid fa-globe mr-1"></i>Web
-                        </button>
-                        <button class="section-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-section="repos">
-                            <i class="fa-solid fa-database mr-1"></i>Repositories
-                        </button>
+                    </div>
+                    <div id="editor-status" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                        <span>Valid TOML</span>
                     </div>
                 </div>
 
-                <div class="p-6 max-h-[calc(100vh-300px)] overflow-y-auto" id="forms-container">
-                    {% include "web/_config_editor.html" %}
+                <div id="visual-editor" class="view-panel">
+                    <div class="p-6 max-h-[calc(100vh-250px)] overflow-y-auto" id="forms-container">
+                        {% include "web/_config_editor.html" %}
+                    </div>
                 </div>
-            </div>
 
             <div id="toml-editor-panel" class="view-panel hidden">
                 <textarea
@@ -123,8 +101,10 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
             <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Feishu Channel</h3>
-                <button onclick="closeModal('modal-feishu')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+                <button onclick="closeModal('modal-feishu')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
             <div class="p-4 space-y-4">
@@ -155,8 +135,10 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
             <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Email Channel</h3>
-                <button onclick="closeModal('modal-email')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+                <button onclick="closeModal('modal-email')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
             <div class="p-4 space-y-4">
@@ -211,8 +193,10 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4">
             <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Repository</h3>
-                <button onclick="closeModal('modal-repo')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+                <button onclick="closeModal('modal-repo')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
             <div class="p-4 space-y-4">
@@ -341,21 +325,21 @@
             const visualPanel = document.getElementById('visual-editor');
             const tomlPanel = document.getElementById('toml-editor-panel');
             const toggleText = document.getElementById('toggle-text');
-            const toggleIcon = document.querySelector('#view-toggle i');
+            const toggleIcon = document.querySelector('#view-toggle svg');
 
             if (currentView === 'visual') {
                 currentView = 'toml';
                 visualPanel.classList.add('hidden');
                 tomlPanel.classList.remove('hidden');
                 toggleText.textContent = 'Switch to Visual';
-                toggleIcon.className = 'fa-solid fa-eye text-gray-500';
+                toggleIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>';
                 tomlEditor.value = currentTOML;
             } else {
                 currentView = 'visual';
                 tomlPanel.classList.add('hidden');
                 visualPanel.classList.remove('hidden');
                 toggleText.textContent = 'Switch to TOML';
-                toggleIcon.className = 'fa-solid fa-file-code text-gray-500';
+                toggleIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>';
                 currentTOML = tomlEditor.value;
                 syncTOMLToUI();
             }
