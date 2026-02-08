@@ -33,3 +33,11 @@ def mock_report():
         analyzed_diff_length=800,
     )
     return report
+
+
+def test_fixtures_exist(reporter, mock_report):
+    """Test that fixtures are properly configured."""
+    assert reporter is not None
+    assert mock_report is not None
+    assert isinstance(reporter, MarkdownReporter)
+    assert isinstance(mock_report, RepositoryReport)
