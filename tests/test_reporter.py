@@ -52,3 +52,13 @@ def test_commit_messages_html_escaped(reporter, mock_report):
     assert "&gt;" in rendered
     # The literal iframe tag should NOT appear
     assert "<iframe" not in rendered
+
+
+def test_analysis_html_not_escaped(reporter, mock_report):
+    """Test that HTML in analysis content is NOT escaped."""
+    rendered = reporter.generate_repository_report(mock_report)
+
+    # Analysis summary/detail should preserve HTML for markdown rendering
+    assert "**Bold**" in rendered
+    assert "<strong>" in rendered
+    assert "<a href='#'>" in rendered
