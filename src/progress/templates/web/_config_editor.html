@@ -34,16 +34,13 @@
         <label for="ctrl-timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             <i class="fa-solid fa-globe mr-1 text-gray-400"></i>Timezone
         </label>
-        <select id="ctrl-timezone" data-path="timezone"
-            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="UTC" {% if tz == 'UTC' %}selected{% endif %}>UTC</option>
-            <option value="Asia/Shanghai" {% if tz == 'Asia/Shanghai' %}selected{% endif %}>Asia/Shanghai</option>
-            <option value="America/New_York" {% if tz == 'America/New_York' %}selected{% endif %}>America/New_York</option>
-            <option value="America/Los_Angeles" {% if tz == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles</option>
-            <option value="Europe/London" {% if tz == 'Europe/London' %}selected{% endif %}>Europe/London</option>
-            <option value="Europe/Paris" {% if tz == 'Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
-            <option value="Asia/Tokyo" {% if tz == 'Asia/Tokyo' %}selected{% endif %}>Asia/Tokyo</option>
-        </select>
+        <div class="relative">
+            <input type="text" id="ctrl-timezone" data-path="timezone" autocomplete="off"
+                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Search timezone..." value="{{ tz }}">
+            <div id="timezone-dropdown" class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            </div>
+        </div>
         <div class="comment-help mt-1 text-xs text-gray-500 dark:text-gray-400" data-help-for="timezone">
             <i class="fa-regular fa-circle-question mr-1"></i>
             <span>IANA timezone identifier</span>

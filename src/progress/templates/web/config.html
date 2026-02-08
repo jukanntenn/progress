@@ -237,6 +237,8 @@
         let modifiedConfig = null;
         let editingChannelIndex = null;
         let editingRepoIndex = null;
+        let allTimezones = [];
+        let timezoneDropdownOpen = false;
 
         const tomlEditor = document.getElementById('toml-editor');
         const tomlStatus = document.getElementById('editor-status');
@@ -262,6 +264,95 @@
                 toast.classList.add('opacity-0', 'translate-y-4');
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
+        }
+
+        async function loadTimezones() {
+            try {
+                const response = await fetch('/api/timezones');
+                const data = await response.json();
+
+                if (data.success) {
+                    allTimezones = data.timezones;
+                }
+            } catch (e) {
+                console.error('Failed to load timezones:', e);
+            }
+        }
+
+        function filterTimezones(query) {
+            if (!query) {
+                return allTimezones.slice(0, 50);
+            }
+
+            const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
+
+            return allTimezones.filter(tz => {
+                const normalizedTz = tz.toLowerCase().replace(/[\/_]/g, '');
+                return normalizedTz.includes(normalizedQuery);
+            }).slice(0, 50);
+        }
+
+        function renderTimezoneDropdown(filteredTimezones) {
+            const dropdown = document.getElementById('timezone-dropdown');
+
+            if (filteredTimezones.length === 0) {
+                dropdown.innerHTML = '<div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No timezones found</div>';
+            } else {
+                dropdown.innerHTML = filteredTimezones.map(tz => `
+                    <div class="timezone-option px-3 py-2 text-sm text-gray-900 dark:text-gray-100 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-timezone="${tz}">
+                        ${tz}
+                    </div>
+                `).join('');
+            }
+
+            dropdown.classList.remove('hidden');
+
+            dropdown.querySelectorAll('.timezone-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const timezone = option.dataset.timezone;
+                    const input = document.getElementById('ctrl-timezone');
+                    input.value = timezone;
+                    closeTimezoneDropdown();
+                    updateStatus('modified');
+                });
+            });
+        }
+
+        function openTimezoneDropdown() {
+            const input = document.getElementById('ctrl-timezone');
+            const query = input.value.trim();
+            const filtered = filterTimezones(query);
+            renderTimezoneDropdown(filtered);
+            timezoneDropdownOpen = true;
+        }
+
+        function closeTimezoneDropdown() {
+            const dropdown = document.getElementById('timezone-dropdown');
+            dropdown.classList.add('hidden');
+            timezoneDropdownOpen = false;
+        }
+
+        function initTimezoneSelector() {
+            const input = document.getElementById('ctrl-timezone');
+            const dropdown = document.getElementById('timezone-dropdown');
+
+            input.addEventListener('focus', () => {
+                openTimezoneDropdown();
+            });
+
+            input.addEventListener('input', () => {
+                const query = input.value.trim();
+                const filtered = filterTimezones(query);
+                renderTimezoneDropdown(filtered);
+                timezoneDropdownOpen = true;
+                updateStatus('modified');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (timezoneDropdownOpen && !input.contains(e.target) && !dropdown.contains(e.target)) {
+                    closeTimezoneDropdown();
+                }
+            });
         }
 
         function parseTOML(tomlContent) {
@@ -389,6 +480,8 @@
                     element.checked = !!value;
                 } else if (element.tagName === 'SELECT') {
                     element.value = value || '';
+                } else if (element.id === 'ctrl-timezone') {
+                    element.value = value || 'UTC';
                 } else {
                     element.value = value !== undefined ? value : '';
                 }
@@ -413,6 +506,9 @@
                     } else {
                         removeNestedValue(parsed, path);
                     }
+                } else if (element.id === 'ctrl-timezone') {
+                    value = element.value || 'UTC';
+                    setNestedValue(parsed, path, value);
                 } else if (element.value) {
                     value = element.value;
                     setNestedValue(parsed, path, value);
@@ -939,6 +1035,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             initEventListeners();
             loadConfig();
+            loadTimezones();
+            initTimezoneSelector();
         });
     </script>
 </body>

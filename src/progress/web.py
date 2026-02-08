@@ -447,4 +447,7 @@ def get_timezones():
     """GET API endpoint - returns all IANA timezones sorted alphabetically."""
     timezones = sorted(pytz.all_timezones)
 
-    return jsonify(timezones)
+    return jsonify({
+        "success": True,
+        "timezones": timezones
+    })
