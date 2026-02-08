@@ -41,11 +41,11 @@
 {% for msg in report.commit_messages %}
 {% if '\n' in msg %}
 <details>
-<summary>{{ msg.split('\n')[0] }}</summary>
-{{ msg }}
+<summary>{{ msg.split('\n')[0]|escape_html }}</summary>
+{{ msg|escape_html }}
 </details>
 {% else %}
-{{ msg }}
+{{ msg|escape_html }}
 {% endif %}
 {% endfor %}
 
