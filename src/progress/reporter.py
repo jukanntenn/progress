@@ -1,5 +1,6 @@
 """Markdown report generator with i18n support."""
 
+from html import escape
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -22,8 +23,6 @@ def _escape_html(text: str) -> str:
     Returns:
         HTML-escaped text
     """
-    from html import escape
-
     return escape(text)
 
 
