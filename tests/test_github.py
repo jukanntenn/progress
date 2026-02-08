@@ -379,3 +379,19 @@ class TestParseRepoName:
 
         result = parse_repo_name(input_url)
         assert result == expected, f"Failed for {input_url}: got {result}, expected {expected}"
+
+    def test_parse_repo_name_openlist_regression(self):
+        """Regression test for OpenList -> OpenLis bug."""
+        from progress.consts import parse_repo_name
+
+        # Test the specific case that was failing
+        result = parse_repo_name("OpenListTeam/OpenList")
+        assert result == "OpenListTeam/OpenList", f"Got {result!r}"
+
+        # Test with .git suffix
+        result = parse_repo_name("OpenListTeam/OpenList.git")
+        assert result == "OpenListTeam/OpenList", f"Got {result!r}"
+
+        # Test full HTTPS URL
+        result = parse_repo_name("https://github.com/OpenListTeam/OpenList.git")
+        assert result == "OpenListTeam/OpenList", f"Got {result!r}"
