@@ -233,3 +233,4 @@ openspec/
 
 # Git worktrees for isolated development
 .worktrees/
+docs/plans/
