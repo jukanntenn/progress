@@ -25,7 +25,7 @@ from .consts import (
 )
 from .enums import Protocol
 from .errors import GitException
-from .utils import retry, run_command, sanitize
+from .utils import retry, run_command, sanitize, strip_git_suffix
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ def _parse_owner_repo(url: str) -> tuple[str, str]:
     if "/" in url:
         parts = url.split("/")
         if len(parts) == 2:
-            return parts[0], parts[1].rstrip(GIT_SUFFIX)
+            return parts[0], strip_git_suffix(parts[1])
 
     raise ValueError(f"Invalid repository URL format: {url}")
 
