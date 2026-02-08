@@ -230,3 +230,6 @@ config.toml
 **/*.pot~
 
 openspec/
+
+# Git worktrees for isolated development
+.worktrees/
