@@ -62,3 +62,55 @@ def test_analysis_html_not_escaped(reporter, mock_report):
     assert "**Bold**" in rendered
     assert "<strong>" in rendered
     assert "<a href='#'>" in rendered
+
+
+def test_multiline_commit_with_html_escaped(reporter):
+    """Test that HTML in multiline commits is escaped."""
+    report = RepositoryReport(
+        repo_name="test/repo",
+        repo_slug="test-repo",
+        repo_web_url="https://github.com/test/repo",
+        branch="main",
+        commit_count=1,
+        current_commit="abc123",
+        previous_commit="def456",
+        commit_messages=[
+            "First line\n<script>alert('xss')</script>\nThird line"
+        ],
+        analysis_summary="Summary",
+        analysis_detail="Detail",
+        truncated=False,
+        original_diff_length=1000,
+        analyzed_diff_length=800,
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "&lt;script&gt;" in rendered
+    assert "<script>" not in rendered
+
+
+def test_special_characters_in_commits(reporter):
+    """Test that special characters are properly escaped."""
+    report = RepositoryReport(
+        repo_name="test/repo",
+        repo_slug="test-repo",
+        repo_web_url="https://github.com/test/repo",
+        branch="main",
+        commit_count=1,
+        current_commit="abc123",
+        previous_commit="def456",
+        commit_messages=[
+            "Commit with &amp; and <tag> and \"quotes\""
+        ],
+        analysis_summary="Summary",
+        analysis_detail="Detail",
+        truncated=False,
+        original_diff_length=1000,
+        analyzed_diff_length=800,
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "&amp;" in rendered  # & should become &amp;amp;
+    assert "&lt;tag&gt;" in rendered  # <tag> should be escaped
