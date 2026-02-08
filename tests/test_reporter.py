@@ -41,3 +41,14 @@ def test_fixtures_exist(reporter, mock_report):
     assert mock_report is not None
     assert isinstance(reporter, MarkdownReporter)
     assert isinstance(mock_report, RepositoryReport)
+
+
+def test_commit_messages_html_escaped(reporter, mock_report):
+    """Test that HTML tags in commit messages are escaped."""
+    rendered = reporter.generate_repository_report(mock_report)
+
+    # Commit messages should have HTML escaped
+    assert "&lt;iframe" in rendered
+    assert "&gt;" in rendered
+    # The literal iframe tag should NOT appear
+    assert "<iframe" not in rendered
