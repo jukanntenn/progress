@@ -13,8 +13,11 @@ from markdown_it import MarkdownIt
 from mdit_py_plugins.front_matter import front_matter_plugin
 from mdit_py_plugins.footnote import footnote_plugin
 
+import pytz
+
 from .consts import DATABASE_PATH
 from .db import close_db, create_tables, init_db
+from .editor_schema import EditorSchema
 from .errors import ConfigException
 from .models import Report
 
@@ -427,3 +430,21 @@ def validate_config():
         )
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+
+
+@bp.route("/api/config/schema")
+def get_config_schema():
+    """GET API endpoint - returns editor schema for configuration."""
+    schema = EditorSchema(sections=[])
+
+    return jsonify({
+        "sections": [section.model_dump() for section in schema.sections]
+    })
+
+
+@bp.route("/api/timezones")
+def get_timezones():
+    """GET API endpoint - returns all IANA timezones sorted alphabetically."""
+    timezones = sorted(pytz.all_timezones)
+
+    return jsonify(timezones)

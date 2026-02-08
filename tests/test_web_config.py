@@ -249,3 +249,34 @@ def test_api_config_validate_invalid(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert data["success"] is False
+
+
+def test_api_config_schema(client):
+    """Test GET /api/config/schema route."""
+    response = client.get("/api/config/schema")
+    assert response.status_code == 200
+
+    data = json.loads(response.data)
+    assert "sections" in data
+    assert isinstance(data["sections"], list)
+
+
+def test_api_timezones(client):
+    """Test GET /api/timezones route."""
+    response = client.get("/api/timezones")
+    assert response.status_code == 200
+
+    data = json.loads(response.data)
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "UTC" in data
+    assert "America/New_York" in data
+    assert "Asia/Shanghai" in data
+
+def test_api_timezones_sorted(client):
+    """Test that /api/timezones returns sorted timezones."""
+    response = client.get("/api/timezones")
+    assert response.status_code == 200
+
+    data = json.loads(response.data)
+    assert data == sorted(data)
