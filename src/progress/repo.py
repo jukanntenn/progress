@@ -519,6 +519,7 @@ class Repo:
             "--branch",
             branch,
             "--single-branch",
+            "--tags",
         ]
 
         self._run_command(cmd)
