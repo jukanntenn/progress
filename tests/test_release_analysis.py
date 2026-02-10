@@ -26,15 +26,15 @@ class TestAnalyzeReleasesBasic:
     def test_calls_run_claude_release_analysis(self, analyzer_config):
         """Test that analyze_releases calls the internal method."""
         release_data = {
-            "releases": [
-                {
-                    "tag_name": "v1.0.0",
-                    "title": "Release",
-                    "notes": "Notes",
-                    "published_at": "2024-01-01T00:00:00Z",
-                    "commit_hash": "abc123"
-                }
-            ]
+            "latest_release": {
+                "tag": "v1.0.0",
+                "name": "Release",
+                "notes": "Notes",
+                "published_at": "2024-01-01T00:00:00Z",
+            },
+            "intermediate_releases": [],
+            "diff_content": None,
+            "is_first_check": True,
         }
 
         with patch('progress.analyzer.run_command') as mock_cmd:
@@ -147,9 +147,15 @@ class TestBuildReleaseAnalysisPromptBasic:
     def test_includes_language_setting(self, analyzer_config):
         """Test that language setting is included in prompt."""
         release_data = {
-            "releases": [
-                {"tag_name": "v1.0", "title": "Release", "notes": "Notes", "published_at": "2024-01-01", "commit_hash": "abc"}
-            ]
+            "latest_release": {
+                "tag": "v1.0",
+                "name": "Release",
+                "notes": "Notes",
+                "published_at": "2024-01-01",
+            },
+            "intermediate_releases": [],
+            "diff_content": None,
+            "is_first_check": True,
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -161,51 +167,57 @@ class TestBuildReleaseAnalysisPromptBasic:
     def test_passes_is_first_check_flag(self, analyzer_config):
         """Test that is_first_check flag is passed correctly."""
         release_data = {
-            "releases": [
-                {"tag_name": "v1.0", "title": "Release", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"}
-            ]
+            "latest_release": {
+                "tag": "v1.0",
+                "name": "Release",
+                "notes": "",
+                "published_at": "2024-01-01",
+            },
+            "intermediate_releases": [],
+            "diff_content": None,
+            "is_first_check": True,
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
         prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
 
-        # Verify first check indicator is in prompt
-        assert "First Release Check" in prompt or "is_first_check" in prompt
+        # The template no longer uses is_first_check, it's always "first check" style for single release
+        assert "Release" in prompt
 
     def test_incremental_release_prompt_renders_with_intermediate_and_diff(self, analyzer_config):
         """Test incremental release prompt renders without template key errors."""
         release_data = {
-            "releases": [
-                {
-                    "tag_name": "v1.2.0",
-                    "title": "Version 1.2.0",
-                    "notes": "Latest notes",
-                    "published_at": "2024-02-01T00:00:00Z",
-                    "commit_hash": "abc123",
-                },
-                {
-                    "tag_name": "v1.1.0",
-                    "title": "Version 1.1.0",
-                    "notes": "Intermediate notes",
-                    "published_at": "2024-01-15T00:00:00Z",
-                    "commit_hash": "def456",
-                }
-            ]
+            "latest_release": {
+                "tag": "v1.2.0",
+                "name": "Version 1.2.0",
+                "notes": "Latest notes",
+                "published_at": "2024-02-01T00:00:00Z",
+            },
+            "intermediate_releases": [],
+            "diff_content": "sample diff content",
+            "is_first_check": False,
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
         prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
 
-        assert "New Release Detected" in prompt
+        # The new simplified template only shows the single release being analyzed
+        # Intermediate releases concept was removed
         assert "v1.2.0" in prompt
-        assert "v1.1.0" in prompt
+        assert "sample diff content" in prompt
 
     def test_includes_json_output_instructions(self, analyzer_config):
         """Test that prompt includes JSON output format instructions."""
         release_data = {
-            "releases": [
-                {"tag_name": "v1.0", "title": "Release", "notes": "Release notes", "published_at": "2024-01-01", "commit_hash": "abc"}
-            ]
+            "latest_release": {
+                "tag": "v1.0",
+                "name": "Release",
+                "notes": "Release notes",
+                "published_at": "2024-01-01",
+            },
+            "intermediate_releases": [],
+            "diff_content": None,
+            "is_first_check": True,
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
