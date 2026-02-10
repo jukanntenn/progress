@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import base64
+import git
 from pathlib import Path
 from typing import List, Optional, Tuple
 import json
@@ -239,8 +240,8 @@ class GitClient:
 
     def get_current_commit(self, repo_path: Path) -> str:
         """Get current commit hash."""
-        result = self._run_git_command(["rev-parse", "HEAD"], repo_path)
-        return result.strip()
+        repo = git.Repo(str(repo_path))
+        return repo.head.commit.hexsha
 
     def get_previous_commit(self, repo_path: Path) -> Optional[str]:
         """Get second latest commit hash (HEAD^1).
@@ -248,10 +249,10 @@ class GitClient:
         Returns:
             Second latest commit hash, or None if it doesn't exist
         """
+        repo = git.Repo(str(repo_path))
         try:
-            result = self._run_git_command(["rev-parse", "HEAD^1"], repo_path)
-            return result.strip() if result.strip() else None
-        except RuntimeError:
+            return repo.head.commit.parents[0].hexsha
+        except (IndexError, AttributeError):
             return None
 
     def get_commit_diff(
@@ -324,20 +325,14 @@ class GitClient:
         self, repo_path: Path, old_commit: Optional[str], new_commit: str
     ) -> List[str]:
         """Get list of commit messages (full messages including body)."""
+        repo = git.Repo(str(repo_path))
         if old_commit:
-            result = self._run_git_command(
-                ["log", f"{old_commit}..{new_commit}", "--pretty=format:%B%n%x00"],
-                repo_path,
-            )
+            old = repo.commit(old_commit)
+            new = repo.commit(new_commit)
+            commits = list(repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
         else:
-            result = self._run_git_command(
-                ["log", "--pretty=format:%B%n%x00", "-1"], repo_path
-            )
-
-        if not result.strip():
-            return []
-
-        messages = [msg.strip() for msg in result.split("\x00") if msg.strip()]
+            commits = [repo.head.commit]
+        messages = [c.message for c in commits]
         return messages
 
     def get_commit_count(
@@ -346,16 +341,10 @@ class GitClient:
         """Get commit count."""
         if not old_commit:
             return 1
-
-        result = self._run_git_command(
-            [
-                "rev-list",
-                "--count",
-                f"{old_commit}..{new_commit}",
-            ],
-            repo_path,
-        )
-        return int(result.strip())
+        repo = git.Repo(str(repo_path))
+        old = repo.commit(old_commit)
+        new = repo.commit(new_commit)
+        return sum(1 for _ in repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
 
     def get_nth_commit_from_head(self, repo_path: Path, n: int) -> Optional[str]:
         """Get nth commit hash from HEAD (0-indexed).

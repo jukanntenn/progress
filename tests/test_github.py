@@ -65,6 +65,105 @@ def test_git_client_initialization():
     assert client.workspace_dir.name == "test_workspace"
 
 
+def test_git_client_get_current_commit_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(
+            commit=SimpleNamespace(hexsha="abc123def456")
+        )
+    )
+    def fake_repo_open(path):
+        return mock_repo
+    monkeypatch.setattr("git.Repo", fake_repo_open)
+    client = GitClient("/tmp/test_workspace")
+    commit = client.get_current_commit(Path("/tmp/test_workspace/test_repo"))
+    assert commit == "abc123def456"
+
+
+def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    mock_commit = SimpleNamespace(hexsha="def456")
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(
+            commit=SimpleNamespace(
+                hexsha="abc123",
+                parents=[mock_commit]
+            )
+        )
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    assert client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) == "def456"
+
+
+def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(
+            commit=SimpleNamespace(
+                hexsha="abc123",
+                parents=[]
+            )
+        )
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    assert client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) is None
+
+
+def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    mock_commit1 = SimpleNamespace(message="First commit\n\nDetails here")
+    mock_commit2 = SimpleNamespace(message="Second commit")
+
+    def mock_commit_fn(sha):
+        if sha == "old123":
+            return SimpleNamespace(hexsha="old123")
+        return SimpleNamespace(hexsha="abc123")
+
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123")),
+        commit=mock_commit_fn,
+        iter_commits=lambda rev_range: [mock_commit2, mock_commit1]
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    messages = client.get_commit_messages(Path("/tmp/test_workspace"), "old123", "abc123")
+    assert len(messages) == 2
+    assert messages[0] == "Second commit"
+    assert messages[1] == "First commit\n\nDetails here"
+
+
+def test_git_client_get_commit_count_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+
+    def mock_commit_fn(sha):
+        if sha == "old123":
+            return SimpleNamespace(hexsha="old123")
+        return SimpleNamespace(hexsha="abc123")
+
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123")),
+        commit=mock_commit_fn,
+        iter_commits=lambda rev_range: range(5)
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    count = client.get_commit_count(Path("/tmp/test_workspace"), "old123", "abc123")
+    assert count == 5
+
+
+def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    mock_repo = SimpleNamespace(
+        head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123"))
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    count = client.get_commit_count(Path("/tmp/test_workspace"), None, "abc123")
+    assert count == 1
+
+
 def test_gh_repo_list_parses_json(monkeypatch):
     def fake_run_command(cmd, timeout=None, env=None, **kwargs):
         assert cmd[:3] == ["gh", "repo", "list"]
