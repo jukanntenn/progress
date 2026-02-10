@@ -228,6 +228,11 @@ class RepositoryManager:
         Returns:
             List of release dicts with added ai_summary and ai_detail fields
         """
+        from datetime import datetime
+
+        releases = release_data["releases"]
+        releases.sort(key=lambda r: datetime.fromisoformat(r["published_at"].replace("Z", "+00:00")), reverse=True)
+
         analyzed_releases = []
 
         for release in release_data["releases"]:

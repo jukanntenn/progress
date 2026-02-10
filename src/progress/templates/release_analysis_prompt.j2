@@ -3,40 +3,22 @@ You are analyzing a GitHub release for a repository.
 **Repository**: {{ repo_name }}
 **Branch**: {{ branch }}
 
-{% if is_first_check %}
-## First Release Check
-
-This is the first time checking releases for this repository.
-
-**Release**: {{ release_data.releases[0].tag_name }}
-{% if release_data.releases[0].title %}**Name**: {{ release_data.releases[0].title }}{% endif %}
-**Published**: {{ release_data.releases[0].published_at }}
+**Release**: {{ release_data.latest_release.tag }}
+{% if release_data.latest_release.name %}**Name**: {{ release_data.latest_release.name }}{% endif %}
+**Published**: {{ release_data.latest_release.published_at }}
 
 ### Release Notes
 
-{{ release_data.releases[0].notes if release_data.releases[0].notes else "No release notes provided." }}
+{{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
 
-{% else %}
-## New Release Detected
+{% if release_data.diff_content %}
+### Code Changes
 
-**Latest Release**: {{ release_data.releases[0].tag_name }}
-{% if release_data.releases[0].title %}**Name**: {{ release_data.releases[0].title }}{% endif %}
-**Published**: {{ release_data.releases[0].published_at }}
+The following diff shows code changes related to this release:
 
-### Release Notes
-
-{{ release_data.releases[0].notes if release_data.releases[0].notes else "No release notes provided." }}
-
-{% if release_data.releases|length > 1 %}
-### Other Releases Since Last Check
-
-{% for r in release_data.releases[1:] %}
-**{{ r.tag_name }}** ({{ r.published_at }})
-{% if r.title %}Name: {{ r.title }}{% endif %}
-Notes: {{ r.notes if r.notes else "No notes provided." }}
-
-{% endfor %}
-{% endif %}
+```
+{{ release_data.diff_content }}
+```
 {% endif %}
 
 ## Your Task
@@ -58,10 +40,6 @@ Analyze this release and provide:
    - What are the risks or concerns?
 
 4. **Impact Assessment**: Low/Medium/High impact for users depending on this project.
-
-{% if not is_first_check and release_data.releases|length > 1 %}
-5. **Cumulative Changes Summary**: If there were multiple releases, provide a brief summary of what changed across all of them.
-{% endif %}
 
 {% if language %}
 **Important**: Write your analysis in {{ language }}.
@@ -89,4 +67,4 @@ Requirements:
 - Do not add any explanatory text before or after the JSON
 
 Example:
-{"summary":"This release adds dark mode support and fixes 5 critical bugs.","detail":"## 🎦 New Features\n\n- **Dark Mode**: Full dark theme support across all pages\n\n## 🐛 Bug Fixes\n\n- Fixed login issue with Safari browsers\n- Resolved memory leak in dashboard\n..."}
+{"summary":"This release adds dark mode support and fixes 5 critical bugs.","detail":"## 🎦 New Features\\n\\n- **Dark Mode**: Full dark theme support across all pages\\n\\n## 🐛 Bug Fixes\\n\\n- Fixed login issue with Safari browsers\\n- Resolved memory leak in dashboard\\n..."}
