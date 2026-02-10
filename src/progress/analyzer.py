@@ -330,11 +330,13 @@ class ClaudeCodeAnalyzer:
     ) -> str:
         """Build release analysis prompt."""
         template = self.jinja_env.get_template("release_analysis_prompt.j2")
+        releases = release_data.get("releases", [])
+        is_first_check = len(releases) == 1
         return template.render(
             repo_name=repo_name,
             branch=branch,
             release_data=release_data,
-            is_first_check=release_data.get("is_first_check", False),
+            is_first_check=is_first_check,
             language=self.language,
         )
 

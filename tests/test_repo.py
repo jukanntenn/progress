@@ -292,3 +292,27 @@ class TestRepo:
             Path("/tmp/workspace/owner_repo"), "abc123", "def456"
         )
         assert result == ["msg1", "msg2"]
+
+    def test_clone_includes_tags_flag(self):
+        """Test that clone command includes --tags flag"""
+        model = Mock(spec=Repository)
+        model.url = "https://github.com/owner/repo.git"
+        model.branch = "main"
+        model.last_commit_hash = None
+
+        git = Mock(spec=GitClient)
+        git.workspace_dir = Path("/tmp/workspace")
+
+        config = Mock(spec=Config)
+        github_config = Mock()
+        github_config.gh_timeout = 300
+        config.github = github_config
+
+        repo = Repo(model, git, config, gh_token="test_token")
+
+        with patch.object(repo, "_run_command") as mock_run:
+            repo._run_gh_clone_command("https://github.com/owner/repo.git", "main")
+
+            call_args = mock_run.call_args[0][0]
+            assert "--" in call_args
+            assert "--tags" in call_args
