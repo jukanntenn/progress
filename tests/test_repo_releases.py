@@ -76,10 +76,12 @@ class TestCheckReleasesBasic:
         result = repo.check_releases()
 
         assert result is not None
-        assert result["is_first_check"] is True
-        assert result["latest_release"]["tag"] == "v1.0.0"
-        assert result["diff_content"] is None
-        assert len(result["intermediate_releases"]) == 0
+        assert "releases" in result
+        assert len(result["releases"]) == 1
+        assert result["releases"][0]["tag_name"] == "v1.0.0"
+        assert result["releases"][0]["title"] == "Version 1.0.0"
+        assert result["releases"][0]["notes"] == "First release"
+        assert result["releases"][0]["commit_hash"] == "abc123def456"
 
         mock_github_client.list_releases.assert_called_once_with("test", "repo")
         mock_github_client.get_release_commit.assert_called_once_with("test", "repo", "v1.0.0")
@@ -133,9 +135,11 @@ class TestCheckReleasesBasic:
         result = repo.check_releases()
 
         assert result is not None
-        assert result["is_first_check"] is False
-        assert len(result["intermediate_releases"]) >= 1
-        assert result["latest_release"]["tag"] in ["v1.1.0", "v2.0.0"]
+        assert "releases" in result
+        assert len(result["releases"]) == 2
+        tag_names = [r["tag_name"] for r in result["releases"]]
+        assert "v1.1.0" in tag_names
+        assert "v2.0.0" in tag_names
 
 
 class TestUpdateReleases:
@@ -173,16 +177,15 @@ class TestReleaseAnalysisFallback:
 
         repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
         release_data = {
-            "is_first_check": True,
-            "latest_release": {
-                "tag": "v1.0.0",
-                "name": "Version 1.0.0",
-                "notes": "Initial release with features",
-                "published_at": "2024-01-01T00:00:00Z",
-                "commit_hash": "abc123"
-            },
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {
+                    "tag_name": "v1.0.0",
+                    "title": "Version 1.0.0",
+                    "notes": "Initial release with features",
+                    "published_at": "2024-01-01T00:00:00Z",
+                    "commit_hash": "abc123"
+                }
+            ]
         }
 
         # Create analyzer mock that raises AnalysisException
@@ -218,16 +221,15 @@ class TestReleaseAnalysisFallback:
 
         repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
         release_data = {
-            "is_first_check": True,
-            "latest_release": {
-                "tag": "v2.0.0",
-                "name": "Version 2.0.0",
-                "notes": "",
-                "published_at": "2024-02-01T00:00:00Z",
-                "commit_hash": "def456"
-            },
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {
+                    "tag_name": "v2.0.0",
+                    "title": "Version 2.0.0",
+                    "notes": "",
+                    "published_at": "2024-02-01T00:00:00Z",
+                    "commit_hash": "def456"
+                }
+            ]
         }
 
         analyzer = Mock(spec=ClaudeCodeAnalyzer)

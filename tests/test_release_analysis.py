@@ -26,16 +26,15 @@ class TestAnalyzeReleasesBasic:
     def test_calls_run_claude_release_analysis(self, analyzer_config):
         """Test that analyze_releases calls the internal method."""
         release_data = {
-            "is_first_check": True,
-            "latest_release": {
-                "tag": "v1.0.0",
-                "name": "Release",
-                "notes": "Notes",
-                "published_at": "2024-01-01T00:00:00Z",
-                "commit_hash": "abc123"
-            },
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {
+                    "tag_name": "v1.0.0",
+                    "title": "Release",
+                    "notes": "Notes",
+                    "published_at": "2024-01-01T00:00:00Z",
+                    "commit_hash": "abc123"
+                }
+            ]
         }
 
         with patch('progress.analyzer.run_command') as mock_cmd:
@@ -52,10 +51,9 @@ class TestAnalyzeReleasesBasic:
     def test_passes_repo_and_branch_to_prompt_builder(self, analyzer_config):
         """Test that repo and branch are passed to prompt builder."""
         release_data = {
-            "is_first_check": True,
-            "latest_release": {"tag": "v1.0.0", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"},
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {"tag_name": "v1.0.0", "title": "Release", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"}
+            ]
         }
 
         with patch('progress.analyzer.ClaudeCodeAnalyzer._build_release_analysis_prompt') as mock_build:
@@ -149,10 +147,9 @@ class TestBuildReleaseAnalysisPromptBasic:
     def test_includes_language_setting(self, analyzer_config):
         """Test that language setting is included in prompt."""
         release_data = {
-            "is_first_check": True,
-            "latest_release": {"tag": "v1.0", "notes": "Notes", "published_at": "2024-01-01", "commit_hash": "abc"},
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {"tag_name": "v1.0", "title": "Release", "notes": "Notes", "published_at": "2024-01-01", "commit_hash": "abc"}
+            ]
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -164,10 +161,9 @@ class TestBuildReleaseAnalysisPromptBasic:
     def test_passes_is_first_check_flag(self, analyzer_config):
         """Test that is_first_check flag is passed correctly."""
         release_data = {
-            "is_first_check": True,
-            "latest_release": {"tag": "v1.0", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"},
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {"tag_name": "v1.0", "title": "Release", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"}
+            ]
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -179,25 +175,22 @@ class TestBuildReleaseAnalysisPromptBasic:
     def test_incremental_release_prompt_renders_with_intermediate_and_diff(self, analyzer_config):
         """Test incremental release prompt renders without template key errors."""
         release_data = {
-            "is_first_check": False,
-            "latest_release": {
-                "tag": "v1.2.0",
-                "name": "Version 1.2.0",
-                "notes": "Latest notes",
-                "published_at": "2024-02-01T00:00:00Z",
-                "commit_hash": "abc123",
-            },
-            "intermediate_releases": [
+            "releases": [
                 {
-                    "tag": "v1.1.0",
-                    "name": "Version 1.1.0",
+                    "tag_name": "v1.2.0",
+                    "title": "Version 1.2.0",
+                    "notes": "Latest notes",
+                    "published_at": "2024-02-01T00:00:00Z",
+                    "commit_hash": "abc123",
+                },
+                {
+                    "tag_name": "v1.1.0",
+                    "title": "Version 1.1.0",
                     "notes": "Intermediate notes",
                     "published_at": "2024-01-15T00:00:00Z",
+                    "commit_hash": "def456",
                 }
-            ],
-            "diff_from": "v1.0.0",
-            "diff_to": "v1.2.0",
-            "diff_content": "diff --git a/x b/x\n+hello\n",
+            ]
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -206,15 +199,13 @@ class TestBuildReleaseAnalysisPromptBasic:
         assert "New Release Detected" in prompt
         assert "v1.2.0" in prompt
         assert "v1.1.0" in prompt
-        assert "diff --git" in prompt
 
     def test_includes_json_output_instructions(self, analyzer_config):
         """Test that prompt includes JSON output format instructions."""
         release_data = {
-            "is_first_check": True,
-            "latest_release": {"tag": "v1.0", "notes": "Release notes", "published_at": "2024-01-01", "commit_hash": "abc"},
-            "intermediate_releases": [],
-            "diff_content": None
+            "releases": [
+                {"tag_name": "v1.0", "title": "Release", "notes": "Release notes", "published_at": "2024-01-01", "commit_hash": "abc"}
+            ]
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -247,25 +238,22 @@ class TestRepositoryReportTemplateBasic:
             original_diff_length=0,
             analyzed_diff_length=0,
             release_data={
-                "is_first_check": False,
-                "latest_release": {
-                    "tag": "v1.2.0",
-                    "name": "Version 1.2.0",
-                    "notes": "Latest notes",
-                    "published_at": "2024-02-01T00:00:00Z",
-                    "commit_hash": "abc123",
-                },
-                "intermediate_releases": [
+                "releases": [
                     {
-                        "tag": "v1.1.0",
-                        "name": "Version 1.1.0",
+                        "tag_name": "v1.2.0",
+                        "title": "Version 1.2.0",
+                        "notes": "Latest notes",
+                        "published_at": "2024-02-01T00:00:00Z",
+                        "commit_hash": "abc123",
+                    },
+                    {
+                        "tag_name": "v1.1.0",
+                        "title": "Version 1.1.0",
                         "notes": "Intermediate notes",
                         "published_at": "2024-01-15T00:00:00Z",
+                        "commit_hash": "def456",
                     }
-                ],
-                "diff_from": "v1.0.0",
-                "diff_to": "v1.2.0",
-                "diff_content": None,
+                ]
             },
             release_summary="Summary",
             release_detail="Detail",

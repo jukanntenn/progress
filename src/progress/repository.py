@@ -253,29 +253,33 @@ class RepositoryManager:
                 release_summary, release_detail = self.analyzer.analyze_releases(
                     str(repo.name), str(repo.branch), release_data
                 )
-                latest = release_data["latest_release"]
-                commit_hash = latest.get("commit_hash")
-                if commit_hash:
-                    repo_obj.update_releases(latest["tag"], commit_hash)
+                releases = release_data.get("releases", [])
+                if releases:
+                    latest = releases[0]
+                    commit_hash = latest.get("commit_hash")
+                    if commit_hash:
+                        repo_obj.update_releases(latest["tag_name"], commit_hash)
         except Exception as e:
             self.logger.warning(f"Release analysis failed for {repo.name}: {e}")
             if release_data:
                 from .i18n import gettext as _
-                latest = release_data["latest_release"]
-                tag = latest.get("tag", "unknown")
-                notes = latest.get("notes", "")
-                release_summary = _("**New release {tag} is available.**\n\n").format(tag=tag)
-                if notes:
-                    release_summary += _("**Release Notes:**\n\n{notes}\n\n").format(notes=notes[:500])
-                release_summary += _("*AI analysis was not available. View release notes on GitHub for full details.*")
-                release_detail = _("**Release Information:**\n\n")
-                release_detail += f"- **Tag:** {tag}\n"
-                release_detail += f"- **Name:** {latest.get('name', tag)}\n"
-                release_detail += f"- **Published:** {latest.get('published_at', 'unknown')}\n"
-                if notes:
-                    release_detail += f"\n**Release Notes:**\n\n{notes}\n"
-                if release_data.get("intermediate_releases"):
-                    release_detail += f"\n**Intermediate Releases:** {len(release_data['intermediate_releases'])} additional release(s)\n"
+                releases = release_data.get("releases", [])
+                if releases:
+                    latest = releases[0]
+                    tag = latest.get("tag_name", "unknown")
+                    notes = latest.get("notes", "")
+                    release_summary = _("**New release {tag} is available.**\n\n").format(tag=tag)
+                    if notes:
+                        release_summary += _("**Release Notes:**\n\n{notes}\n\n").format(notes=notes[:500])
+                    release_summary += _("*AI analysis was not available. View release notes on GitHub for full details.*")
+                    release_detail = _("**Release Information:**\n\n")
+                    release_detail += f"- **Tag:** {tag}\n"
+                    release_detail += f"- **Name:** {latest.get('title', tag)}\n"
+                    release_detail += f"- **Published:** {latest.get('published_at', 'unknown')}\n"
+                    if notes:
+                        release_detail += f"\n**Release Notes:**\n\n{notes}\n"
+                    if len(releases) > 1:
+                        release_detail += f"\n**Additional Releases:** {len(releases) - 1} more release(s)\n"
 
         # Get diff data, returns None if no new commits
         diff_data = repo_obj.get_diff()

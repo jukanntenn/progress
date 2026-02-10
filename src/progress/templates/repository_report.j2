@@ -4,8 +4,8 @@
 
 {% if report.release_data %}
 ┌─────────────────────────────────────────────────────────────────┐
-│ 🚀 **New Release**: {{ report.release_data.latest_release.tag }}         │
-│ Published: {{ report.release_data.latest_release.published_at }}         │
+│ 🚀 **New Release**: {{ report.release_data.releases[0].tag_name }}         │
+│ Published: {{ report.release_data.releases[0].published_at }}         │
 └─────────────────────────────────────────────────────────────────┘
 
 {{ report.release_summary }}
@@ -15,15 +15,15 @@
 
 {{ report.release_detail }}
 
-{% if report.release_data.intermediate_releases %}
+{% if report.release_data.releases|length > 1 %}
 ### Other releases since last check
-{% for r in report.release_data.intermediate_releases[:5] %}
-**{{ r.tag }}** ({{ r.published_at }})
+{% for r in report.release_data.releases[1:6] %}
+**{{ r.tag_name }}** ({{ r.published_at }})
 {{ r.notes | truncate(200) if r.notes else _("No release notes provided.") }}
 
 {% endfor %}
-{% if report.release_data.intermediate_releases | length > 5 %}
-*...and {{ report.release_data.intermediate_releases | length - 5 }} more releases*
+{% if report.release_data.releases | length > 6 %}
+*...and {{ report.release_data.releases | length - 6 }} more releases*
 {% endif %}
 {% endif %}
 

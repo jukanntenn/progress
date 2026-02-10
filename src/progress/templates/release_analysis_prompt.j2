@@ -8,45 +8,34 @@ You are analyzing a GitHub release for a repository.
 
 This is the first time checking releases for this repository.
 
-**Release**: {{ release_data.latest_release.tag }}
-{% if release_data.latest_release.name %}**Name**: {{ release_data.latest_release.name }}{% endif %}
-**Published**: {{ release_data.latest_release.published_at }}
+**Release**: {{ release_data.releases[0].tag_name }}
+{% if release_data.releases[0].title %}**Name**: {{ release_data.releases[0].title }}{% endif %}
+**Published**: {{ release_data.releases[0].published_at }}
 
 ### Release Notes
 
-{{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
+{{ release_data.releases[0].notes if release_data.releases[0].notes else "No release notes provided." }}
 
 {% else %}
 ## New Release Detected
 
-**Latest Release**: {{ release_data.latest_release.tag }}
-{% if release_data.latest_release.name %}**Name**: {{ release_data.latest_release.name }}{% endif %}
-**Published**: {{ release_data.latest_release.published_at }}
-**Previous Release**: {{ release_data.diff_from }}
+**Latest Release**: {{ release_data.releases[0].tag_name }}
+{% if release_data.releases[0].title %}**Name**: {{ release_data.releases[0].title }}{% endif %}
+**Published**: {{ release_data.releases[0].published_at }}
 
 ### Release Notes
 
-{{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
+{{ release_data.releases[0].notes if release_data.releases[0].notes else "No release notes provided." }}
 
-{% if release_data.intermediate_releases %}
+{% if release_data.releases|length > 1 %}
 ### Other Releases Since Last Check
 
-{% for r in release_data.intermediate_releases %}
-**{{ r.tag }}** ({{ r.published_at }})
-{% if r.name %}Name: {{ r.name }}{% endif %}
+{% for r in release_data.releases[1:] %}
+**{{ r.tag_name }}** ({{ r.published_at }})
+{% if r.title %}Name: {{ r.title }}{% endif %}
 Notes: {{ r.notes if r.notes else "No notes provided." }}
 
 {% endfor %}
-{% endif %}
-
-{% if release_data.diff_content %}
-### Code Changes
-
-The following diff shows all code changes between {{ release_data.diff_from }} and {{ release_data.diff_to }}:
-
-```
-{{ release_data.diff_content }}
-```
 {% endif %}
 {% endif %}
 
@@ -70,7 +59,7 @@ Analyze this release and provide:
 
 4. **Impact Assessment**: Low/Medium/High impact for users depending on this project.
 
-{% if not is_first_check %}
+{% if not is_first_check and release_data.releases|length > 1 %}
 5. **Cumulative Changes Summary**: If there were multiple releases, provide a brief summary of what changed across all of them.
 {% endif %}
 
