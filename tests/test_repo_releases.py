@@ -8,6 +8,7 @@ import pytest
 from progress.repo import Repo
 from progress.models import Repository
 from progress.github import GitClient
+from progress.github_client import GitHubClient
 from progress.config import Config
 from progress.errors import GitException
 
@@ -20,6 +21,8 @@ def mock_config():
     config.github.gh_timeout = 300
     config.github.git_timeout = 300
     config.workspace_dir = "/tmp/test"
+    config.github.gh_token = None
+    config.github.proxy = None
     return config
 
 
@@ -31,6 +34,13 @@ def mock_git_client():
     git.workspace_dir = Path("/tmp/test")
     git.get_commit_diff = Mock(return_value="diff content")
     return git
+
+
+@pytest.fixture
+def mock_github_client():
+    """Create a mock GitHubClient."""
+    github_client = Mock(spec=GitHubClient)
+    return github_client
 
 
 @pytest.fixture
@@ -50,86 +60,82 @@ def mock_repository():
 class TestCheckReleasesBasic:
     """Test basic Repo.check_releases() scenarios."""
 
-    def test_first_check_with_releases(self, mock_repository, mock_git_client, mock_config):
+    def test_first_check_with_releases(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test first-time check when releases exist."""
-        with patch('progress.repo.gh_release_list') as mock_list:
-            with patch('progress.github.gh_release_get_commit') as mock_commit:
-                with patch('progress.github.gh_release_get_body') as mock_body:
-                    mock_list.return_value = [
-                        {
-                            "tagName": "v1.0.0",
-                            "name": "Version 1.0.0",
-                            "publishedAt": "2024-01-01T00:00:00Z"
-                        }
-                    ]
-                    mock_commit.return_value = "abc123def456"
-                    mock_body.return_value = "First release"
+        mock_github_client.list_releases.return_value = [
+            {
+                "tagName": "v1.0.0",
+                "name": "Version 1.0.0",
+                "publishedAt": "2024-01-01T00:00:00Z"
+            }
+        ]
+        mock_github_client.get_release_commit.return_value = "abc123def456"
+        mock_github_client.get_release_body.return_value = "First release"
 
-                    repo = Repo(mock_repository, mock_git_client, mock_config)
-                    result = repo.check_releases()
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
+        result = repo.check_releases()
 
-                    assert result is not None
-                    assert result["is_first_check"] is True
-                    assert result["latest_release"]["tag"] == "v1.0.0"
-                    assert result["diff_content"] is None
-                    assert len(result["intermediate_releases"]) == 0
+        assert result is not None
+        assert result["is_first_check"] is True
+        assert result["latest_release"]["tag"] == "v1.0.0"
+        assert result["diff_content"] is None
+        assert len(result["intermediate_releases"]) == 0
 
-    def test_first_check_no_releases(self, mock_repository, mock_git_client, mock_config):
+        mock_github_client.list_releases.assert_called_once_with("test", "repo")
+        mock_github_client.get_release_commit.assert_called_once_with("test", "repo", "v1.0.0")
+        mock_github_client.get_release_body.assert_called_once_with("test", "repo", "v1.0.0")
+
+    def test_first_check_no_releases(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test first-time check when repository has no releases."""
-        with patch('progress.repo.gh_release_list') as mock_list:
-            mock_list.return_value = []
+        mock_github_client.list_releases.return_value = []
 
-            repo = Repo(mock_repository, mock_git_client, mock_config)
-            result = repo.check_releases()
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
+        result = repo.check_releases()
 
-            assert result is None
+        assert result is None
 
-    def test_gh_cli_failure_returns_none(self, mock_repository, mock_git_client, mock_config):
+    def test_gh_cli_failure_returns_none(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test that GitHub CLI failure returns None gracefully."""
-        with patch('progress.repo.gh_release_list') as mock_list:
-            mock_list.side_effect = GitException("API error")
+        mock_github_client.list_releases.side_effect = GitException("API error")
 
-            repo = Repo(mock_repository, mock_git_client, mock_config)
-            result = repo.check_releases()
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
+        result = repo.check_releases()
 
-            assert result is None
+        assert result is None
 
-    def test_incremental_check_filters_by_date(self, mock_repository, mock_git_client, mock_config):
+    def test_incremental_check_filters_by_date(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test that incremental check filters releases by date correctly."""
-        repo = Repo(mock_repository, mock_git_client, mock_config)
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
         repo.model.last_release_tag = "v1.0.0"
         repo.model.last_release_commit_hash = "oldhash"
         repo.model.last_release_check_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=ZoneInfo("UTC"))
 
-        with patch('progress.repo.gh_release_list') as mock_list:
-            with patch('progress.github.gh_release_get_commit') as mock_commit:
-                with patch('progress.github.gh_release_get_body') as mock_body:
-                    # Mix of old and new releases
-                    mock_list.return_value = [
-                        {
-                            "tagName": "v1.0.0",
-                            "publishedAt": "2023-12-01T00:00:00Z"  # Old
-                        },
-                        {
-                            "tagName": "v1.1.0",
-                            "publishedAt": "2024-01-15T00:00:00Z",  # New
-                            "name": "v1.1.0"
-                        },
-                        {
-                            "tagName": "v2.0.0",
-                            "publishedAt": "2024-02-01T00:00:00Z",  # New
-                            "name": "v2.0.0"
-                        }
-                    ]
-                    mock_commit.return_value = "abc123"
-                    mock_body.return_value = "Release notes"
+        # Mix of old and new releases
+        mock_github_client.list_releases.return_value = [
+            {
+                "tagName": "v1.0.0",
+                "publishedAt": "2023-12-01T00:00:00Z"  # Old
+            },
+            {
+                "tagName": "v1.1.0",
+                "publishedAt": "2024-01-15T00:00:00Z",  # New
+                "name": "v1.1.0"
+            },
+            {
+                "tagName": "v2.0.0",
+                "publishedAt": "2024-02-01T00:00:00Z",  # New
+                "name": "v2.0.0"
+            }
+        ]
+        mock_github_client.get_release_commit.return_value = "abc123"
+        mock_github_client.get_release_body.return_value = "Release notes"
 
-                    result = repo.check_releases()
+        result = repo.check_releases()
 
-                    assert result is not None
-                    assert result["is_first_check"] is False
-                    assert len(result["intermediate_releases"]) >= 1
-                    assert result["latest_release"]["tag"] in ["v1.1.0", "v2.0.0"]
+        assert result is not None
+        assert result["is_first_check"] is False
+        assert len(result["intermediate_releases"]) >= 1
+        assert result["latest_release"]["tag"] in ["v1.1.0", "v2.0.0"]
 
 
 class TestUpdateReleases:
@@ -158,14 +164,14 @@ class TestUpdateReleases:
 class TestReleaseAnalysisFallback:
     """Test fallback behavior when AI analysis fails."""
 
-    def test_analysis_failure_generates_fallback_summary(self, mock_repository, mock_git_client, mock_config):
+    def test_analysis_failure_generates_fallback_summary(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test that when AI analysis fails, a fallback summary is generated."""
         from progress.repository import RepositoryManager
         from progress.analyzer import ClaudeCodeAnalyzer
         from progress.reporter import MarkdownReporter
         from progress.errors import AnalysisException
 
-        repo = Repo(mock_repository, mock_git_client, mock_config)
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
         release_data = {
             "is_first_check": True,
             "latest_release": {
@@ -203,14 +209,14 @@ class TestReleaseAnalysisFallback:
         assert result.release_detail != ""
         assert "Tag:" in result.release_detail or "tag" in result.release_detail.lower()
 
-    def test_analysis_failure_with_no_notes(self, mock_repository, mock_git_client, mock_config):
+    def test_analysis_failure_with_no_notes(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test fallback when release has no notes."""
         from progress.repository import RepositoryManager
         from progress.analyzer import ClaudeCodeAnalyzer
         from progress.reporter import MarkdownReporter
         from progress.errors import AnalysisException
 
-        repo = Repo(mock_repository, mock_git_client, mock_config)
+        repo = Repo(mock_repository, mock_git_client, mock_config, github_client=mock_github_client)
         release_data = {
             "is_first_check": True,
             "latest_release": {

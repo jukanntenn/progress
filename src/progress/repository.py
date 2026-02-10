@@ -11,6 +11,7 @@ from .consts import parse_repo_name, WORKSPACE_DIR_DEFAULT
 from .db import UTC
 from .enums import Protocol
 from .github import GitClient, normalize_repo_url
+from .github_client import GitHubClient
 from .models import Repository
 from .reporter import MarkdownReporter
 from .repo import Repo
@@ -122,6 +123,11 @@ class RepositoryManager:
         self.proxy = config.github.proxy
         self.protocol = config.github.protocol
 
+        self.github_client = GitHubClient(
+            token=self.gh_token,
+            proxy=self.proxy
+        )
+
     def sync(self, repos_config: list) -> SyncResult:
         """Sync repository configuration to database.
 
@@ -230,6 +236,7 @@ class RepositoryManager:
             gh_token=self.gh_token,
             proxy=self.proxy,
             protocol=self.protocol,
+            github_client=self.github_client,
         )
 
         # Clone or update repository

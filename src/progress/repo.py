@@ -13,12 +13,11 @@ from .enums import Protocol
 from .errors import GitException
 from .github import (
     GitClient,
-    gh_release_get_commit,
-    gh_release_list,
     parse_protocol_from_url,
     resolve_repo_url,
     sanitize_repo_name,
 )
+from .github_client import GitHubClient
 from .models import Repository
 from .utils import get_now, retry, run_command, sanitize
 
@@ -45,6 +44,7 @@ class Repo:
         gh_token: str | None = None,
         proxy: str | None = None,
         protocol: Protocol | str = Protocol.HTTPS,
+        github_client: GitHubClient | None = None,
     ):
         """Initialize Repo instance.
 
@@ -55,6 +55,7 @@ class Repo:
             gh_token: GitHub token for cloning (optional)
             proxy: Proxy configuration for cloning (optional)
             protocol: Protocol to use for cloning (default: HTTPS)
+            github_client: GitHub API client (optional, created if not provided)
         """
         self.model = model
         self.git = git
@@ -72,6 +73,11 @@ class Repo:
                 "SSH protocol configured but SSH client not available, "
                 "falling back to HTTPS"
             )
+
+        if github_client is None:
+            self.github_client = GitHubClient(token=gh_token, proxy=proxy)
+        else:
+            self.github_client = github_client
 
     @property
     def slug(self) -> str:
@@ -327,7 +333,8 @@ class Repo:
             - diff_content: str (git diff)
         """
         try:
-            releases = gh_release_list(self.slug, gh_token=self.gh_token)
+            owner, repo_name = self.slug.split("/")
+            releases = self.github_client.list_releases(owner, repo_name)
         except GitException as e:
             logger.warning(f"Failed to check releases for {self.slug}: {e}")
             return None
@@ -345,22 +352,21 @@ class Repo:
         """Handle first-time release check.
 
         Args:
-            releases: List of release dicts from gh_release_list
+            releases: List of release dicts from list_releases
 
         Returns:
             Dict with release data (no diff content)
         """
-        from .github import gh_release_get_commit, gh_release_get_body
-
+        owner, repo_name = self.slug.split("/")
         latest = releases[0]
         try:
-            commit_hash = gh_release_get_commit(self.slug, latest["tagName"], gh_token=self.gh_token)
+            commit_hash = self.github_client.get_release_commit(owner, repo_name, latest["tagName"])
         except GitException as e:
             logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
             commit_hash = None
 
         try:
-            notes = gh_release_get_body(self.slug, latest["tagName"], gh_token=self.gh_token)
+            notes = self.github_client.get_release_body(owner, repo_name, latest["tagName"])
         except GitException as e:
             logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
             notes = ""
@@ -382,7 +388,7 @@ class Repo:
         """Handle incremental release check.
 
         Args:
-            releases: List of release dicts from gh_release_list
+            releases: List of release dicts from list_releases
 
         Returns:
             Dict with release data including diff, or None if no new releases
@@ -406,19 +412,18 @@ class Repo:
         if not new_releases:
             return None
 
-        from .github import gh_release_get_commit, gh_release_get_body
-
+        owner, repo_name = self.slug.split("/")
         new_releases_asc = sorted(new_releases, key=lambda r: r["publishedAt"])
         latest = new_releases_asc[-1]
 
         try:
-            commit_hash = gh_release_get_commit(self.slug, latest["tagName"], gh_token=self.gh_token)
+            commit_hash = self.github_client.get_release_commit(owner, repo_name, latest["tagName"])
         except GitException as e:
             logger.warning(f"Failed to get commit hash for {latest['tagName']}: {e}")
             commit_hash = None
 
         try:
-            notes = gh_release_get_body(self.slug, latest["tagName"], gh_token=self.gh_token)
+            notes = self.github_client.get_release_body(owner, repo_name, latest["tagName"])
         except GitException as e:
             logger.warning(f"Failed to get release notes for {latest['tagName']}: {e}")
             notes = ""
@@ -438,7 +443,7 @@ class Repo:
         intermediate_with_notes = []
         for r in intermediate:
             try:
-                r_notes = gh_release_get_body(self.slug, r["tagName"], gh_token=self.gh_token)
+                r_notes = self.github_client.get_release_body(owner, repo_name, r["tagName"])
             except GitException as e:
                 logger.warning(f"Failed to get release notes for {r['tagName']}: {e}")
                 r_notes = ""
