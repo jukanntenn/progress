@@ -12,6 +12,7 @@ from .db import UTC
 from .enums import Protocol
 from .github import GitClient, normalize_repo_url
 from .github_client import GitHubClient
+from .i18n import gettext as _
 from .models import Repository
 from .reporter import MarkdownReporter
 from .repo import Repo
@@ -249,8 +250,13 @@ class RepositoryManager:
                 )
             except Exception as e:
                 self.logger.warning(f"Failed to analyze release {release['tag_name']}: {e}")
-                summary = f"**AI analysis unavailable for {release['tag_name']}**"
-                detail = f"**Release Information:**\n\n- **Tag:** {release['tag_name']}\n- **Name:** {release.get('title', release['tag_name'])}\n- **Published:** {release.get('published_at', 'unknown')}\n\n{release.get('notes', '')}"
+                summary = _("**AI analysis unavailable for {tag_name}**").format(tag_name=release['tag_name'])
+                detail = _("**Release Information:**\n\n- **Tag:** {tag_name}\n- **Name:** {name}\n- **Published:** {published}\n\n{notes}").format(
+                    tag_name=release['tag_name'],
+                    name=release.get('title', release['tag_name']),
+                    published=release.get('published_at', 'unknown'),
+                    notes=release.get('notes', '')
+                )
 
             analyzed_releases.append({
                 **release,
@@ -288,13 +294,17 @@ class RepositoryManager:
         releases_list = None
         release_data = repo_obj.check_releases()
         if release_data:
-            self.logger.info(f"Found {len(release_data['releases'])} new releases, analyzing...")
-            releases_list = self._analyze_all_releases(str(repo.name), str(repo.branch), release_data)
+            try:
+                self.logger.info(f"Found {len(release_data['releases'])} new releases, analyzing...")
+                releases_list = self._analyze_all_releases(str(repo.name), str(repo.branch), release_data)
 
-            latest = release_data["releases"][0]
-            commit_hash = latest.get("commit_hash")
-            if commit_hash:
-                repo_obj.update_releases(latest["tag_name"], commit_hash)
+                latest = release_data["releases"][0]
+                commit_hash = latest.get("commit_hash")
+                if commit_hash:
+                    repo_obj.update_releases(latest["tag_name"], commit_hash)
+            except Exception as e:
+                self.logger.error(f"Failed to analyze releases: {e}")
+                self.logger.info("Continuing with commit analysis...")
 
         # Get diff data, returns None if no new commits
         diff_data = repo_obj.get_diff()
