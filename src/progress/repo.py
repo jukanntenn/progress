@@ -325,7 +325,7 @@ class Repo:
 
         Returns:
             Dict with list of release data, or None if no new releases:
-            - releases: list of dicts with tag_name, name, notes, published_at, commit_hash
+            - releases: list of dicts with tag_name, title, notes, published_at, commit_hash
         """
         try:
             owner, repo_name = self.slug.split("/")
