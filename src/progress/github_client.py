@@ -79,3 +79,175 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Failed to list releases for {owner}/{repo}: {e}")
             raise GitException(f"Failed to list releases for {owner}/{repo}: {e}") from e
+
+    def list_repos(
+        self,
+        owner: str,
+        limit: int = 100,
+        source: bool = True,
+    ) -> list[dict]:
+        """List repositories for an owner.
+
+        Args:
+            owner: Repository owner (user or organization)
+            limit: Maximum number of repositories to fetch
+            source: Whether to filter for source repositories only
+
+        Returns:
+            List of repository dicts with keys: nameWithOwner, description, createdAt, updatedAt
+            Returns empty list if owner not found
+
+        Raises:
+            GitException: If API call fails (except not found)
+        """
+        try:
+            user = self.github.get_user(owner)
+            repos = user.get_repos()
+
+            result = []
+            for repo in repos:
+                if source and not repo.source:
+                    continue
+                result.append({
+                    "nameWithOwner": repo.full_name,
+                    "description": repo.description,
+                    "createdAt": repo.created_at,
+                    "updatedAt": repo.updated_at,
+                })
+                if len(result) >= limit:
+                    break
+
+            logger.debug(f"Found {len(result)} repositories for {owner}")
+            return result
+
+        except UnknownObjectException:
+            logger.debug(f"Owner {owner} not found")
+            return []
+        except RateLimitExceededException as e:
+            logger.warning(f"GitHub API rate limit reached: {e}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}") from e
+        except BadCredentialsException as e:
+            logger.warning(f"GitHub API authentication failed: {e}")
+            raise GitException(f"Owner {owner} access denied: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to list repositories for {owner}: {e}")
+            raise GitException(f"Failed to list repositories for {owner}: {e}") from e
+
+    def get_release_commit(self, owner: str, repo: str, tag_name: str) -> str:
+        """Get commit hash for a release tag.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Release tag name
+
+        Returns:
+            Commit hash string
+
+        Raises:
+            GitException: If release not found or API error
+        """
+        try:
+            repo_obj = self.github.get_repo(f"{owner}/{repo}")
+            releases = repo_obj.get_releases()
+
+            for release in releases:
+                if release.tag_name == tag_name:
+                    tags = repo_obj.get_tags()
+                    for tag in tags:
+                        if tag.name == tag_name:
+                            logger.debug(f"Found commit {tag.commit.sha} for {owner}/{repo}:{tag_name}")
+                            return tag.commit.sha
+
+            logger.debug(f"Release {tag_name} not found for {owner}/{repo}")
+            raise GitException(f"Release {tag_name} not found for {owner}/{repo}")
+
+        except GitException:
+            raise
+        except UnknownObjectException as e:
+            logger.error(f"Repository or release not found: {e}")
+            raise GitException(f"Repository {owner}/{repo} or release {tag_name} not found: {e}") from e
+        except RateLimitExceededException as e:
+            logger.warning(f"GitHub API rate limit reached: {e}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}") from e
+        except BadCredentialsException as e:
+            logger.warning(f"GitHub API authentication failed: {e}")
+            raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}")
+            raise GitException(f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}") from e
+
+    def get_release_body(self, owner: str, repo: str, tag_name: str) -> str:
+        """Get release notes/body.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Release tag name
+
+        Returns:
+            Release body string, or empty string if body is None
+
+        Raises:
+            GitException: If release not found or API error
+        """
+        try:
+            repo_obj = self.github.get_repo(f"{owner}/{repo}")
+            releases = repo_obj.get_releases()
+
+            for release in releases:
+                if release.tag_name == tag_name:
+                    body = release.body or ""
+                    logger.debug(f"Found release body for {owner}/{repo}:{tag_name}")
+                    return body
+
+            logger.debug(f"Release {tag_name} not found for {owner}/{repo}")
+            raise GitException(f"Release {tag_name} not found for {owner}/{repo}")
+
+        except GitException:
+            raise
+        except UnknownObjectException as e:
+            logger.error(f"Repository or release not found: {e}")
+            raise GitException(f"Repository {owner}/{repo} or release {tag_name} not found: {e}") from e
+        except RateLimitExceededException as e:
+            logger.warning(f"GitHub API rate limit reached: {e}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}") from e
+        except BadCredentialsException as e:
+            logger.warning(f"GitHub API authentication failed: {e}")
+            raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}")
+            raise GitException(f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}") from e
+
+    def get_readme(self, owner: str, repo: str) -> Optional[str]:
+        """Get README content.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Decoded README content string, or None if not found
+
+        Raises:
+            GitException: If API error (except not found)
+        """
+        try:
+            repo_obj = self.github.get_repo(f"{owner}/{repo}")
+            readme_content = repo_obj.get_readme()
+            content = readme_content.decoded_content.decode()
+            logger.debug(f"Found README for {owner}/{repo}")
+            return content
+
+        except UnknownObjectException:
+            logger.debug(f"README not found for {owner}/{repo}")
+            return None
+        except RateLimitExceededException as e:
+            logger.warning(f"GitHub API rate limit reached: {e}")
+            raise GitException(f"GitHub API rate limit exceeded: {e}") from e
+        except BadCredentialsException as e:
+            logger.warning(f"GitHub API authentication failed: {e}")
+            raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to get README for {owner}/{repo}: {e}")
+            raise GitException(f"Failed to get README for {owner}/{repo}: {e}") from e
