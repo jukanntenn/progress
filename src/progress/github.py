@@ -268,8 +268,23 @@ class GitClient:
         Returns:
             Diff content
         """
-        commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
-        return self._run_git_command(["diff", commit_range], repo_path)
+        repo = git.Repo(str(repo_path))
+        if old_commit is None:
+            old = repo.head.commit.parents[0] if repo.head.commit.parents else None
+            new = repo.head.commit
+        else:
+            old = repo.commit(old_commit)
+            new = repo.commit(new_commit)
+
+        if old is None:
+            diff = new.diff(create_patch=True, paths=None)
+        else:
+            diff = old.diff(new, create_patch=True, paths=None)
+
+        return "\n".join(
+            d.diff.decode("utf-8", errors="replace") if isinstance(d.diff, bytes) else str(d.diff)
+            for d in diff
+        )
 
     def get_changed_files(
         self, repo_path: Path, old_commit: Optional[str], new_commit: str
@@ -405,15 +420,9 @@ class GitClient:
         """
         self._cleanup_git_locks(repo_path)
 
-        self._run_git_command(
-            ["fetch", "origin"],
-            repo_path,
-        )
-
-        self._run_git_command(
-            ["reset", "--hard", f"origin/{branch}"],
-            repo_path,
-        )
+        repo = git.Repo(str(repo_path))
+        repo.remotes.origin.fetch()
+        repo.head.reset(f"origin/{branch}", index=True, working_tree=True)
 
     def _cleanup_git_locks(self, repo_path: Path):
         """Clean up git lock files.

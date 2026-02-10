@@ -164,6 +164,50 @@ def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
     assert count == 1
 
 
+def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
+    from types import SimpleNamespace
+    expected_diff = "@@ file1.py @@\n+new line\n-old line"
+    mock_diff = SimpleNamespace(diff=expected_diff)
+    mock_repo = SimpleNamespace(
+        commit=SimpleNamespace(hexsha="abc123"),
+        head=SimpleNamespace(
+            commit=SimpleNamespace(
+                hexsha="abc123",
+                parents=[SimpleNamespace(diff=lambda *a, **k: [mock_diff])]
+            )
+        )
+    )
+
+    def fake_repo_diff(old, new, **kwargs):
+        return [mock_diff]
+
+    mock_repo.diff = fake_repo_diff
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+    client = GitClient("/tmp/test_workspace")
+    diff = client.get_commit_diff(Path("/tmp/test_workspace"), None, "abc123")
+    assert diff == expected_diff
+
+
+def test_git_client_fetch_and_reset_with_gitpython(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    mock_remote = Mock()
+    mock_head = SimpleNamespace(reset=Mock())
+    mock_repo = SimpleNamespace(
+        remotes=SimpleNamespace(origin=mock_remote),
+        head=mock_head
+    )
+    monkeypatch.setattr("git.Repo", lambda p: mock_repo)
+
+    client = GitClient(str(tmp_path))
+    monkeypatch.setattr(client, "_cleanup_git_locks", Mock())
+
+    client.fetch_and_reset(tmp_path / "test_repo", "main")
+    mock_remote.fetch.assert_called_once()
+    mock_head.reset.assert_called_once()
+
+
 def test_gh_repo_list_parses_json(monkeypatch):
     def fake_run_command(cmd, timeout=None, env=None, **kwargs):
         assert cmd[:3] == ["gh", "repo", "list"]
