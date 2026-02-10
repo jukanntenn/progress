@@ -58,9 +58,7 @@ class RepositoryReport:
     truncated: bool
     original_diff_length: int
     analyzed_diff_length: int
-    release_data: dict | None = None
-    release_summary: str = ""
-    release_detail: str = ""
+    releases: list | None = None
 
     @property
     def content(self) -> str:
@@ -218,6 +216,50 @@ class RepositoryManager:
         except Repository.DoesNotExist:
             return None
 
+    def _analyze_all_releases(self, repo_name: str, branch: str, release_data: dict) -> list:
+        """Analyze all releases individually.
+
+        Args:
+            repo_name: Repository name
+            branch: Branch name
+            release_data: Dict with releases list
+
+        Returns:
+            List of release dicts with added ai_summary and ai_detail fields
+        """
+        analyzed_releases = []
+
+        for release in release_data["releases"]:
+            single_release_data = {
+                "is_first_check": False,
+                "latest_release": {
+                    "tag": release["tag_name"],
+                    "name": release["title"],
+                    "notes": release["notes"],
+                    "published_at": release["published_at"],
+                    "commit_hash": release.get("commit_hash"),
+                },
+                "intermediate_releases": [],
+                "diff_content": None,
+            }
+
+            try:
+                summary, detail = self.analyzer.analyze_releases(
+                    repo_name, branch, single_release_data
+                )
+            except Exception as e:
+                self.logger.warning(f"Failed to analyze release {release['tag_name']}: {e}")
+                summary = f"**AI analysis unavailable for {release['tag_name']}**"
+                detail = f"**Release Information:**\n\n- **Tag:** {release['tag_name']}\n- **Name:** {release.get('title', release['tag_name'])}\n- **Published:** {release.get('published_at', 'unknown')}\n\n{release.get('notes', '')}"
+
+            analyzed_releases.append({
+                **release,
+                "ai_summary": summary,
+                "ai_detail": detail,
+            })
+
+        return analyzed_releases
+
     def check(self, repo: Repository) -> RepositoryReport | None:
         """Check code changes and releases for a single repository.
 
@@ -243,47 +285,20 @@ class RepositoryManager:
         repo_obj.clone_or_update()
 
         # Check releases (independent from commits)
-        release_data = None
-        release_summary = ""
-        release_detail = ""
-        try:
-            release_data = repo_obj.check_releases()
-            if release_data:
-                self.logger.info("Found new releases, analyzing...")
-                release_summary, release_detail = self.analyzer.analyze_releases(
-                    str(repo.name), str(repo.branch), release_data
-                )
-                releases = release_data.get("releases", [])
-                if releases:
-                    latest = releases[0]
-                    commit_hash = latest.get("commit_hash")
-                    if commit_hash:
-                        repo_obj.update_releases(latest["tag_name"], commit_hash)
-        except Exception as e:
-            self.logger.warning(f"Release analysis failed for {repo.name}: {e}")
-            if release_data:
-                from .i18n import gettext as _
-                releases = release_data.get("releases", [])
-                if releases:
-                    latest = releases[0]
-                    tag = latest.get("tag_name", "unknown")
-                    notes = latest.get("notes", "")
-                    release_summary = _("**New release {tag} is available.**\n\n").format(tag=tag)
-                    if notes:
-                        release_summary += _("**Release Notes:**\n\n{notes}\n\n").format(notes=notes[:500])
-                    release_summary += _("*AI analysis was not available. View release notes on GitHub for full details.*")
-                    release_detail = _("**Release Information:**\n\n")
-                    release_detail += f"- **Tag:** {tag}\n"
-                    release_detail += f"- **Name:** {latest.get('title', tag)}\n"
-                    release_detail += f"- **Published:** {latest.get('published_at', 'unknown')}\n"
-                    if notes:
-                        release_detail += f"\n**Release Notes:**\n\n{notes}\n"
-                    if len(releases) > 1:
-                        release_detail += f"\n**Additional Releases:** {len(releases) - 1} more release(s)\n"
+        releases_list = None
+        release_data = repo_obj.check_releases()
+        if release_data:
+            self.logger.info(f"Found {len(release_data['releases'])} new releases, analyzing...")
+            releases_list = self._analyze_all_releases(str(repo.name), str(repo.branch), release_data)
+
+            latest = release_data["releases"][0]
+            commit_hash = latest.get("commit_hash")
+            if commit_hash:
+                repo_obj.update_releases(latest["tag_name"], commit_hash)
 
         # Get diff data, returns None if no new commits
         diff_data = repo_obj.get_diff()
-        if diff_data is None and not release_data:
+        if diff_data is None and not releases_list:
             self.logger.debug("No new commits or releases, skipping")
             return None
 
@@ -332,9 +347,7 @@ class RepositoryManager:
             truncated=truncated,
             original_diff_length=original_length,
             analyzed_diff_length=analyzed_length,
-            release_data=release_data,
-            release_summary=release_summary,
-            release_detail=release_detail,
+            releases=releases_list,
         )
 
     def check_all(

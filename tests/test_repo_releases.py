@@ -199,18 +199,20 @@ class TestReleaseAnalysisFallback:
         with patch('progress.repository.Repo', return_value=repo):
             # Mock repo.check_releases to return test data
             with patch.object(repo, 'check_releases', return_value=release_data):
-                with patch.object(repo, 'clone_or_update'):
-                    with patch.object(repo, 'get_diff', return_value=None):
-                        with patch.object(repo, 'get_current_commit', return_value="current123"):
-                            result = manager.check(mock_repository)
+                with patch.object(repo, 'update_releases'):
+                    with patch.object(repo, 'clone_or_update'):
+                        with patch.object(repo, 'get_diff', return_value=None):
+                            with patch.object(repo, 'get_current_commit', return_value="current123"):
+                                result = manager.check(mock_repository)
 
         # Verify that despite analysis failure, we get fallback content
         assert result is not None
-        assert result.release_data is not None
-        assert result.release_summary != ""
-        assert "v1.0.0" in result.release_summary
-        assert result.release_detail != ""
-        assert "Tag:" in result.release_detail or "tag" in result.release_detail.lower()
+        assert result.releases is not None
+        assert len(result.releases) == 1
+        assert "AI analysis unavailable" in result.releases[0]["ai_summary"]
+        assert "v1.0.0" in result.releases[0]["ai_summary"]
+        assert result.releases[0]["ai_detail"] != ""
+        assert "Tag:" in result.releases[0]["ai_detail"] or "tag" in result.releases[0]["ai_detail"].lower()
 
     def test_analysis_failure_with_no_notes(self, mock_repository, mock_git_client, mock_config, mock_github_client):
         """Test fallback when release has no notes."""
@@ -240,12 +242,14 @@ class TestReleaseAnalysisFallback:
 
         with patch('progress.repository.Repo', return_value=repo):
             with patch.object(repo, 'check_releases', return_value=release_data):
-                with patch.object(repo, 'clone_or_update'):
-                    with patch.object(repo, 'get_diff', return_value=None):
-                        with patch.object(repo, 'get_current_commit', return_value="current123"):
-                            result = manager.check(mock_repository)
+                with patch.object(repo, 'update_releases'):
+                    with patch.object(repo, 'clone_or_update'):
+                        with patch.object(repo, 'get_diff', return_value=None):
+                            with patch.object(repo, 'get_current_commit', return_value="current123"):
+                                result = manager.check(mock_repository)
 
         assert result is not None
-        assert result.release_data is not None
-        assert result.release_summary != ""
-        assert "v2.0.0" in result.release_summary
+        assert result.releases is not None
+        assert len(result.releases) == 1
+        assert "AI analysis unavailable" in result.releases[0]["ai_summary"]
+        assert "v2.0.0" in result.releases[0]["ai_summary"]
