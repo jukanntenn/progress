@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .github import gh_api_get_readme, gh_repo_list
+from .github_client import GitHubClient
 from .models import DiscoveredRepository, GitHubOwner
 
 logger = logging.getLogger(__name__)
@@ -21,8 +21,9 @@ def _parse_github_datetime(value: str | None) -> datetime | None:
 
 
 class OwnerManager:
-    def __init__(self, gh_token: str | None):
+    def __init__(self, gh_token: str | None, proxy: str | None = None):
         self.gh_token = gh_token
+        self.github_client = GitHubClient(token=gh_token, proxy=proxy)
         self.logger = logger
 
     def sync_owners(self, owner_configs) -> dict:
@@ -68,7 +69,7 @@ class OwnerManager:
 
     def _check_owner(self, owner: GitHubOwner) -> list[dict]:
         try:
-            repos = gh_repo_list(str(owner.name), limit=100, source=True, gh_token=self.gh_token)
+            repos = self.github_client.list_repos(str(owner.name), limit=100, source=True)
         except Exception as e:
             self.logger.error(f"Failed to list repositories for {owner.name}: {e}")
             return []
@@ -130,7 +131,7 @@ class OwnerManager:
         readme_was_truncated = False
 
         try:
-            readme_content = gh_api_get_readme(slug_owner, repo_name, gh_token=self.gh_token)
+            readme_content = self.github_client.get_readme(slug_owner, repo_name)
             has_readme = readme_content is not None
         except Exception as e:
             self.logger.warning(f"Failed to fetch README for {name_with_owner}: {e}")

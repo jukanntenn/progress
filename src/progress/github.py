@@ -1,52 +1,25 @@
 """GitHub CLI interactions"""
 
 import logging
-import os
 import re
-import shutil
-import subprocess
-import threading
-import base64
 import git
 from pathlib import Path
 from typing import List, Optional, Tuple
-import json
 
 from .consts import (
-    CMD_GH,
     CMD_GIT,
-    GH_MAX_RETRIES,
     GIT_MAX_RETRIES,
     GIT_SUFFIX,
     GITHUB_HTTPS_PREFIX,
     GITHUB_SSH_PREFIX,
-    TIMEOUT_GH_COMMAND,
     TIMEOUT_GIT_COMMAND,
     WORKSPACE_DIR_DEFAULT,
 )
 from .enums import Protocol
 from .errors import GitException
-from .utils import retry, run_command, sanitize, strip_git_suffix
+from .utils import retry, run_command, strip_git_suffix
 
 logger = logging.getLogger(__name__)
-
-
-def _get_env_with_token(gh_token: Optional[str]) -> dict | None:
-    """Create environment dict with GH_TOKEN if provided.
-
-    Args:
-        gh_token: GitHub token (optional)
-
-    Returns:
-        Environment dict with token set, or None
-    """
-    if not gh_token:
-        return None
-
-    env = os.environ.copy()
-    env["GH_TOKEN"] = gh_token
-    logger.debug(f"Using GH_TOKEN: {gh_token[:8]}...")
-    return env
 
 
 def parse_protocol_from_url(url: str) -> Protocol | None:
@@ -476,231 +449,3 @@ class GitClient:
         """
         cmd = [CMD_GIT, "-C", str(repo_path)] + args
         return run_command(cmd, timeout=self.timeout)
-
-
-def gh_release_list(
-    repo_slug: str,
-    exclude_drafts: bool = True,
-    exclude_pre_releases: bool = True,
-    limit: int = 100,
-    gh_token: Optional[str] = None,
-) -> List[dict]:
-    """List GitHub releases for a repository.
-
-    Security: All parameters are safely passed as list arguments to subprocess,
-    preventing command injection. Release data from GitHub is treated as
-    read-only and not executed or interpolated into commands.
-
-    Args:
-        repo_slug: Repository slug in format "owner/repo"
-        exclude_drafts: Whether to exclude draft releases
-        exclude_pre_releases: Whether to exclude pre-releases
-        limit: Maximum number of releases to fetch
-        gh_token: GitHub token for authentication (optional)
-
-    Returns:
-        List of release dicts with keys: tagName, name, body, publishedAt, targetCommitish
-
-    Raises:
-        GitException: If gh command fails
-    """
-    cmd = [
-        CMD_GH,
-        "release",
-        "list",
-        "--repo",
-        repo_slug,
-        "--limit",
-        str(limit),
-        "--json",
-        "tagName,name,publishedAt",
-    ]
-
-    if exclude_drafts:
-        cmd.append("--exclude-drafts")
-    if exclude_pre_releases:
-        cmd.append("--exclude-pre-releases")
-
-    env = _get_env_with_token(gh_token)
-
-    try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
-        releases = json.loads(output) if output.strip() else []
-        logger.debug(f"Found {len(releases)} releases for {repo_slug}")
-        return releases
-    except RuntimeError as e:
-        error_str = str(e).lower()
-        if "no releases found" in error_str:
-            logger.debug(f"No releases found for {repo_slug}")
-            return []
-        if "rate limit" in error_str or "api rate limit" in error_str:
-            logger.warning(f"GitHub API rate limit reached while checking {repo_slug}")
-            raise GitException(f"GitHub API rate limit exceeded: {e}")
-        if "repository not found" in error_str:
-            logger.debug(f"Repository {repo_slug} not found")
-            return []
-        if "access denied" in error_str or "forbidden" in error_str:
-            logger.warning(f"Repository {repo_slug} access denied")
-            raise GitException(f"Repository {repo_slug} access denied: {e}")
-        raise GitException(f"Failed to list releases for {repo_slug}: {e}")
-
-
-def gh_release_get_commit(repo_slug: str, tag_name: str, gh_token: Optional[str] = None) -> str:
-    """Get the commit hash that a release tag points to.
-
-    Args:
-        repo_slug: Repository slug in format "owner/repo"
-        tag_name: Release tag name (e.g., "v5.0.0")
-        gh_token: GitHub token for authentication (optional)
-
-    Returns:
-        Commit hash string
-
-    Raises:
-        GitException: If gh command fails or release not found
-    """
-    cmd = [
-        CMD_GH,
-        "release",
-        "view",
-        tag_name,
-        "--repo",
-        repo_slug,
-        "--json",
-        "targetCommitish",
-        "--jq",
-        ".targetCommitish",
-    ]
-
-    env = _get_env_with_token(gh_token)
-
-    try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
-        commit_hash = output.strip()
-        if not commit_hash:
-            raise GitException(f"No commit hash found for release {tag_name}")
-        logger.debug(f"Release {tag_name} points to commit {commit_hash}")
-        return commit_hash
-    except RuntimeError as e:
-        error_str = str(e).lower()
-        if "rate limit" in error_str or "api rate limit" in error_str:
-            logger.warning(f"GitHub API rate limit reached while getting {tag_name}")
-            raise GitException(f"GitHub API rate limit exceeded: {e}")
-        if "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
-            logger.warning(f"Release {tag_name} not found or access denied")
-            raise GitException(f"Release {tag_name} not found or access denied: {e}")
-        raise GitException(f"Failed to get commit hash for release {tag_name}: {e}")
-
-
-def gh_release_get_body(repo_slug: str, tag_name: str, gh_token: Optional[str] = None) -> str:
-    """Get the release notes/body for a release.
-
-    Args:
-        repo_slug: Repository slug in format "owner/repo"
-        tag_name: Release tag name (e.g., "v5.0.0")
-        gh_token: GitHub token for authentication (optional)
-
-    Returns:
-        Release notes/body string
-
-    Raises:
-        GitException: If gh command fails or release not found
-    """
-    cmd = [
-        CMD_GH,
-        "release",
-        "view",
-        tag_name,
-        "--repo",
-        repo_slug,
-        "--json",
-        "body",
-        "--jq",
-        ".body",
-    ]
-
-    env = _get_env_with_token(gh_token)
-
-    try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
-        body = output.strip()
-        logger.debug(f"Fetched release notes for {tag_name}")
-        return body
-    except RuntimeError as e:
-        error_str = str(e).lower()
-        if "rate limit" in error_str or "api rate limit" in error_str:
-            logger.warning(f"GitHub API rate limit reached while getting {tag_name}")
-            raise GitException(f"GitHub API rate limit exceeded: {e}")
-        if "not found" in error_str or "access denied" in error_str or "forbidden" in error_str:
-            logger.warning(f"Release {tag_name} not found or access denied")
-            raise GitException(f"Release {tag_name} not found or access denied: {e}")
-        raise GitException(f"Failed to get release notes for {tag_name}: {e}")
-
-
-def gh_repo_list(
-    owner: str,
-    limit: int = 100,
-    source: bool = True,
-    gh_token: Optional[str] = None,
-) -> List[dict]:
-    cmd = [
-        CMD_GH,
-        "repo",
-        "list",
-        owner,
-        "--limit",
-        str(limit),
-        "--json",
-        "nameWithOwner,description,createdAt,updatedAt",
-    ]
-    if source:
-        cmd.append("--source")
-
-    env = _get_env_with_token(gh_token)
-
-    try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
-        return json.loads(output) if output.strip() else []
-    except Exception as e:
-        from .errors import CommandException
-
-        error_str = str(e).lower()
-        if isinstance(e, CommandException):
-            if "could not resolve" in error_str or "not found" in error_str:
-                logger.warning(f"Owner {owner} not found")
-                return []
-            if "rate limit" in error_str or "api rate limit" in error_str:
-                logger.warning(f"GitHub API rate limit reached while listing repos for {owner}")
-                raise GitException(f"GitHub API rate limit exceeded: {e}") from e
-            raise GitException(f"Failed to list repositories for {owner}: {e}") from e
-        raise
-
-
-def gh_api_get_readme(
-    owner: str,
-    repo: str,
-    gh_token: Optional[str] = None,
-) -> str | None:
-    cmd = [CMD_GH, "api", f"repos/{owner}/{repo}/readme"]
-
-    env = _get_env_with_token(gh_token)
-
-    try:
-        output = run_command(cmd, timeout=TIMEOUT_GH_COMMAND, env=env)
-        data = json.loads(output) if output.strip() else {}
-        content_b64 = data.get("content")
-        if not content_b64:
-            return None
-        try:
-            return base64.b64decode(content_b64).decode("utf-8", errors="replace")
-        except Exception as decode_error:
-            raise GitException(f"Failed to decode README content: {decode_error}") from decode_error
-    except Exception as e:
-        from .errors import CommandException
-
-        error_str = str(e).lower()
-        if isinstance(e, CommandException):
-            if "404" in error_str or "not found" in error_str:
-                return None
-            raise GitException(f"Failed to fetch README for {owner}/{repo}: {e}") from e
-        raise

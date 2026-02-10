@@ -635,7 +635,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
         else:
             logger.info("No enabled proposal trackers")
 
-        owner_manager = OwnerManager(cfg.github.gh_token)
+        owner_manager = OwnerManager(cfg.github.gh_token, cfg.github.proxy)
         owner_sync_result = owner_manager.sync_owners(cfg.owners)
         logger.info(f"Owner sync completed: {owner_sync_result}")
 

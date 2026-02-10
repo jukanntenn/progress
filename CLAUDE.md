@@ -120,7 +120,9 @@ progress/
 - RSS Generation: feedgen
 - Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)
 - Containerized development and deployment: Docker
-- GitHub Interaction: GitHub CLI (gh)
+- Git Operations: GitPython 3.1.46+
+- GitHub API: PyGithub 2.8.1+
+- GitHub CLI: GitHub CLI (gh) - only for initial repository clone
 - AI Assistant: Claude Code
 
 ## Standards

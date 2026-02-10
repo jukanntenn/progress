@@ -551,6 +551,11 @@ test = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.3.1" },
@@ -574,6 +579,9 @@ requires-dist = [
     { name = "watchdog", marker = "extra == 'dev'", specifier = ">=5.0.0" },
 ]
 provides-extras = ["dev", "test"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "pycparser"

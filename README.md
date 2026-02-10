@@ -25,7 +25,7 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 
 - Python 3.12 or higher
 - [uv package manager](https://github.com/astral-sh/uv) (recommended) or pip
-- [GitHub CLI](https://cli.github.com/)
+- [GitHub CLI](https://cli.github.com/) (only required for initial repository clone)
 - [Claude Code CLI](https://claude.com/product/claude-code)
 
 ## Quick Start

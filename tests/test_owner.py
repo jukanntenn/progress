@@ -54,7 +54,7 @@ def test_owner_manager_check_owner_first_check_returns_most_recent(temp_db, monk
     manager = OwnerManager(gh_token=None)
     owner = GitHubOwner.create(owner_type="organization", name="acme", enabled=True)
 
-    def fake_repo_list(owner_name, limit=100, source=True, gh_token=None):
+    def fake_repo_list(owner_name, limit=100, source=True):
         assert owner_name == "acme"
         return [
             {
@@ -71,11 +71,11 @@ def test_owner_manager_check_owner_first_check_returns_most_recent(temp_db, monk
             },
         ]
 
-    def fake_get_readme(owner_name, repo_name, gh_token=None):
+    def fake_get_readme(owner_name, repo_name):
         return "# Hello"
 
-    monkeypatch.setattr("progress.owner.gh_repo_list", fake_repo_list)
-    monkeypatch.setattr("progress.owner.gh_api_get_readme", fake_get_readme)
+    monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
+    monkeypatch.setattr(manager.github_client, "get_readme", fake_get_readme)
 
     new_repos = manager._check_owner(owner)
     assert len(new_repos) == 1
@@ -95,7 +95,7 @@ def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
         last_tracked_repo=datetime.fromisoformat("2024-01-15T00:00:00+00:00"),
     )
 
-    def fake_repo_list(owner_name, limit=100, source=True, gh_token=None):
+    def fake_repo_list(owner_name, limit=100, source=True):
         return [
             {
                 "nameWithOwner": "alice/older",
@@ -111,8 +111,8 @@ def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
             },
         ]
 
-    monkeypatch.setattr("progress.owner.gh_repo_list", fake_repo_list)
-    monkeypatch.setattr("progress.owner.gh_api_get_readme", lambda *args, **kwargs: None)
+    monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
+    monkeypatch.setattr(manager.github_client, "get_readme", lambda *args, **kwargs: None)
 
     new_repos = manager._check_owner(owner)
     assert len(new_repos) == 1
