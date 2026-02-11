@@ -36,6 +36,7 @@ TEMPLATE_REPOSITORY_REPORT = "repository_report.j2"
 TEMPLATE_AGGREGATED_REPORT = "aggregated_report.j2"
 TEMPLATE_EMAIL_NOTIFICATION = "email_notification.j2"
 TEMPLATE_CHANGELOG_NOTIFICATION = "changelog_notification.j2"
+TEMPLATE_DISCOVERED_REPOS_REPORT = "discovered_repositories_report.j2"
 
 # ==================== URL Patterns ====================
 REPO_URL_PATTERNS = [
