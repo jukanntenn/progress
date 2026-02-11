@@ -1,6 +1,7 @@
 """Test MarkdownReporter functionality."""
 
 import pytest
+from zoneinfo import ZoneInfo
 from progress.reporter import MarkdownReporter
 from progress.repository import RepositoryReport
 
@@ -114,3 +115,50 @@ def test_special_characters_in_commits(reporter):
 
     assert "&amp;" in rendered  # & should become &amp;amp;
     assert "&lt;tag&gt;" in rendered  # <tag> should be escaped
+
+
+def test_generate_discovered_repos_report(reporter):
+    """Test generating discovered repositories report"""
+    timezone = ZoneInfo("UTC")
+
+    repos = [
+        {
+            "owner_name": "vitejs",
+            "repo_name": "vite",
+            "repo_url": "https://github.com/vitejs/vite",
+            "description": "Next generation frontend tooling",
+            "readme_summary": "**Vite** is a build tool",
+            "readme_detail": "## Vite\n\nFull details here",
+            "discovered_at": "2026-02-11 14:30:00",
+        },
+        {
+            "owner_name": "facebook",
+            "repo_name": "react",
+            "repo_url": "https://github.com/facebook/react",
+            "description": None,
+            "readme_summary": None,
+            "readme_detail": None,
+            "discovered_at": "2026-02-11 12:00:00",
+        },
+    ]
+
+    result = reporter.generate_discovered_repos_report(repos, timezone)
+
+    assert "# New repositories discovered" in result
+    assert "[vitejs/vite](https://github.com/vitejs/vite)" in result
+    assert "[facebook/react](https://github.com/facebook/react)" in result
+    assert "> Next generation frontend tooling" in result
+    assert "🗓2026-02-11 14:30:00" in result
+    assert "🗓2026-02-11 12:00:00" in result
+    assert "---" in result
+    assert result.count("---") == 1  # Only one separator between repos
+
+
+def test_generate_discovered_repos_report_empty(reporter):
+    """Test generating report with no repositories"""
+    timezone = ZoneInfo("UTC")
+
+    result = reporter.generate_discovered_repos_report([], timezone)
+
+    assert "# New repositories discovered" in result
+    assert "## [" not in result  # No repo sections

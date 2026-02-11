@@ -8,7 +8,11 @@ from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, FileSystemLoader
 
-from .consts import TEMPLATE_AGGREGATED_REPORT, TEMPLATE_REPOSITORY_REPORT
+from .consts import (
+    TEMPLATE_AGGREGATED_REPORT,
+    TEMPLATE_DISCOVERED_REPOS_REPORT,
+    TEMPLATE_REPOSITORY_REPORT,
+)
 from .i18n import gettext as _
 
 logger = logging.getLogger(__name__)
@@ -100,4 +104,25 @@ class MarkdownReporter:
             iso_time=now.isoformat(),
             batch_index=batch_index,
             total_batches=total_batches,
+        )
+
+    def generate_discovered_repos_report(
+        self, repos: list[dict], timezone: ZoneInfo = ZoneInfo("UTC")
+    ) -> str:
+        """Generate discovered repositories report.
+
+        Args:
+            repos: List of discovered repo dicts with fields:
+                   owner_name, repo_name, repo_url, description,
+                   readme_summary, readme_detail, discovered_at
+            timezone: Timezone for timestamps
+
+        Returns:
+            Rendered Markdown report
+        """
+        now = datetime.now(timezone)
+        template = self.jinja_env.get_template(TEMPLATE_DISCOVERED_REPOS_REPORT)
+        return template.render(
+            repos=repos,
+            report_date=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
         )
