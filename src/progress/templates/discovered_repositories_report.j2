@@ -1,0 +1,26 @@
+# New repositories discovered {{ report_date }}
+
+{% for repo in repos %}
+## [{{ repo.owner_name }}/{{ repo.repo_name }}]({{ repo.repo_url }})
+
+{% if repo.description %}
+> {{ repo.description }}
+{% endif %}
+
+{% if repo.readme_summary %}{{ repo.readme_summary }}{% endif %}
+
+{% if repo.readme_detail %}
+<details>
+<summary>Click to view detailed analysis</summary>
+
+{{ repo.readme_detail }}
+
+</details>
+{% endif %}
+
+🗓{{ repo.discovered_at }}
+
+{% if not loop.last %}
+
+---{% endif %}
+{% endfor %}
