@@ -2,6 +2,7 @@
 
 **Date:** 2026-02-11
 **Status:** Approved
+**Implementation:** Completed 2026-02-11
 
 ## Overview
 
@@ -302,3 +303,10 @@ None. Report format changes, but:
 - **Consistency:** Uses existing `MarkdownReporter` pattern
 - **Maintainability:** Template is easier to modify than string concatenation
 - **Testability:** Clear separation of data prep and rendering
+
+## Implementation Notes
+
+- **Implementation date:** 2026-02-11
+- **All tests passing:** 249 tests passed, including 3 new tests for discovered repos reporting
+- **Manual integration testing:** Skipped by user preference - can be performed separately
+- **Report format matches design specification:** Flat list structure, newest-first sorting, markdown link headings, optional description blockquote, README sections with collapsible details, and per-repo calendar emoji timestamps
