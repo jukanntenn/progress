@@ -1,6 +1,7 @@
 """CLI main entry point."""
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -325,62 +326,62 @@ def _send_entity_notification(
     new_repos: list[dict],
     timezone,
 ) -> None:
-    now = get_now(timezone)
-    lines: list[str] = [
-        f"# New repositories discovered ({now.strftime('%Y-%m-%d %H:%M')})",
-        "",
-    ]
+    if not new_repos:
+        return
 
-    grouped: dict[tuple[str, str], list[dict]] = {}
-    for r in new_repos:
-        key = (r.get("owner_type") or "", r.get("owner_name") or "")
-        grouped.setdefault(key, []).append(r)
+    # Sort newest-first
+    sorted_repos = sorted(
+        new_repos,
+        key=lambda r: r.get("created_at") or datetime.min,
+        reverse=True
+    )
 
-    for (owner_type, owner_name), repos in sorted(grouped.items()):
-        lines.append(f"## {owner_name} ({owner_type})")
-        lines.append("")
-        for r in sorted(repos, key=lambda x: x.get("repo_name") or ""):
-            lines.append(f"### {r.get('repo_name')}")
-            lines.append("")
-            repo_url = r.get("repo_url")
-            if repo_url:
-                lines.append(f"- URL: {repo_url}")
-            if r.get("description"):
-                lines.append(f"- Description: {r.get('description')}")
-            created_at = r.get("created_at")
-            if created_at and hasattr(created_at, "isoformat"):
-                lines.append(f"- Created at: {created_at.isoformat()}")
-            if r.get("readme_was_truncated"):
-                lines.append("- README was truncated to 50KB for analysis")
-            lines.append("")
+    # Enrich with AI analysis from database
+    for r in sorted_repos:
+        record_id = r.get("id")
+        if record_id:
+            record = DiscoveredRepository.get_by_id(record_id)
+            if record:
+                r["readme_summary"] = record.readme_summary
+                r["readme_detail"] = record.readme_detail
 
-            if not r.get("has_readme"):
-                lines.append("This repository does not have a README file.")
-                lines.append("")
-                continue
+    # Format timestamps
+    for r in sorted_repos:
+        created_at = r.get("created_at")
+        if created_at:
+            if isinstance(created_at, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at)
+                except ValueError:
+                    created_at = None
+            if created_at and hasattr(created_at, "strftime"):
+                r["discovered_at"] = created_at.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                r["discovered_at"] = "Unknown"
+        else:
+            r["discovered_at"] = "Unknown"
 
-            readme_summary = r.get("readme_summary")
-            if readme_summary:
-                lines.append("#### README Summary")
-                lines.append(str(readme_summary))
-                lines.append("")
+        # Ensure owner_name exists
+        if "owner_name" not in r:
+            name_with_owner = r.get("name_with_owner", "")
+            if "/" in name_with_owner:
+                r["owner_name"] = name_with_owner.split("/")[0]
+            else:
+                r["owner_name"] = "Unknown"
 
-            readme_detail = r.get("readme_detail")
-            if readme_detail:
-                lines.append("#### README Detail")
-                lines.append(str(readme_detail))
-                lines.append("")
-
-    report_content = "\n".join(lines)
+    # Generate report using template
+    reporter = MarkdownReporter()
+    report_content = reporter.generate_discovered_repos_report(sorted_repos, timezone)
 
     try:
         title, summary = analyzer.generate_title_and_summary(report_content)
     except Exception as e:
         logger.warning(f"Failed to generate title/summary for owner monitoring: {e}")
+        now = get_now(timezone)
         title = _("Progress Report for Open Source Projects - {date}").format(
             date=now.strftime("%Y-%m-%d %H:%M")
         )
-        summary = ""
+        summary = f"Discovered {len(new_repos)} new repositories"
 
     markpost_url = markpost_client.upload(report_content, title=title)
 
