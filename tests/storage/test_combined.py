@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from progress.storages.combined import CombinedStorage
@@ -13,11 +14,11 @@ def test_combined_storage_saves_to_db_then_primary_and_updates_url():
 
     with patch("progress.db.models.Report") as report_model:
         storage = CombinedStorage(mock_db, mock_primary)
-        result = storage.save("Title", "Body")
+        result = storage.save("Title", "Body", Path("/dir"))
 
         assert result == "https://example.com/p/123"
-        mock_db.save.assert_called_once_with("Title", "Body")
-        mock_primary.save.assert_called_once_with("Title", "Body")
+        mock_db.save.assert_called_once_with("Title", "Body", Path("/dir"))
+        mock_primary.save.assert_called_once_with("Title", "Body", Path("/dir"))
         report_model.update.assert_called_once()
 
 
@@ -31,7 +32,7 @@ def test_combined_storage_does_not_update_when_not_url():
 
     with patch("progress.db.models.Report") as report_model:
         storage = CombinedStorage(mock_db, mock_primary)
-        result = storage.save("Title", "Body")
+        result = storage.save("Title", "Body", Path("/dir"))
 
         assert result == "/tmp/report.md"
         report_model.update.assert_not_called()

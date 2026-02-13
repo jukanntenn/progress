@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from .base import Storage
 from .db import DBStorage
@@ -15,11 +16,11 @@ class CombinedStorage:
     def report_id(self) -> int | None:
         return self._db.report_id
 
-    def save(self, title: str, body: str | None) -> str:
+    def save(self, title: str, body: str | None, directory: Path) -> str:
         from progress.db.models import Report
 
-        self._db.save(title, body)
-        result = self._primary.save(title, body)
+        self._db.save(title, body, directory)
+        result = self._primary.save(title, body, directory)
 
         report_id = self._db.report_id
         if report_id is not None and result.startswith("http"):
