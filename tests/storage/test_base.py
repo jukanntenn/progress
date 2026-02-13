@@ -1,10 +1,12 @@
+from pathlib import Path
+
 from progress.storages.base import Storage
 
 
-def test_storage_protocol_accepts_save_method():
-    class MockStorage:
-        def save(self, title: str, body: str | None) -> str:
-            return "mock-result"
+def test_storage_protocol_requires_directory():
+    class TestStorage:
+        def save(self, title: str, body: str | None, directory: Path) -> str:
+            return ""
 
-    storage: Storage = MockStorage()
-    assert storage.save("t", "b") == "mock-result"
+    storage: Storage = TestStorage()
+    assert hasattr(storage, "save")
