@@ -7,8 +7,8 @@ from progress.storages.file import FileStorage
 
 
 def test_file_storage_saves_content(tmp_path):
-    storage = FileStorage(tmp_path)
-    result = storage.save("Test Title", "Test Body")
+    storage = FileStorage()
+    result = storage.save("Test Title", "Test Body", tmp_path)
 
     saved = Path(result)
     assert saved.exists()
@@ -19,8 +19,8 @@ def test_file_storage_saves_content(tmp_path):
 
 def test_file_storage_creates_directory_if_not_exists(tmp_path):
     directory = tmp_path / "subdir" / "nested"
-    storage = FileStorage(directory)
-    result = storage.save("Title", "Body")
+    storage = FileStorage()
+    result = storage.save("Title", "Body", directory)
 
     saved = Path(result)
     assert saved.parent.exists()
@@ -32,6 +32,14 @@ def test_file_storage_raises_on_permission_denied(tmp_path):
     readonly_dir.mkdir()
     readonly_dir.chmod(0o555)
 
-    storage = FileStorage(readonly_dir)
+    storage = FileStorage()
     with pytest.raises(ProgressException, match="Failed to write report"):
-        storage.save("Title", "Body")
+        storage.save("Title", "Body", readonly_dir)
+
+
+def test_file_storage_uses_seconds_timestamp(tmp_path):
+    storage = FileStorage()
+    result = storage.save("Title", "Body", tmp_path)
+
+    filename = Path(result).stem
+    assert len(filename) == 10  # seconds timestamp is 10 digits
