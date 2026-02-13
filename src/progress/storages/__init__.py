@@ -33,7 +33,7 @@ def get_storage(
         return db_storage
 
     if storage_type == StorageType.FILE:
-        return CombinedStorage(db_storage, FileStorage("data/reports"))
+        return CombinedStorage(db_storage, FileStorage())
 
     if storage_type == StorageType.MARKPOST:
         if markpost_url is not None:
