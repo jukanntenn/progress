@@ -274,6 +274,7 @@ def process_reports(
                         content=report.content,
                         title="",
                         config=config,
+                        directory=Path(config.data_dir) / "reports" / "repo" / "update",
                     )
                 except Exception as db_error:
                     logger.error(
@@ -323,6 +324,7 @@ def process_reports(
             content=aggregated_report_with_summary,
             title=unified_title,
             config=config,
+            directory=Path(config.data_dir) / "reports" / "repo" / "update",
         )
         logger.info("Aggregated report saved to database")
     except Exception as db_error:
