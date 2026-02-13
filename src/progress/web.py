@@ -6,20 +6,19 @@ import shutil
 from datetime import datetime
 from pathlib import Path as PathlibPath
 
-import tomlkit
-from flask import Blueprint, Flask, current_app, jsonify, render_template, request
-from feedgen.feed import FeedGenerator
-from markdown_it import MarkdownIt
-from mdit_py_plugins.front_matter import front_matter_plugin
-from mdit_py_plugins.footnote import footnote_plugin
-
 import pytz
+import tomlkit
+from feedgen.feed import FeedGenerator
+from flask import Blueprint, Flask, current_app, jsonify, render_template, request
+from markdown_it import MarkdownIt
+from mdit_py_plugins.footnote import footnote_plugin
+from mdit_py_plugins.front_matter import front_matter_plugin
 
 from .consts import DATABASE_PATH
 from .db import close_db, create_tables, init_db
+from .db.models import Report
 from .editor_schema import EditorSchema
 from .errors import ConfigException
-from .models import Report
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +26,11 @@ PAGE_SIZE = 50
 
 bp = Blueprint("web", __name__, template_folder="templates/web")
 
-mdit = MarkdownIt("commonmark", {"breaks": True, "html": True}).use(
-    front_matter_plugin
-).use(footnote_plugin)
+mdit = (
+    MarkdownIt("commonmark", {"breaks": True, "html": True})
+    .use(front_matter_plugin)
+    .use(footnote_plugin)
+)
 
 
 def create_app(config=None):
@@ -178,7 +179,9 @@ def index():
     if page < 1:
         page = 1
 
-    query = Report.select().where(Report.repo.is_null()).order_by(Report.created_at.desc())
+    query = (
+        Report.select().where(Report.repo.is_null()).order_by(Report.created_at.desc())
+    )
 
     total = query.count()
     reports = list(query.paginate(page, PAGE_SIZE))
@@ -190,20 +193,26 @@ def index():
         created_at_str = ""
         if report.created_at:
             if isinstance(report.created_at, datetime):
-                created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+                created_at_str = report.created_at.astimezone(timezone).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
             elif isinstance(report.created_at, str):
                 try:
                     dt = datetime.fromisoformat(report.created_at)
-                    created_at_str = dt.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+                    created_at_str = dt.astimezone(timezone).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                 except ValueError:
                     created_at_str = report.created_at
 
-        report_list.append({
-            "id": report.id,
-            "title": report.title,
-            "created_at": created_at_str,
-            "markpost_url": report.markpost_url,
-        })
+        report_list.append(
+            {
+                "id": report.id,
+                "title": report.title,
+                "created_at": created_at_str,
+                "markpost_url": report.markpost_url,
+            }
+        )
 
     total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
 
@@ -241,7 +250,9 @@ def detail(report_id: int):
     created_at_str = ""
     if report.created_at:
         if isinstance(report.created_at, datetime):
-            created_at_str = report.created_at.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
+            created_at_str = report.created_at.astimezone(timezone).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
         elif isinstance(report.created_at, str):
             try:
                 dt = datetime.fromisoformat(report.created_at)
@@ -292,8 +303,16 @@ def rss():
                 created_at = report.created_at.astimezone(timezone)
             else:
                 created_at = report.created_at
-            fe.published(created_at.strftime("%a, %d %b %Y %H:%M:%S %Z") if isinstance(created_at, datetime) else str(created_at))
-            fe.updated(created_at.strftime("%a, %d %b %Y %H:%M:%S %Z") if isinstance(created_at, datetime) else str(created_at))
+            fe.published(
+                created_at.strftime("%a, %d %b %Y %H:%M:%S %Z")
+                if isinstance(created_at, datetime)
+                else str(created_at)
+            )
+            fe.updated(
+                created_at.strftime("%a, %d %b %Y %H:%M:%S %Z")
+                if isinstance(created_at, datetime)
+                else str(created_at)
+            )
 
     rss_feed = fg.rss_str(pretty=True)
     response = current_app.response_class(rss_feed, mimetype="application/rss+xml")
@@ -328,13 +347,15 @@ def get_config():
         config_dict = config_to_dict(toml_content)
         comments = extract_comments(toml_content)
 
-        return jsonify({
-            "success": True,
-            "data": config_dict,
-            "toml": toml_content,
-            "path": config_path,
-            "comments": comments
-        })
+        return jsonify(
+            {
+                "success": True,
+                "data": config_dict,
+                "toml": toml_content,
+                "path": config_path,
+                "comments": comments,
+            }
+        )
     except ConfigException as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -359,15 +380,19 @@ def save_config():
 
         toml_content = doc.as_string()
     else:
-        return jsonify({"success": False, "error": "Missing 'toml' or 'config' field"}), 400
+        return jsonify(
+            {"success": False, "error": "Missing 'toml' or 'config' field"}
+        ), 400
 
     try:
         write_config_file(toml_content, current_app)
-        return jsonify({
-            "success": True,
-            "message": "Configuration saved successfully",
-            "toml": toml_content
-        })
+        return jsonify(
+            {
+                "success": True,
+                "message": "Configuration saved successfully",
+                "toml": toml_content,
+            }
+        )
     except ConfigException as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -437,9 +462,7 @@ def get_config_schema():
     """GET API endpoint - returns editor schema for configuration."""
     schema = EditorSchema(sections=[])
 
-    return jsonify({
-        "sections": [section.model_dump() for section in schema.sections]
-    })
+    return jsonify({"sections": [section.model_dump() for section in schema.sections]})
 
 
 @bp.route("/api/timezones")
@@ -447,7 +470,4 @@ def get_timezones():
     """GET API endpoint - returns all IANA timezones sorted alphabetically."""
     timezones = sorted(pytz.all_timezones)
 
-    return jsonify({
-        "success": True,
-        "timezones": timezones
-    })
+    return jsonify({"success": True, "timezones": timezones})

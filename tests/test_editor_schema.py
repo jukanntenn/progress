@@ -7,11 +7,7 @@ from pydantic import ValidationError
 
 
 def test_field_schema_with_required_fields():
-    field = FieldSchema(
-        type="text",
-        path="repos.0.url",
-        label="Repository URL"
-    )
+    field = FieldSchema(type="text", path="repos.0.url", label="Repository URL")
 
     assert field.type == "text"
     assert field.path == "repos.0.url"
@@ -32,7 +28,7 @@ def test_field_schema_with_all_fields():
         required=True,
         default="shallow",
         options=["shallow", "full"],
-        validation={"min": 1, "max": 100}
+        validation={"min": 1, "max": 100},
     )
 
     assert field.type == "select"
@@ -51,7 +47,7 @@ def test_field_schema_with_list_type():
         path="repos",
         label="Repositories",
         help_text="List of repositories to track",
-        required=True
+        required=True,
     )
 
     assert field.type == "list"
@@ -63,13 +59,7 @@ def test_section_schema_with_required_fields():
     section = SectionSchema(
         id="repositories",
         title="Repository Configuration",
-        fields=[
-            FieldSchema(
-                type="text",
-                path="repos.0.url",
-                label="Repository URL"
-            )
-        ]
+        fields=[FieldSchema(type="text", path="repos.0.url", label="Repository URL")],
     )
 
     assert section.id == "repositories"
@@ -86,18 +76,15 @@ def test_section_schema_with_all_fields():
         description="Configure GitHub CLI integration",
         fields=[
             FieldSchema(
-                type="text",
-                path="github.gh_token",
-                label="GitHub Token",
-                required=True
+                type="text", path="github.gh_token", label="GitHub Token", required=True
             ),
             FieldSchema(
                 type="select",
                 path="github.fetch_depth",
                 label="Fetch Depth",
-                options=["shallow", "full"]
-            )
-        ]
+                options=["shallow", "full"],
+            ),
+        ],
     )
 
     assert section.id == "github"
@@ -113,12 +100,8 @@ def test_editor_schema_with_sections():
                 id="repositories",
                 title="Repository Configuration",
                 fields=[
-                    FieldSchema(
-                        type="text",
-                        path="repos.0.url",
-                        label="Repository URL"
-                    )
-                ]
+                    FieldSchema(type="text", path="repos.0.url", label="Repository URL")
+                ],
             ),
             SectionSchema(
                 id="github",
@@ -128,10 +111,10 @@ def test_editor_schema_with_sections():
                         type="text",
                         path="github.gh_token",
                         label="GitHub Token",
-                        required=True
+                        required=True,
                     )
-                ]
-            )
+                ],
+            ),
         ]
     )
 
@@ -142,10 +125,7 @@ def test_editor_schema_with_sections():
 
 def test_field_schema_missing_required_field():
     with pytest.raises(ValidationError) as exc_info:
-        FieldSchema(
-            path="repos.0.url",
-            label="Repository URL"
-        )
+        FieldSchema(path="repos.0.url", label="Repository URL")
 
     errors = exc_info.value.errors()
     assert any(error["loc"] == ("type",) for error in errors)
@@ -153,10 +133,7 @@ def test_field_schema_missing_required_field():
 
 def test_section_schema_missing_required_field():
     with pytest.raises(ValidationError) as exc_info:
-        SectionSchema(
-            id="repositories",
-            fields=[]
-        )
+        SectionSchema(id="repositories", fields=[])
 
     errors = exc_info.value.errors()
     assert any(error["loc"] == ("title",) for error in errors)
@@ -171,7 +148,7 @@ def test_field_schema_serialization():
         required=True,
         default="shallow",
         options=["shallow", "full"],
-        validation={"min": 1}
+        validation={"min": 1},
     )
 
     field_dict = field.model_dump()
@@ -191,13 +168,7 @@ def test_section_schema_serialization():
         id="github",
         title="GitHub Settings",
         description="Configure GitHub",
-        fields=[
-            FieldSchema(
-                type="text",
-                path="github.gh_token",
-                label="GitHub Token"
-            )
-        ]
+        fields=[FieldSchema(type="text", path="github.gh_token", label="GitHub Token")],
     )
 
     section_dict = section.model_dump()
@@ -217,11 +188,9 @@ def test_editor_schema_serialization():
                 title="GitHub Settings",
                 fields=[
                     FieldSchema(
-                        type="text",
-                        path="github.gh_token",
-                        label="GitHub Token"
+                        type="text", path="github.gh_token", label="GitHub Token"
                     )
-                ]
+                ],
             )
         ]
     )
@@ -239,7 +208,7 @@ def test_field_schema_with_timezone_type():
         path="notification.timezone",
         label="Timezone",
         help_text="Notification timezone",
-        default="UTC"
+        default="UTC",
     )
 
     assert field.type == "timezone"
@@ -248,10 +217,7 @@ def test_field_schema_with_timezone_type():
 
 def test_field_schema_with_boolean_type():
     field = FieldSchema(
-        type="boolean",
-        path="github.verify_ssl",
-        label="Verify SSL",
-        default=True
+        type="boolean", path="github.verify_ssl", label="Verify SSL", default=True
     )
 
     assert field.type == "boolean"

@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from progress.config import Config
-from progress.markpost import MarkpostClient
+from progress.utils.markpost import MarkpostClient
 
 from .file import FileStorage
 from .markpost import MarkpostStorage
@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class AutoStorage:
-    def __init__(self, config: Config, *, default_directory: str | Path = "data/reports") -> None:
+    def __init__(
+        self, config: Config, *, default_directory: str | Path = "data/reports"
+    ) -> None:
         self._config = config
         self._default_directory = default_directory
         self._storage = self._create_storage()
@@ -25,4 +27,3 @@ class AutoStorage:
 
     def save(self, title: str, body: str | None) -> str:
         return self._storage.save(title, body)
-

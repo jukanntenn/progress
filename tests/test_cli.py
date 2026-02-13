@@ -1,13 +1,12 @@
 """Test CLI functionality."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 
 def test_prepare_discovered_repos_data():
     """Test data preparation for discovered repositories report."""
-    from progress.models import DiscoveredRepository
+    from progress.contrib.repo.models import DiscoveredRepository
 
     # Mock repo data from owner.py
     new_repos = [
@@ -46,14 +45,12 @@ def test_prepare_discovered_repos_data():
     mock_record2.readme_summary = None
     mock_record2.readme_detail = None
 
-    with patch("progress.cli.DiscoveredRepository") as mock_db:
+    with patch("progress.contrib.repo.models.DiscoveredRepository") as mock_db:
         mock_db.get_by_id.side_effect = [mock_record1, mock_record2]
 
         # Sort newest-first
         sorted_repos = sorted(
-            new_repos,
-            key=lambda r: r.get("created_at") or datetime.min,
-            reverse=True
+            new_repos, key=lambda r: r.get("created_at") or datetime.min, reverse=True
         )
 
         # Enrich with AI analysis

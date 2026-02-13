@@ -1,7 +1,10 @@
-import requests
 import pytest
+import requests
 
-from progress.changelog_parsers import HTMLChineseVersionParser, MarkdownHeadingParser
+from progress.contrib.changelog.changelog_parsers import (
+    HTMLChineseVersionParser,
+    MarkdownHeadingParser,
+)
 from progress.errors import ChangelogParseError
 
 
@@ -55,7 +58,7 @@ def test_html_chinese_version_parser_parses_utools_style_versions():
 
 
 def test_fetch_wraps_request_errors_as_changelog_parse_error(monkeypatch):
-    import progress.changelog_parsers as cp
+    import progress.contrib.changelog.changelog_parsers as cp
 
     def fake_get(*args, **kwargs):
         raise requests.RequestException("boom")
@@ -68,7 +71,7 @@ def test_fetch_wraps_request_errors_as_changelog_parse_error(monkeypatch):
 
 
 def test_fetch_decodes_utf8_when_response_encoding_is_latin1(monkeypatch):
-    import progress.changelog_parsers as cp
+    import progress.contrib.changelog.changelog_parsers as cp
 
     class FakeResponse:
         def __init__(self, content: bytes):

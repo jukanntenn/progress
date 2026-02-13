@@ -204,14 +204,17 @@ def run_command(
             err += f"Stderr:\n{e.stderr.strip()}\n"
 
         from .errors import CommandException
+
         raise CommandException(err) from e
 
     except subprocess.TimeoutExpired:
         from .errors import CommandException
+
         raise CommandException("Command timeout") from None
 
     except subprocess.SubprocessError as e:
         from .errors import CommandException
+
         raise CommandException("Failed to run command") from e
 
 

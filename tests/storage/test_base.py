@@ -8,4 +8,3 @@ def test_storage_protocol_accepts_save_method():
 
     storage: Storage = MockStorage()
     assert storage.save("t", "b") == "mock-result"
-

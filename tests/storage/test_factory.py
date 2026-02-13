@@ -36,7 +36,9 @@ def test_get_storage_returns_combined_for_file():
                     markpost_url=None,
                 )
                 assert storage == combined_cls.return_value
-                combined_cls.assert_called_once_with(db_cls.return_value, file_cls.return_value)
+                combined_cls.assert_called_once_with(
+                    db_cls.return_value, file_cls.return_value
+                )
 
 
 def test_get_storage_returns_db_storage_when_markpost_url_provided():
@@ -53,4 +55,3 @@ def test_get_storage_returns_db_storage_when_markpost_url_provided():
             markpost_url="https://example.com/p/1",
         )
         assert storage == db_cls.return_value
-

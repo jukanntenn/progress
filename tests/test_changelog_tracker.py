@@ -1,13 +1,14 @@
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
-import requests
 import pytest
+import requests
 
-from progress.changelog_tracker import ChangelogTrackerManager
 from progress.config import ChangelogTrackerConfig
+from progress.contrib.changelog.changelog_tracker import ChangelogTrackerManager
+from progress.contrib.changelog.models import ChangelogTracker
 from progress.db import close_db, create_tables, init_db
-from progress.models import ChangelogTracker
+
 
 @pytest.fixture()
 def db(tmp_path):
@@ -68,7 +69,11 @@ def test_sync_creates_updates_and_deletes_trackers(db):
     result2 = manager.sync(trackers2)
     assert result2["updated"] == 1
 
-    row = ChangelogTracker.select().where(ChangelogTracker.url == "https://example.com/a").first()
+    row = (
+        ChangelogTracker.select()
+        .where(ChangelogTracker.url == "https://example.com/a")
+        .first()
+    )
     assert row is not None
     assert row.name == "A2"
     assert row.enabled is False
@@ -78,8 +83,10 @@ def test_sync_creates_updates_and_deletes_trackers(db):
     assert ChangelogTracker.select().count() == 0
 
 
-def test_check_first_time_sends_notification_and_updates_last_seen_version(db, monkeypatch):
-    import progress.changelog_parsers as cp
+def test_check_first_time_sends_notification_and_updates_last_seen_version(
+    db, monkeypatch
+):
+    import progress.contrib.changelog.changelog_parsers as cp
 
     url = "https://example.com/a"
     monkeypatch.setattr(
@@ -115,7 +122,7 @@ def test_check_first_time_sends_notification_and_updates_last_seen_version(db, m
 
 
 def test_check_no_new_version_does_not_notify(db, monkeypatch):
-    import progress.changelog_parsers as cp
+    import progress.contrib.changelog.changelog_parsers as cp
 
     url = "https://example.com/a"
     monkeypatch.setattr(
@@ -148,7 +155,7 @@ def test_check_no_new_version_does_not_notify(db, monkeypatch):
 
 
 def test_check_all_runs_in_config_order_and_skips_disabled(db, monkeypatch):
-    import progress.changelog_parsers as cp
+    import progress.contrib.changelog.changelog_parsers as cp
 
     url_a = "https://example.com/a"
     url_b = "https://example.com/b"
@@ -201,7 +208,7 @@ def test_check_all_runs_in_config_order_and_skips_disabled(db, monkeypatch):
 
 
 def test_check_extracts_multiple_new_versions_until_last_seen(db, monkeypatch):
-    import progress.changelog_parsers as cp
+    import progress.contrib.changelog.changelog_parsers as cp
 
     url = "https://example.com/a"
     monkeypatch.setattr(

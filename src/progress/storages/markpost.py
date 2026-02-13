@@ -1,6 +1,6 @@
 import logging
 
-from progress.markpost import MarkpostClient
+from progress.utils.markpost import MarkpostClient
 
 logger = logging.getLogger(__name__)
 
@@ -12,4 +12,3 @@ class MarkpostStorage:
     def save(self, title: str, body: str | None) -> str:
         logger.info(f"Uploading report to Markpost: {title}")
         return self._client.upload(body or "", title=title or None)
-

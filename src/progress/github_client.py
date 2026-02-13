@@ -2,7 +2,12 @@
 
 import logging
 from typing import Optional
-from github import Github, UnknownObjectException, RateLimitExceededException, BadCredentialsException
+from github import (
+    Github,
+    UnknownObjectException,
+    RateLimitExceededException,
+    BadCredentialsException,
+)
 from .errors import GitException
 
 logger = logging.getLogger(__name__)
@@ -21,7 +26,9 @@ class GitHubClient:
         self.github = Github(token)
         if proxy:
             self.github.set_proxy(proxy)
-        logger.debug(f"GitHubClient initialized (token: {token[:8] + '...' if token else 'None'})")
+        logger.debug(
+            f"GitHubClient initialized (token: {token[:8] + '...' if token else 'None'})"
+        )
 
     def list_releases(
         self,
@@ -56,11 +63,13 @@ class GitHubClient:
                     continue
                 if exclude_pre_releases and release.prerelease:
                     continue
-                result.append({
-                    "tagName": release.tag_name,
-                    "name": release.title,
-                    "publishedAt": release.published_at,
-                })
+                result.append(
+                    {
+                        "tagName": release.tag_name,
+                        "name": release.title,
+                        "publishedAt": release.published_at,
+                    }
+                )
                 if len(result) >= limit:
                     break
 
@@ -78,7 +87,9 @@ class GitHubClient:
             raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
         except Exception as e:
             logger.error(f"Failed to list releases for {owner}/{repo}: {e}")
-            raise GitException(f"Failed to list releases for {owner}/{repo}: {e}") from e
+            raise GitException(
+                f"Failed to list releases for {owner}/{repo}: {e}"
+            ) from e
 
     def list_repos(
         self,
@@ -108,12 +119,14 @@ class GitHubClient:
             for repo in repos:
                 if source and not repo.source:
                     continue
-                result.append({
-                    "nameWithOwner": repo.full_name,
-                    "description": repo.description,
-                    "createdAt": repo.created_at,
-                    "updatedAt": repo.updated_at,
-                })
+                result.append(
+                    {
+                        "nameWithOwner": repo.full_name,
+                        "description": repo.description,
+                        "createdAt": repo.created_at,
+                        "updatedAt": repo.updated_at,
+                    }
+                )
                 if len(result) >= limit:
                     break
 
@@ -156,7 +169,9 @@ class GitHubClient:
                     tags = repo_obj.get_tags()
                     for tag in tags:
                         if tag.name == tag_name:
-                            logger.debug(f"Found commit {tag.commit.sha} for {owner}/{repo}:{tag_name}")
+                            logger.debug(
+                                f"Found commit {tag.commit.sha} for {owner}/{repo}:{tag_name}"
+                            )
                             return tag.commit.sha
 
             logger.debug(f"Release {tag_name} not found for {owner}/{repo}")
@@ -166,7 +181,9 @@ class GitHubClient:
             raise
         except UnknownObjectException as e:
             logger.error(f"Repository or release not found: {e}")
-            raise GitException(f"Repository {owner}/{repo} or release {tag_name} not found: {e}") from e
+            raise GitException(
+                f"Repository {owner}/{repo} or release {tag_name} not found: {e}"
+            ) from e
         except RateLimitExceededException as e:
             logger.warning(f"GitHub API rate limit reached: {e}")
             raise GitException(f"GitHub API rate limit exceeded: {e}") from e
@@ -174,8 +191,12 @@ class GitHubClient:
             logger.warning(f"GitHub API authentication failed: {e}")
             raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
         except Exception as e:
-            logger.error(f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}")
-            raise GitException(f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}") from e
+            logger.error(
+                f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}"
+            )
+            raise GitException(
+                f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}"
+            ) from e
 
     def get_release_body(self, owner: str, repo: str, tag_name: str) -> str:
         """Get release notes/body.
@@ -208,7 +229,9 @@ class GitHubClient:
             raise
         except UnknownObjectException as e:
             logger.error(f"Repository or release not found: {e}")
-            raise GitException(f"Repository {owner}/{repo} or release {tag_name} not found: {e}") from e
+            raise GitException(
+                f"Repository {owner}/{repo} or release {tag_name} not found: {e}"
+            ) from e
         except RateLimitExceededException as e:
             logger.warning(f"GitHub API rate limit reached: {e}")
             raise GitException(f"GitHub API rate limit exceeded: {e}") from e
@@ -216,8 +239,12 @@ class GitHubClient:
             logger.warning(f"GitHub API authentication failed: {e}")
             raise GitException(f"Repository {owner}/{repo} access denied: {e}") from e
         except Exception as e:
-            logger.error(f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}")
-            raise GitException(f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}") from e
+            logger.error(
+                f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}"
+            )
+            raise GitException(
+                f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}"
+            ) from e
 
     def get_readme(self, owner: str, repo: str) -> Optional[str]:
         """Get README content.

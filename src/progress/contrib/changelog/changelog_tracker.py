@@ -4,11 +4,15 @@ import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
-from .changelog_parsers import HTMLChineseVersionParser, MarkdownHeadingParser, VersionEntry
-from .config import ChangelogTrackerConfig, Config
-from .errors import ChangelogParseError
+from ...config import ChangelogTrackerConfig, Config
 from .models import ChangelogTracker
-from .utils import get_now
+from ...errors import ChangelogParseError
+from ...utils import get_now
+from .changelog_parsers import (
+    HTMLChineseVersionParser,
+    MarkdownHeadingParser,
+    VersionEntry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +65,9 @@ class ChangelogTrackerManager:
 
         for t in trackers:
             url = str(t.url)
-            tracker = ChangelogTracker.select().where(ChangelogTracker.url == url).first()
+            tracker = (
+                ChangelogTracker.select().where(ChangelogTracker.url == url).first()
+            )
             if tracker is None:
                 ChangelogTracker.create(
                     name=t.name,

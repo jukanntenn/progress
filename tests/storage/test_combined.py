@@ -11,7 +11,7 @@ def test_combined_storage_saves_to_db_then_primary_and_updates_url():
     mock_primary = Mock()
     mock_primary.save.return_value = "https://example.com/p/123"
 
-    with patch("progress.storages.combined.Report") as report_model:
+    with patch("progress.db.models.Report") as report_model:
         storage = CombinedStorage(mock_db, mock_primary)
         result = storage.save("Title", "Body")
 
@@ -29,10 +29,9 @@ def test_combined_storage_does_not_update_when_not_url():
     mock_primary = Mock()
     mock_primary.save.return_value = "/tmp/report.md"
 
-    with patch("progress.storages.combined.Report") as report_model:
+    with patch("progress.db.models.Report") as report_model:
         storage = CombinedStorage(mock_db, mock_primary)
         result = storage.save("Title", "Body")
 
         assert result == "/tmp/report.md"
         report_model.update.assert_not_called()
-

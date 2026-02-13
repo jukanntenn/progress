@@ -5,7 +5,7 @@ import requests
 
 from progress.config import MarkpostConfig
 from progress.errors import ClientError, ProgressException
-from progress.markpost import MarkpostClient
+from progress.utils.markpost import MarkpostClient
 
 
 class TestUrlParsing:
@@ -15,7 +15,11 @@ class TestUrlParsing:
         "url,expected_base,expected_key",
         [
             ("https://example.com/p/test-key", "https://example.com", "test-key"),
-            ("https://markpost.example.com/p/abc123xyz", "https://markpost.example.com", "abc123xyz"),
+            (
+                "https://markpost.example.com/p/abc123xyz",
+                "https://markpost.example.com",
+                "abc123xyz",
+            ),
             ("http://localhost:8080/p/dev-key", "http://localhost:8080", "dev-key"),
         ],
     )
@@ -29,6 +33,7 @@ class TestUrlParsing:
     def test_extract_invalid_url(self):
         """Test invalid URL raises exception during client initialization."""
         import pydantic
+
         with pytest.raises((ProgressException, pydantic.ValidationError)):
             config = MarkpostConfig(url="not-a-url", timeout=30)
             MarkpostClient(config)
@@ -64,6 +69,7 @@ class TestUpload:
 
     def test_upload_success(self, monkeypatch):
         """Test successful upload."""
+
         class FakeResponse:
             status_code = 200
 
@@ -94,6 +100,7 @@ class TestUpload:
 
     def test_upload_missing_id_field(self, monkeypatch):
         """Test upload when API response missing 'id' field."""
+
         class FakeResponse:
             status_code = 200
 
@@ -168,6 +175,7 @@ class TestGetStatus:
 
     def test_get_status_exists(self, monkeypatch):
         """Test checking existing post."""
+
         class FakeResponse:
             status_code = 200
 
@@ -183,6 +191,7 @@ class TestGetStatus:
 
     def test_get_status_not_found(self, monkeypatch):
         """Test checking non-existent post."""
+
         class FakeResponse:
             status_code = 404
 

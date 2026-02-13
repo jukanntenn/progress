@@ -114,7 +114,7 @@ gh_token = "test_token"
     response = client.post(
         "/api/config",
         data=json.dumps({"toml": new_toml}),
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert response.status_code == 200
@@ -148,7 +148,7 @@ gh_token = "test_token"
     response = client.post(
         "/api/config",
         data=json.dumps({"toml": toml_with_comments}),
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert response.status_code == 200
@@ -170,7 +170,7 @@ timezone = "UTC"
     response = client.post(
         "/api/config",
         data=json.dumps({"toml": invalid_toml}),
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert response.status_code == 400
@@ -184,7 +184,7 @@ def test_api_config_post_with_config_field(client):
     response = client.post(
         "/api/config",
         data=json.dumps({"config": {"timezone": "UTC", "language": "en"}}),
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert response.status_code == 200
@@ -197,7 +197,7 @@ def test_api_config_post_missing_both_fields(client):
     response = client.post(
         "/api/config",
         data=json.dumps({"invalid": "data"}),
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert response.status_code == 400
@@ -274,6 +274,7 @@ def test_api_timezones(client):
     assert "UTC" in data["timezones"]
     assert "America/New_York" in data["timezones"]
     assert "Asia/Shanghai" in data["timezones"]
+
 
 def test_api_timezones_sorted(client):
     """Test that /api/timezones returns sorted timezones."""

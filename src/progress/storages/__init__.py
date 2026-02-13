@@ -1,6 +1,6 @@
 from progress.config import Config, StorageType
 from progress.errors import ConfigException
-from progress.markpost import MarkpostClient
+from progress.utils.markpost import MarkpostClient
 
 from .auto import AutoStorage
 from .base import Storage
@@ -49,4 +49,3 @@ def get_storage(
         return CombinedStorage(db_storage, AutoStorage(config))
 
     raise ConfigException(f"Unknown report storage type: {storage_type}")
-

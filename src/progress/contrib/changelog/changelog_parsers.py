@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import requests
 from lxml import html
 
-from .errors import ChangelogParseError
+from ...errors import ChangelogParseError
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +30,9 @@ class ChangelogParser(ABC):
             response.raise_for_status()
             return self._decode_response_text(response)
         except requests.RequestException as e:
-            raise ChangelogParseError(f"Failed to fetch changelog from {url}: {e}") from e
+            raise ChangelogParseError(
+                f"Failed to fetch changelog from {url}: {e}"
+            ) from e
 
     @staticmethod
     def _decode_response_text(response: requests.Response) -> str:
@@ -56,7 +58,9 @@ class ChangelogParser(ABC):
             except Exception:
                 continue
 
-            if enc in bad_encodings and ("â\x80" in text or "ã\x80" in text or "â" in text or "ã" in text):
+            if enc in bad_encodings and (
+                "â\x80" in text or "ã\x80" in text or "â" in text or "ã" in text
+            ):
                 continue
 
             return text

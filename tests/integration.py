@@ -50,7 +50,9 @@ class TestConsole:
     @staticmethod
     def header(title: str) -> None:
         print(f"\n{TestConsole.BOLD}{TestConsole.BLUE}{'=' * 60}{TestConsole.RESET}")
-        print(f"{TestConsole.BOLD}{TestConsole.BLUE}{title.center(60)}{TestConsole.RESET}")
+        print(
+            f"{TestConsole.BOLD}{TestConsole.BLUE}{title.center(60)}{TestConsole.RESET}"
+        )
         print(f"{TestConsole.BOLD}{TestConsole.BLUE}{'=' * 60}{TestConsole.RESET}\n")
 
 
@@ -58,7 +60,9 @@ class GitHubCLI:
     def __init__(self) -> None:
         self.user = self.get_user()
 
-    def _run(self, args: list[str], check: bool = True, env: dict[str, str] | None = None) -> str:
+    def _run(
+        self, args: list[str], check: bool = True, env: dict[str, str] | None = None
+    ) -> str:
         result = subprocess.run(
             ["gh", *args],
             capture_output=True,
@@ -88,15 +92,26 @@ class GitHubCLI:
             raise RuntimeError("Unable to obtain GitHub token from gh auth token")
         return token
 
-    def create_repo(self, owner: str, name: str, description: str = "", private: bool = False) -> str:
-        args = ["repo", "create", f"{owner}/{name}", "--description", description, "--confirm"]
+    def create_repo(
+        self, owner: str, name: str, description: str = "", private: bool = False
+    ) -> str:
+        args = [
+            "repo",
+            "create",
+            f"{owner}/{name}",
+            "--description",
+            description,
+            "--confirm",
+        ]
         args.append("--private" if private else "--public")
         return self._run(args)
 
     def delete_repo(self, owner: str, name: str) -> None:
         self._run(["repo", "delete", f"{owner}/{name}", "--yes"], check=False)
 
-    def create_release(self, owner: str, repo: str, tag: str, title: str, notes: str = "") -> None:
+    def create_release(
+        self, owner: str, repo: str, tag: str, title: str, notes: str = ""
+    ) -> None:
         self._run(
             [
                 "release",
@@ -111,7 +126,9 @@ class GitHubCLI:
             ]
         )
 
-    def add_commit(self, owner: str, repo: str, files: dict[str, str], message: str) -> None:
+    def add_commit(
+        self, owner: str, repo: str, files: dict[str, str], message: str
+    ) -> None:
         with tempfile.TemporaryDirectory(prefix="progress-integration-") as tmpdir:
             repo_path = Path(tmpdir) / repo
             subprocess.run(
@@ -120,7 +137,9 @@ class GitHubCLI:
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "checkout", "-B", "main"], cwd=repo_path, check=False)
+            subprocess.run(
+                ["git", "checkout", "-B", "main"], cwd=repo_path, check=False
+            )
 
             for rel_path, content in files.items():
                 full_path = repo_path / rel_path
@@ -152,7 +171,9 @@ class GitHubCLI:
                 text=True,
             )
             if push.returncode != 0:
-                subprocess.run(["git", "push", "-u", "origin", "main"], cwd=repo_path, check=True)
+                subprocess.run(
+                    ["git", "push", "-u", "origin", "main"], cwd=repo_path, check=True
+                )
 
 
 def _assert(condition: bool, message: str) -> None:
@@ -208,7 +229,9 @@ class IntegrationTest:
         repo_proposals = CreatedRepo(self.owner, self._unique_name("proposals"))
 
         self.console.info(f"Creating {repo_main.slug}...")
-        self.gh.create_repo(self.owner, repo_main.name, description="Progress integration test repo")
+        self.gh.create_repo(
+            self.owner, repo_main.name, description="Progress integration test repo"
+        )
         self.created_repos.append(repo_main)
 
         self.gh.add_commit(
@@ -221,7 +244,9 @@ class IntegrationTest:
             },
             "Initial commit",
         )
-        self.gh.create_release(self.owner, repo_main.name, "v0.1.0", "v0.1.0", notes="Initial release")
+        self.gh.create_release(
+            self.owner, repo_main.name, "v0.1.0", "v0.1.0", notes="Initial release"
+        )
 
         self.console.info(f"Creating {repo_proposals.slug}...")
         self.gh.create_repo(
@@ -264,7 +289,13 @@ class IntegrationTest:
 
         return repo_main, repo_proposals
 
-    def write_config(self, *, repos: list[CreatedRepo], proposals_repo: CreatedRepo, changelog_repo: CreatedRepo) -> None:
+    def write_config(
+        self,
+        *,
+        repos: list[CreatedRepo],
+        proposals_repo: CreatedRepo,
+        changelog_repo: CreatedRepo,
+    ) -> None:
         repos_lines = "\n".join(
             [
                 "\n".join(
@@ -280,55 +311,58 @@ class IntegrationTest:
             ]
         ).rstrip()
 
-        content = "\n".join(
-            [
-                'language = "en"',
-                'timezone = "UTC"',
-                f'database_path = "{self.database_path.as_posix()}"',
-                f'workspace_dir = "{self.workspace_dir.as_posix()}"',
-                "",
-                "[markpost]",
-                "enabled = false",
-                "timeout = 5",
-                "max_batch_size = 1048576",
-                "",
-                "[notification]",
-                "enabled = false",
-                "",
-                "[github]",
-                'protocol = "https"',
-                "git_timeout = 600",
-                "gh_timeout = 300",
-                "",
-                "[analysis]",
-                "max_diff_length = 200000",
-                "concurrency = 1",
-                'language = "en"',
-                "timeout = 60",
-                "",
-                repos_lines,
-                "",
-                "[[owners]]",
-                'type = "user"',
-                f'name = "{self.owner}"',
-                "enabled = true",
-                "",
-                "[[proposal_trackers]]",
-                'type = "pep"',
-                f'repo_url = "{proposals_repo.https_url}"',
-                'branch = "main"',
-                "enabled = true",
-                'proposal_dir = "peps"',
-                'file_pattern = "pep-*.rst"',
-                "",
-                "[[changelog_trackers]]",
-                f'name = "{changelog_repo.slug}"',
-                f'url = "{changelog_repo.raw_changelog_url}"',
-                'parser_type = "markdown_heading"',
-                "enabled = true",
-                "",
-            ]
-        ).rstrip() + "\n"
+        content = (
+            "\n".join(
+                [
+                    'language = "en"',
+                    'timezone = "UTC"',
+                    f'database_path = "{self.database_path.as_posix()}"',
+                    f'workspace_dir = "{self.workspace_dir.as_posix()}"',
+                    "",
+                    "[markpost]",
+                    "enabled = false",
+                    "timeout = 5",
+                    "max_batch_size = 1048576",
+                    "",
+                    "[notification]",
+                    "enabled = false",
+                    "",
+                    "[github]",
+                    'protocol = "https"',
+                    "git_timeout = 600",
+                    "gh_timeout = 300",
+                    "",
+                    "[analysis]",
+                    "max_diff_length = 200000",
+                    "concurrency = 1",
+                    'language = "en"',
+                    "timeout = 60",
+                    "",
+                    repos_lines,
+                    "",
+                    "[[owners]]",
+                    'type = "user"',
+                    f'name = "{self.owner}"',
+                    "enabled = true",
+                    "",
+                    "[[proposal_trackers]]",
+                    'type = "pep"',
+                    f'repo_url = "{proposals_repo.https_url}"',
+                    'branch = "main"',
+                    "enabled = true",
+                    'proposal_dir = "peps"',
+                    'file_pattern = "pep-*.rst"',
+                    "",
+                    "[[changelog_trackers]]",
+                    f'name = "{changelog_repo.slug}"',
+                    f'url = "{changelog_repo.raw_changelog_url}"',
+                    'parser_type = "markdown_heading"',
+                    "enabled = true",
+                    "",
+                ]
+            ).rstrip()
+            + "\n"
+        )
 
         self.config_path.write_text(content, encoding="utf-8")
 
@@ -353,9 +387,21 @@ class IntegrationTest:
                 + (f"\nstderr:\n{result.stderr.strip()}" if result.stderr else "")
             )
 
-    def verify_database(self, *, expected_repo_count: int, min_reports: int, min_discovered: int, min_events: int) -> None:
+    def verify_database(
+        self,
+        *,
+        expected_repo_count: int,
+        min_reports: int,
+        min_discovered: int,
+        min_events: int,
+    ) -> None:
         from progress.db import close_db, create_tables, init_db
-        from progress.models import DiscoveredRepository, ProposalEvent, Report, Repository
+        from progress.models import (
+            DiscoveredRepository,
+            ProposalEvent,
+            Report,
+            Repository,
+        )
 
         init_db(str(self.database_path))
         create_tables()
@@ -366,23 +412,43 @@ class IntegrationTest:
             discovered_count = DiscoveredRepository.select().count()
             event_count = ProposalEvent.select().count()
 
-            _assert(repo_count == expected_repo_count, f"Repository count expected {expected_repo_count}, got {repo_count}")
-            _assert(report_count >= min_reports, f"Report count expected >= {min_reports}, got {report_count}")
-            _assert(discovered_count >= min_discovered, f"DiscoveredRepository count expected >= {min_discovered}, got {discovered_count}")
-            _assert(event_count >= min_events, f"ProposalEvent count expected >= {min_events}, got {event_count}")
+            _assert(
+                repo_count == expected_repo_count,
+                f"Repository count expected {expected_repo_count}, got {repo_count}",
+            )
+            _assert(
+                report_count >= min_reports,
+                f"Report count expected >= {min_reports}, got {report_count}",
+            )
+            _assert(
+                discovered_count >= min_discovered,
+                f"DiscoveredRepository count expected >= {min_discovered}, got {discovered_count}",
+            )
+            _assert(
+                event_count >= min_events,
+                f"ProposalEvent count expected >= {min_events}, got {event_count}",
+            )
 
             latest_aggregated = (
-                Report.select().where(Report.repo.is_null(True)).order_by(Report.created_at.desc()).first()
+                Report.select()
+                .where(Report.repo.is_null(True))
+                .order_by(Report.created_at.desc())
+                .first()
             )
-            _assert(latest_aggregated is not None, "Aggregated report not found in database")
             _assert(
-                latest_aggregated.content is not None and latest_aggregated.content.strip() != "",
+                latest_aggregated is not None, "Aggregated report not found in database"
+            )
+            _assert(
+                latest_aggregated.content is not None
+                and latest_aggregated.content.strip() != "",
                 "Aggregated report content is empty",
             )
         finally:
             close_db()
 
-    def evolve_repos(self, repo_main: CreatedRepo, repo_proposals: CreatedRepo) -> CreatedRepo:
+    def evolve_repos(
+        self, repo_main: CreatedRepo, repo_proposals: CreatedRepo
+    ) -> CreatedRepo:
         self.gh.add_commit(
             repo_main.owner,
             repo_main.name,
@@ -399,7 +465,13 @@ class IntegrationTest:
             },
             "Add feature and bump changelog",
         )
-        self.gh.create_release(repo_main.owner, repo_main.name, "v0.2.0", "v0.2.0", notes="New feature release")
+        self.gh.create_release(
+            repo_main.owner,
+            repo_main.name,
+            "v0.2.0",
+            "v0.2.0",
+            notes="New feature release",
+        )
 
         pep1_updated = (
             ":PEP: 1\n"
@@ -433,7 +505,9 @@ class IntegrationTest:
 
         repo_new = CreatedRepo(self.owner, self._unique_name("extra"))
         self.console.info(f"Creating {repo_new.slug}...")
-        self.gh.create_repo(self.owner, repo_new.name, description="Additional repo for second run")
+        self.gh.create_repo(
+            self.owner, repo_new.name, description="Additional repo for second run"
+        )
         self.created_repos.append(repo_new)
         self.gh.add_commit(
             self.owner,
@@ -468,7 +542,9 @@ class IntegrationTest:
             self.run_progress()
 
             self.console.step(5, 7, "Verifying database (first run)")
-            self.verify_database(expected_repo_count=2, min_reports=2, min_discovered=1, min_events=0)
+            self.verify_database(
+                expected_repo_count=2, min_reports=2, min_discovered=1, min_events=0
+            )
 
             self.console.step(6, 7, "Evolving repositories and updating config")
             repo_new = self.evolve_repos(repo_main, repo_proposals)
@@ -478,9 +554,13 @@ class IntegrationTest:
                 changelog_repo=repo_main,
             )
 
-            self.console.step(7, 7, "Running Progress and verifying database (second run)")
+            self.console.step(
+                7, 7, "Running Progress and verifying database (second run)"
+            )
             self.run_progress()
-            self.verify_database(expected_repo_count=3, min_reports=4, min_discovered=2, min_events=1)
+            self.verify_database(
+                expected_repo_count=3, min_reports=4, min_discovered=2, min_events=1
+            )
 
             self.console.success("All integration checks passed")
             return 0
@@ -499,12 +579,22 @@ class IntegrationTest:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Progress standalone integration test")
-    parser.add_argument("--prefix", default="progress-it", help="Repository name prefix")
-    parser.add_argument("--keep-repos", action="store_true", help="Do not delete created GitHub repos")
-    parser.add_argument("--keep-artifacts", action="store_true", help="Keep local database/workspace")
+    parser.add_argument(
+        "--prefix", default="progress-it", help="Repository name prefix"
+    )
+    parser.add_argument(
+        "--keep-repos", action="store_true", help="Do not delete created GitHub repos"
+    )
+    parser.add_argument(
+        "--keep-artifacts", action="store_true", help="Keep local database/workspace"
+    )
     args = parser.parse_args()
 
-    test = IntegrationTest(prefix=args.prefix, keep_repos=args.keep_repos, keep_artifacts=args.keep_artifacts)
+    test = IntegrationTest(
+        prefix=args.prefix,
+        keep_repos=args.keep_repos,
+        keep_artifacts=args.keep_artifacts,
+    )
     return test.run()
 
 

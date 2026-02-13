@@ -4,20 +4,16 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 import json
 
-from progress.analyzer import ClaudeCodeAnalyzer
+from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from progress.errors import AnalysisException
-from progress.reporter import MarkdownReporter
-from progress.repository import RepositoryReport
+from progress.contrib.repo.reporter import MarkdownReporter
+from progress.contrib.repo.repository import RepositoryReport
 
 
 @pytest.fixture
 def analyzer_config():
     """Create analyzer configuration."""
-    return {
-        'max_diff_length': 100000,
-        'timeout': 600,
-        'language': 'en'
-    }
+    return {"max_diff_length": 100000, "timeout": 600, "language": "en"}
 
 
 class TestAnalyzeReleasesBasic:
@@ -37,12 +33,14 @@ class TestAnalyzeReleasesBasic:
             "is_first_check": True,
         }
 
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_response = {"summary": "summary", "detail": "detail"}
             mock_cmd.return_value = json.dumps(mock_response)
 
             analyzer = ClaudeCodeAnalyzer(**analyzer_config)
-            summary, detail = analyzer.analyze_releases("test/repo", "main", release_data)
+            summary, detail = analyzer.analyze_releases(
+                "test/repo", "main", release_data
+            )
 
             assert summary == "summary"
             assert detail == "detail"
@@ -52,19 +50,31 @@ class TestAnalyzeReleasesBasic:
         """Test that repo and branch are passed to prompt builder."""
         release_data = {
             "releases": [
-                {"tag_name": "v1.0.0", "title": "Release", "notes": "", "published_at": "2024-01-01", "commit_hash": "abc"}
+                {
+                    "tag_name": "v1.0.0",
+                    "title": "Release",
+                    "notes": "",
+                    "published_at": "2024-01-01",
+                    "commit_hash": "abc",
+                }
             ]
         }
 
-        with patch('progress.analyzer.ClaudeCodeAnalyzer._build_release_analysis_prompt') as mock_build:
+        with patch(
+            "progress.ai.analyzers.claude_code.ClaudeCodeAnalyzer._build_release_analysis_prompt"
+        ) as mock_build:
             mock_build.return_value = "test prompt"
-            with patch('progress.analyzer.ClaudeCodeAnalyzer._run_claude_release_analysis') as mock_run:
+            with patch(
+                "progress.ai.analyzers.claude_code.ClaudeCodeAnalyzer._run_claude_release_analysis"
+            ) as mock_run:
                 mock_run.return_value = ("summary", "detail")
 
                 analyzer = ClaudeCodeAnalyzer(**analyzer_config)
                 analyzer.analyze_releases("owner/repo", "develop", release_data)
 
-                mock_build.assert_called_once_with("owner/repo", "develop", release_data)
+                mock_build.assert_called_once_with(
+                    "owner/repo", "develop", release_data
+                )
 
 
 class TestRunClaudeReleaseAnalysisBasic:
@@ -72,12 +82,9 @@ class TestRunClaudeReleaseAnalysisBasic:
 
     def test_successful_analysis_parses_json(self, analyzer_config):
         """Test successful JSON parsing."""
-        mock_response = {
-            "summary": "Test summary",
-            "detail": "Test detail"
-        }
+        mock_response = {"summary": "Test summary", "detail": "Test detail"}
 
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_cmd.return_value = json.dumps(mock_response)
 
             analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -90,7 +97,7 @@ class TestRunClaudeReleaseAnalysisBasic:
         """Test that timeout raises AnalysisException."""
         from progress.errors import CommandException
 
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_cmd.side_effect = CommandException("Command timed out")
 
             analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -101,7 +108,7 @@ class TestRunClaudeReleaseAnalysisBasic:
         """Test that Claude not found raises AnalysisException."""
         from progress.errors import CommandException
 
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             error = FileNotFoundError("Claude Code not found")
             mock_cmd.side_effect = error
 
@@ -113,7 +120,7 @@ class TestRunClaudeReleaseAnalysisBasic:
 
     def test_invalid_json_raises_exception(self, analyzer_config):
         """Test that invalid JSON raises AnalysisException."""
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_cmd.return_value = "{invalid json"
 
             analyzer = ClaudeCodeAnalyzer(**analyzer_config)
@@ -122,7 +129,7 @@ class TestRunClaudeReleaseAnalysisBasic:
 
     def test_missing_summary_field_raises_exception(self, analyzer_config):
         """Test that missing summary field raises exception."""
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_response = {"detail": "Only detail"}
             mock_cmd.return_value = json.dumps(mock_response)
 
@@ -132,7 +139,7 @@ class TestRunClaudeReleaseAnalysisBasic:
 
     def test_missing_detail_field_raises_exception(self, analyzer_config):
         """Test that missing detail field raises exception."""
-        with patch('progress.analyzer.run_command') as mock_cmd:
+        with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             mock_response = {"summary": "Only summary"}
             mock_cmd.return_value = json.dumps(mock_response)
 
@@ -159,7 +166,9 @@ class TestBuildReleaseAnalysisPromptBasic:
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
-        prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
+        prompt = analyzer._build_release_analysis_prompt(
+            "test/repo", "main", release_data
+        )
 
         # Verify language is in prompt
         assert "en" in prompt or "language" in prompt.lower()
@@ -179,12 +188,16 @@ class TestBuildReleaseAnalysisPromptBasic:
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
-        prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
+        prompt = analyzer._build_release_analysis_prompt(
+            "test/repo", "main", release_data
+        )
 
         # The template no longer uses is_first_check, it's always "first check" style for single release
         assert "Release" in prompt
 
-    def test_incremental_release_prompt_renders_with_intermediate_and_diff(self, analyzer_config):
+    def test_incremental_release_prompt_renders_with_intermediate_and_diff(
+        self, analyzer_config
+    ):
         """Test incremental release prompt renders without template key errors."""
         release_data = {
             "latest_release": {
@@ -199,7 +212,9 @@ class TestBuildReleaseAnalysisPromptBasic:
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
-        prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
+        prompt = analyzer._build_release_analysis_prompt(
+            "test/repo", "main", release_data
+        )
 
         # The new simplified template only shows the single release being analyzed
         # Intermediate releases concept was removed
@@ -221,7 +236,9 @@ class TestBuildReleaseAnalysisPromptBasic:
         }
 
         analyzer = ClaudeCodeAnalyzer(**analyzer_config)
-        prompt = analyzer._build_release_analysis_prompt("test/repo", "main", release_data)
+        prompt = analyzer._build_release_analysis_prompt(
+            "test/repo", "main", release_data
+        )
 
         # Verify JSON output instructions are present
         assert "JSON object" in prompt
@@ -267,8 +284,8 @@ class TestRepositoryReportTemplateBasic:
                     "commit_hash": "def456",
                     "ai_summary": "Summary for v1.1.0",
                     "ai_detail": "Detail for v1.1.0",
-                }
-            ]
+                },
+            ],
         )
 
         reporter = MarkdownReporter()

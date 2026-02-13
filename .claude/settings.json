@@ -1,0 +1,19 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use.py"
+                    },
+                    {
+                        "type": "command",
+                        "command": "(FILE_PATH=$(jq -r '.tool_input.file_path // empty'); [ -n \"$FILE_PATH\" ] && uv run ruff format \"$FILE_PATH\" >/dev/null 2>&1 &) ; exit 0"
+                    }
+                ]
+            }
+        ]
+    }
+}

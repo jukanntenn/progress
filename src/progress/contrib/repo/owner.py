@@ -2,8 +2,8 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .github_client import GitHubClient
 from .models import DiscoveredRepository, GitHubOwner
+from ...github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,9 @@ class OwnerManager:
 
     def _check_owner(self, owner: GitHubOwner) -> list[dict]:
         try:
-            repos = self.github_client.list_repos(str(owner.name), limit=100, source=True)
+            repos = self.github_client.list_repos(
+                str(owner.name), limit=100, source=True
+            )
         except Exception as e:
             self.logger.error(f"Failed to list repositories for {owner.name}: {e}")
             return []
@@ -94,10 +96,7 @@ class OwnerManager:
         if last_tracked is None:
             candidates = [parsed[-1][1]]
         else:
-            candidates = [
-                r for created_at, r in parsed
-                if created_at > last_tracked
-            ]
+            candidates = [r for created_at, r in parsed if created_at > last_tracked]
 
         if not candidates:
             owner.last_check_time = datetime.now(UTC)

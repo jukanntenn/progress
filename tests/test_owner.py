@@ -4,8 +4,8 @@ import pytest
 
 from progress.config import OwnerConfig
 from progress.db import close_db, create_tables, init_db
-from progress.models import DiscoveredRepository, GitHubOwner
-from progress.owner import OwnerManager
+from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
+from progress.contrib.repo.owner import OwnerManager
 
 
 @pytest.fixture()
@@ -50,7 +50,9 @@ def test_owner_manager_sync_owners_removes_missing(temp_db):
     assert GitHubOwner.select().count() == 0
 
 
-def test_owner_manager_check_owner_first_check_returns_most_recent(temp_db, monkeypatch):
+def test_owner_manager_check_owner_first_check_returns_most_recent(
+    temp_db, monkeypatch
+):
     manager = OwnerManager(gh_token=None)
     owner = GitHubOwner.create(owner_type="organization", name="acme", enabled=True)
 
@@ -112,7 +114,9 @@ def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
         ]
 
     monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
-    monkeypatch.setattr(manager.github_client, "get_readme", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        manager.github_client, "get_readme", lambda *args, **kwargs: None
+    )
 
     new_repos = manager._check_owner(owner)
     assert len(new_repos) == 1

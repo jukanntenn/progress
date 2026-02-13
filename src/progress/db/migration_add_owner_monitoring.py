@@ -2,7 +2,7 @@
 
 import logging
 
-from .models import DiscoveredRepository, GitHubOwner
+from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
 
 logger = logging.getLogger(__name__)
 
@@ -15,4 +15,3 @@ def apply(database) -> None:
 def rollback(database) -> None:
     database.drop_tables([DiscoveredRepository, GitHubOwner], safe=True)
     logger.info("Migration rolled back: owner monitoring tables")
-

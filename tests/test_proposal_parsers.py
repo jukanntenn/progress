@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 
 from progress.errors import ProposalParseError
-from progress.proposal_parsers import DjangoDEPParser, EIPParser, PEPParser, RustRFCParser
+from progress.contrib.proposal.proposal_parsers import (
+    DjangoDEPParser,
+    EIPParser,
+    PEPParser,
+    RustRFCParser,
+)
 
 
 def test_eip_parser_parses_frontmatter(tmp_path: Path):

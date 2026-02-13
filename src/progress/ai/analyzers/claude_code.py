@@ -8,15 +8,15 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .consts import (
+from progress.consts import (
     CMD_CLAUDE,
     TEMPLATE_ANALYSIS_PROMPT,
     TEMPLATE_README_ANALYSIS_PROMPT,
     TIMEOUT_CLAUDE_ANALYSIS,
 )
-from .errors import AnalysisException
-from .i18n import gettext as _
-from .utils import run_command
+from progress.errors import AnalysisException
+from progress.i18n import gettext as _
+from progress.utils import run_command
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ClaudeCodeAnalyzer:
         self.max_diff_length = max_diff_length
         self.timeout = timeout
         self.language = language
-        template_dir = Path(__file__).parent / "templates"
+        template_dir = Path(__file__).parent.parent.parent / "templates"
         self.jinja_env = Environment(
             loader=FileSystemLoader(template_dir),
             autoescape=select_autoescape(),
@@ -192,7 +192,9 @@ class ClaudeCodeAnalyzer:
             logger.warning(f"Proposal analysis failed: {e}")
             return (
                 _(f"New proposal: {proposal_type} #{proposal_number}"),
-                _(f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"),
+                _(
+                    f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"
+                ),
             )
 
     def analyze_status_change(
@@ -253,7 +255,9 @@ class ClaudeCodeAnalyzer:
             logger.warning(f"Proposal analysis failed: {e}")
             return (
                 _(f"Content modified: {proposal_type} #{proposal_number}"),
-                _(f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"),
+                _(
+                    f"Analysis unavailable for {proposal_type} #{proposal_number}: {title}"
+                ),
             )
 
     def _run_claude_readme_analysis(self, prompt: str) -> tuple[str, str]:
@@ -283,14 +287,18 @@ class ClaudeCodeAnalyzer:
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
-            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+            raise AnalysisException(
+                f"Failed to parse JSON from Claude output: {e}"
+            ) from e
         except AnalysisException:
             raise
         except Exception as e:
             logger.error(f"Claude Code README analysis failed: {e}")
             raise AnalysisException(str(e)) from e
 
-    def _run_claude_text_analysis(self, prompt: str, input_text: str) -> tuple[str, str]:
+    def _run_claude_text_analysis(
+        self, prompt: str, input_text: str
+    ) -> tuple[str, str]:
         output = ""
         try:
             output = run_command(
@@ -315,7 +323,9 @@ class ClaudeCodeAnalyzer:
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
-            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+            raise AnalysisException(
+                f"Failed to parse JSON from Claude output: {e}"
+            ) from e
         except AnalysisException:
             raise
         except Exception as e:
@@ -370,14 +380,18 @@ class ClaudeCodeAnalyzer:
 
             if not summary or not detail:
                 logger.error("JSON response missing required fields")
-                raise AnalysisException("Invalid JSON response: missing 'summary' or 'detail' field")
+                raise AnalysisException(
+                    "Invalid JSON response: missing 'summary' or 'detail' field"
+                )
 
             return summary, detail
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
-            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+            raise AnalysisException(
+                f"Failed to parse JSON from Claude output: {e}"
+            ) from e
         except AnalysisException:
             raise
         except Exception as e:
@@ -492,14 +506,18 @@ Here is the aggregated report:
 
             if not summary or not detail:
                 logger.error("JSON response missing required fields")
-                raise AnalysisException("Invalid JSON response: missing 'summary' or 'detail' field")
+                raise AnalysisException(
+                    "Invalid JSON response: missing 'summary' or 'detail' field"
+                )
 
             return summary, detail
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Claude output: {e}")
             logger.debug(f"Raw output: {output}")
-            raise AnalysisException(f"Failed to parse JSON from Claude output: {e}") from e
+            raise AnalysisException(
+                f"Failed to parse JSON from Claude output: {e}"
+            ) from e
         except AnalysisException:
             raise
         except Exception as e:
@@ -520,7 +538,7 @@ Here is the aggregated report:
         """
         output = output.strip()
 
-        json_pattern = r'\{[\s\S]*\}'
+        json_pattern = r"\{[\s\S]*\}"
         match = re.search(json_pattern, output)
 
         if match:

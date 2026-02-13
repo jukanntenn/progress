@@ -1,7 +1,5 @@
 import logging
 
-from progress.models import Report
-
 from .base import Storage
 from .db import DBStorage
 
@@ -18,6 +16,8 @@ class CombinedStorage:
         return self._db.report_id
 
     def save(self, title: str, body: str | None) -> str:
+        from progress.db.models import Report
+
         self._db.save(title, body)
         result = self._primary.save(title, body)
 
@@ -26,4 +26,3 @@ class CombinedStorage:
             Report.update(markpost_url=result).where(Report.id == report_id).execute()
 
         return result
-

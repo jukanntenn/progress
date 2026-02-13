@@ -255,7 +255,9 @@ class GitClient:
             diff = old.diff(new, create_patch=True, paths=None)
 
         return "\n".join(
-            d.diff.decode("utf-8", errors="replace") if isinstance(d.diff, bytes) else str(d.diff)
+            d.diff.decode("utf-8", errors="replace")
+            if isinstance(d.diff, bytes)
+            else str(d.diff)
             for d in diff
         )
 
@@ -270,7 +272,9 @@ class GitClient:
         self, repo_path: Path, old_commit: Optional[str], new_commit: str
     ) -> list[tuple[str, str]]:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
-        result = self._run_git_command(["diff", "--name-status", commit_range], repo_path)
+        result = self._run_git_command(
+            ["diff", "--name-status", commit_range], repo_path
+        )
         items: list[tuple[str, str]] = []
         for line in result.splitlines():
             line = line.strip()

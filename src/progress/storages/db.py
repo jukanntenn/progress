@@ -1,7 +1,5 @@
 import logging
 
-from progress.models import Report
-
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +21,8 @@ class DBStorage:
         self.report_id: int | None = None
 
     def save(self, title: str, body: str | None) -> str:
+        from progress.db.models import Report
+
         report = Report.create(
             repo=self._repo_id,
             title=title,
@@ -35,4 +35,3 @@ class DBStorage:
         self.report_id = report.id
         logger.info(f"Report saved: {report.id}")
         return str(report.id)
-

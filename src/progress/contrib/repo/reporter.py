@@ -1,19 +1,19 @@
 """Markdown report generator with i18n support."""
 
-from html import escape
 import logging
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, FileSystemLoader
 
-from .consts import (
+from ...consts import (
     TEMPLATE_AGGREGATED_REPORT,
     TEMPLATE_DISCOVERED_REPOS_REPORT,
     TEMPLATE_REPOSITORY_REPORT,
 )
-from .i18n import gettext as _
+from ...i18n import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class MarkdownReporter:
     def __init__(self):
         """Initialize reporter with i18n support."""
 
-        template_dir = Path(__file__).parent / "templates"
+        template_dir = Path(__file__).parent.parent.parent / "templates"
         self.jinja_env = Environment(
             loader=FileSystemLoader(template_dir),
             autoescape=False,

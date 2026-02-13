@@ -2,8 +2,8 @@
 
 import pytest
 from zoneinfo import ZoneInfo
-from progress.reporter import MarkdownReporter
-from progress.repository import RepositoryReport
+from progress.contrib.repo.reporter import MarkdownReporter
+from progress.contrib.repo.repository import RepositoryReport
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def mock_report():
         previous_commit="def456",
         commit_messages=[
             "<iframe src='https://evil.com'></iframe> Simple commit",
-            "Normal commit without HTML"
+            "Normal commit without HTML",
         ],
         analysis_summary="**Bold** analysis with <strong>HTML</strong>",
         analysis_detail="Detail with <a href='#'>link</a>",
@@ -75,9 +75,7 @@ def test_multiline_commit_with_html_escaped(reporter):
         commit_count=1,
         current_commit="abc123",
         previous_commit="def456",
-        commit_messages=[
-            "First line\n<script>alert('xss')</script>\nThird line"
-        ],
+        commit_messages=["First line\n<script>alert('xss')</script>\nThird line"],
         analysis_summary="Summary",
         analysis_detail="Detail",
         truncated=False,
@@ -101,9 +99,7 @@ def test_special_characters_in_commits(reporter):
         commit_count=1,
         current_commit="abc123",
         previous_commit="def456",
-        commit_messages=[
-            "Commit with &amp; and <tag> and \"quotes\""
-        ],
+        commit_messages=['Commit with &amp; and <tag> and "quotes"'],
         analysis_summary="Summary",
         analysis_detail="Detail",
         truncated=False,

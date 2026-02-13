@@ -4,22 +4,22 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from .config import Config
-from .consts import CMD_GH, GH_MAX_RETRIES, parse_repo_name
-from .db import UTC
-from .enums import Protocol
-from .errors import GitException
-from .github import (
+from ...config import Config
+from ...consts import CMD_GH, GH_MAX_RETRIES
+from ...db import UTC
+from ...db.models import Repository
+from ...enums import Protocol
+from ...errors import GitException
+from ...github import (
     GitClient,
     parse_protocol_from_url,
     resolve_repo_url,
     sanitize_repo_name,
 )
-from .github_client import GitHubClient
-from .models import Repository
-from .utils import get_now, retry, run_command, sanitize
+from ...github_client import GitHubClient
+from ...utils import get_now, retry, run_command, sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class Repo:
     @property
     def slug(self) -> str:
         """Get repository slug (owner/repo)."""
-        from .consts import parse_repo_name
+        from ...consts import parse_repo_name
 
         return parse_repo_name(self.model.url)
 
@@ -216,9 +216,7 @@ class Repo:
         Returns:
             (diff, previous_commit, commit_count, commit_messages, is_range_check=True)
         """
-        previous_commit = self.git.get_nth_commit_from_head(
-            self.repo_path, lookback
-        )
+        previous_commit = self.git.get_nth_commit_from_head(self.repo_path, lookback)
 
         if not previous_commit:
             previous_commit = self.git.get_previous_commit(self.repo_path)
@@ -232,9 +230,7 @@ class Repo:
         commit_count = self.git.get_commit_count(
             self.repo_path, previous_commit, current_commit
         )
-        diff = self.git.get_commit_diff(
-            self.repo_path, previous_commit, current_commit
-        )
+        diff = self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
 
         return diff, previous_commit, commit_count, commit_messages, True
 
@@ -250,17 +246,13 @@ class Repo:
         Returns:
             (diff, previous_commit, commit_count, commit_messages, is_range_check=False)
         """
-        recent_hashes = self.git.get_recent_commit_hashes(
-            self.repo_path, max_count
-        )
+        recent_hashes = self.git.get_recent_commit_hashes(self.repo_path, max_count)
         previous_commit = recent_hashes[-1] if recent_hashes else None
 
         if not previous_commit:
             return None
 
-        commit_messages = self.git.get_recent_commit_messages(
-            self.repo_path, max_count
-        )
+        commit_messages = self.git.get_recent_commit_messages(self.repo_path, max_count)
         commit_count = len(recent_hashes)
         diff = self.git.get_recent_commit_patches(self.repo_path, max_count)
 
@@ -284,9 +276,7 @@ class Repo:
         commit_count = self.git.get_commit_count(
             self.repo_path, previous_commit, current_commit
         )
-        diff = self.git.get_commit_diff(
-            self.repo_path, previous_commit, current_commit
-        )
+        diff = self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
 
         return diff, previous_commit, commit_count, commit_messages, True
 
@@ -296,9 +286,8 @@ class Repo:
         Args:
             current_commit: Current HEAD commit hash
         """
-        from . import db
+        from ...db import database
 
-        database = db.database
         with database.atomic():
             self.model.last_commit_hash = current_commit
             self.model.last_check_time = get_now(UTC)
@@ -311,9 +300,8 @@ class Repo:
             release_tag: Release tag name (e.g., "v5.0.0")
             commit_hash: Commit hash the release tag points to
         """
-        from . import db
+        from ...db import database
 
-        database = db.database
         with database.atomic():
             self.model.last_release_tag = release_tag
             self.model.last_release_commit_hash = commit_hash
@@ -347,27 +335,39 @@ class Repo:
             published_at_str = r.get("publishedAt")
             if published_at_str:
                 try:
-                    published_at = datetime.fromisoformat(published_at_str.replace("Z", "+00:00"))
+                    published_at = datetime.fromisoformat(
+                        published_at_str.replace("Z", "+00:00")
+                    )
                     if last_check_time is None or published_at > last_check_time:
                         try:
-                            commit_hash = self.github_client.get_release_commit(owner, repo_name, r["tagName"])
+                            commit_hash = self.github_client.get_release_commit(
+                                owner, repo_name, r["tagName"]
+                            )
                         except GitException as e:
-                            logger.warning(f"Failed to get commit hash for {r['tagName']}: {e}")
+                            logger.warning(
+                                f"Failed to get commit hash for {r['tagName']}: {e}"
+                            )
                             commit_hash = None
 
                         try:
-                            notes = self.github_client.get_release_body(owner, repo_name, r["tagName"])
+                            notes = self.github_client.get_release_body(
+                                owner, repo_name, r["tagName"]
+                            )
                         except GitException as e:
-                            logger.warning(f"Failed to get release notes for {r['tagName']}: {e}")
+                            logger.warning(
+                                f"Failed to get release notes for {r['tagName']}: {e}"
+                            )
                             notes = ""
 
-                        new_releases.append({
-                            "tag_name": r["tagName"],
-                            "title": r["name"],
-                            "notes": notes,
-                            "published_at": r["publishedAt"],
-                            "commit_hash": commit_hash,
-                        })
+                        new_releases.append(
+                            {
+                                "tag_name": r["tagName"],
+                                "title": r["name"],
+                                "notes": notes,
+                                "published_at": r["publishedAt"],
+                                "commit_hash": commit_hash,
+                            }
+                        )
                 except (ValueError, TypeError):
                     logger.debug(f"Could not parse publishedAt: {published_at_str}")
                     continue
@@ -389,9 +389,7 @@ class Repo:
         Returns:
             List of commit messages
         """
-        return self.git.get_commit_messages(
-            self.repo_path, old_commit, new_commit
-        )
+        return self.git.get_commit_messages(self.repo_path, old_commit, new_commit)
 
     @retry(
         times=GH_MAX_RETRIES,

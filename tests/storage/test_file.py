@@ -35,4 +35,3 @@ def test_file_storage_raises_on_permission_denied(tmp_path):
     storage = FileStorage(readonly_dir)
     with pytest.raises(ProgressException, match="Failed to write report"):
         storage.save("Title", "Body")
-

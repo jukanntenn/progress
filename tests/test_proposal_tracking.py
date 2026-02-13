@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from progress.db import close_db, create_tables, init_db
-from progress.models import EIP, ProposalEvent, ProposalTracker
-from progress.proposal_tracking import ProposalTrackerManager
+from progress.contrib.proposal.models import EIP, ProposalEvent, ProposalTracker
+from progress.contrib.proposal.proposal_tracking import ProposalTrackerManager
 from progress.config import ProposalTrackerConfig
 
 
@@ -105,7 +105,9 @@ created: 2024-01-02
     assert tracker.last_seen_commit == second_commit
 
 
-def test_initial_check_datetime_compare_is_timezone_safe(db, tmp_path: Path, monkeypatch):
+def test_initial_check_datetime_compare_is_timezone_safe(
+    db, tmp_path: Path, monkeypatch
+):
     repo_dir = tmp_path / "proposal-repo-dt"
     repo_dir.mkdir()
     _git(repo_dir, "init")

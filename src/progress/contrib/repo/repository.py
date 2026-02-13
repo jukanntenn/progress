@@ -5,25 +5,23 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from .analyzer import ClaudeCodeAnalyzer
-from .config import Config
-from .consts import parse_repo_name, WORKSPACE_DIR_DEFAULT
-from .db import UTC
-from .enums import Protocol
-from .github import GitClient, normalize_repo_url
-from .github_client import GitHubClient
-from .i18n import gettext as _
-from .models import Repository
-from .reporter import MarkdownReporter
+from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
+from progress.config import Config
+from progress.consts import WORKSPACE_DIR_DEFAULT, parse_repo_name
+from progress.db.models import Repository
+from progress.github import GitClient, normalize_repo_url
+from progress.github_client import GitHubClient
+from progress.i18n import gettext as _
+
 from .repo import Repo
-from .utils import get_now
+from .reporter import MarkdownReporter
 
 logger = logging.getLogger(__name__)
 
 
 def _get_database():
     """Get database instance (lazy import)."""
-    from . import db
+    from ... import db
 
     return db.database
 
@@ -122,10 +120,7 @@ class RepositoryManager:
         self.proxy = config.github.proxy
         self.protocol = config.github.protocol
 
-        self.github_client = GitHubClient(
-            token=self.gh_token,
-            proxy=self.proxy
-        )
+        self.github_client = GitHubClient(token=self.gh_token, proxy=self.proxy)
 
     def sync(self, repos_config: list) -> SyncResult:
         """Sync repository configuration to database.
@@ -217,7 +212,9 @@ class RepositoryManager:
         except Repository.DoesNotExist:
             return None
 
-    def _analyze_all_releases(self, repo_name: str, branch: str, release_data: dict) -> list:
+    def _analyze_all_releases(
+        self, repo_name: str, branch: str, release_data: dict
+    ) -> list:
         """Analyze all releases individually.
 
         Args:
@@ -231,7 +228,12 @@ class RepositoryManager:
         from datetime import datetime
 
         releases = release_data["releases"]
-        releases.sort(key=lambda r: datetime.fromisoformat(r["published_at"].replace("Z", "+00:00")), reverse=True)
+        releases.sort(
+            key=lambda r: datetime.fromisoformat(
+                r["published_at"].replace("Z", "+00:00")
+            ),
+            reverse=True,
+        )
 
         analyzed_releases = []
 
@@ -254,20 +256,28 @@ class RepositoryManager:
                     repo_name, branch, single_release_data
                 )
             except Exception as e:
-                self.logger.warning(f"Failed to analyze release {release['tag_name']}: {e}")
-                summary = _("**AI analysis unavailable for {tag_name}**").format(tag_name=release['tag_name'])
-                detail = _("**Release Information:**\n\n- **Tag:** {tag_name}\n- **Name:** {name}\n- **Published:** {published}\n\n{notes}").format(
-                    tag_name=release['tag_name'],
-                    name=release.get('title', release['tag_name']),
-                    published=release.get('published_at', 'unknown'),
-                    notes=release.get('notes', '')
+                self.logger.warning(
+                    f"Failed to analyze release {release['tag_name']}: {e}"
+                )
+                summary = _("**AI analysis unavailable for {tag_name}**").format(
+                    tag_name=release["tag_name"]
+                )
+                detail = _(
+                    "**Release Information:**\n\n- **Tag:** {tag_name}\n- **Name:** {name}\n- **Published:** {published}\n\n{notes}"
+                ).format(
+                    tag_name=release["tag_name"],
+                    name=release.get("title", release["tag_name"]),
+                    published=release.get("published_at", "unknown"),
+                    notes=release.get("notes", ""),
                 )
 
-            analyzed_releases.append({
-                **release,
-                "ai_summary": summary,
-                "ai_detail": detail,
-            })
+            analyzed_releases.append(
+                {
+                    **release,
+                    "ai_summary": summary,
+                    "ai_detail": detail,
+                }
+            )
 
         return analyzed_releases
 
@@ -300,8 +310,12 @@ class RepositoryManager:
         release_data = repo_obj.check_releases()
         if release_data:
             try:
-                self.logger.info(f"Found {len(release_data['releases'])} new releases, analyzing...")
-                releases_list = self._analyze_all_releases(str(repo.name), str(repo.branch), release_data)
+                self.logger.info(
+                    f"Found {len(release_data['releases'])} new releases, analyzing..."
+                )
+                releases_list = self._analyze_all_releases(
+                    str(repo.name), str(repo.branch), release_data
+                )
 
                 latest = release_data["releases"][0]
                 commit_hash = latest.get("commit_hash")
@@ -335,8 +349,14 @@ class RepositoryManager:
             if diff.strip():
                 self.logger.info(f"Found {commit_count} new commits")
                 self.logger.info("Analyzing code changes...")
-                analysis_summary, analysis_detail, truncated, original_length, analyzed_length = (
-                    self.analyzer.analyze_diff(str(repo.name), str(repo.branch), diff, commit_messages)
+                (
+                    analysis_summary,
+                    analysis_detail,
+                    truncated,
+                    original_length,
+                    analyzed_length,
+                ) = self.analyzer.analyze_diff(
+                    str(repo.name), str(repo.branch), diff, commit_messages
                 )
                 current_commit = repo_obj.get_current_commit()
                 repo_obj.update(current_commit)

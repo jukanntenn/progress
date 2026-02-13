@@ -3,12 +3,10 @@
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-
 from progress.config import Config
+from progress.contrib.repo.repo import Repo
+from progress.db.models import Repository
 from progress.github import GitClient
-from progress.models import Repository
-from progress.repo import Repo
 
 
 class TestRepo:
@@ -107,7 +105,9 @@ class TestRepo:
         repo = Repo(model, git, config)
         result = repo.get_current_commit()
 
-        git.get_current_commit.assert_called_once_with(Path("/tmp/workspace/owner_repo"))
+        git.get_current_commit.assert_called_once_with(
+            Path("/tmp/workspace/owner_repo")
+        )
         assert result == "def456"
 
     def test_get_diff_no_new_commits(self):
@@ -264,7 +264,7 @@ class TestRepo:
 
         repo = Repo(model, git, config)
 
-        with patch("progress.db") as mock_db_module:
+        with patch("progress.db.database") as mock_db_module:
             mock_database = MagicMock()
             mock_db_module.database = mock_database
 

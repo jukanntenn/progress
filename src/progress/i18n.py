@@ -36,7 +36,7 @@ def initialize(ui_language: str = "en") -> None:
 
 def _get_translation() -> gettext_module.GNUTranslations:
     """Get UI translation (thread-safe with lazy initialization)."""
-    if not hasattr(_thread_local, 'translation'):
+    if not hasattr(_thread_local, "translation"):
         _thread_local.translation = _load_translation(_ui_language)
     return _thread_local.translation
 

@@ -22,4 +22,3 @@ class FileStorage:
             raise ProgressException(f"Failed to write report to {path}: {e}") from e
 
         return str(path.resolve())
-

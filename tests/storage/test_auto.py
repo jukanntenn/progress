@@ -23,4 +23,3 @@ def test_auto_storage_falls_back_to_file_when_markpost_missing():
         auto = AutoStorage(mock_config, default_directory="x")
         auto.save("Title", "Body")
         storage_cls.assert_called_once_with("x")
-

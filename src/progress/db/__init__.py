@@ -4,28 +4,18 @@ import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from peewee import BooleanField, CharField, DateTimeField
+from peewee import CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
-from .config import Config
-from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
-from .migration_add_owner_monitoring import apply as migrate_owner_monitoring
-from .models import (
-    ChangelogTracker,
-    DjangoDEP,
-    DiscoveredRepository,
-    EIP,
-    GitHubOwner,
-    PEP,
-    ProposalEvent,
-    ProposalTracker,
+from progress.config import Config
+from progress.consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
+from progress.db.models import (
     Report,
     Repository,
-    RustRFC,
     database_proxy,
 )
-from .storages import get_storage
+from progress.storages import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +47,10 @@ def init_db(db_path: str):
 
 def migrate_database():
     """Migrate database schema to latest version."""
+    from progress.db.migration_add_owner_monitoring import (
+        apply as migrate_owner_monitoring,
+    )
+
     migrator = SqliteMigrator(database)
 
     migrate_owner_monitoring(database)
@@ -128,9 +122,27 @@ def migrate_database():
         logger.info("Migration completed: release tracking columns added")
 
 
+def close_db():
+    """Close database connection."""
+    global database
+    if database:
+        database.close()
+        logger.info("Database connection closed")
+
 
 def create_tables():
     """Create database tables and migrate schema."""
+    from progress.contrib.changelog.models import ChangelogTracker
+    from progress.contrib.proposal.models import (
+        EIP,
+        PEP,
+        DjangoDEP,
+        ProposalEvent,
+        ProposalTracker,
+        RustRFC,
+    )
+    from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
+
     database.create_tables(
         [
             Repository,
@@ -150,14 +162,6 @@ def create_tables():
     migrate_database()
 
     logger.info("Database tables created")
-
-
-def close_db():
-    """Close database connection."""
-    global database
-    if database:
-        database.close()
-        logger.info("Database connection closed")
 
 
 def save_report(

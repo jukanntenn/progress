@@ -1,6 +1,6 @@
 """Analyzer module unit tests"""
 
-from progress.analyzer import ClaudeCodeAnalyzer
+from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 
 
 def test_generate_title_and_summary_prompt_includes_language_requirement(monkeypatch):
@@ -12,7 +12,7 @@ def test_generate_title_and_summary_prompt_includes_language_requirement(monkeyp
         captured["cmd"] = cmd
         return "TITLE: 标题\nSUMMARY: 摘要\n"
 
-    monkeypatch.setattr("progress.analyzer.run_command", fake_run)
+    monkeypatch.setattr("progress.ai.analyzers.claude_code.run_command", fake_run)
 
     title, summary = analyzer.generate_title_and_summary("report")
     assert title == "标题"
@@ -31,7 +31,7 @@ def test_generate_title_and_summary_uses_fallback_when_missing_fields(monkeypatc
     def fake_run(cmd, cwd=None, timeout=None, check=True, input=None, env=None):
         return "SUMMARY: only summary\n"
 
-    monkeypatch.setattr("progress.analyzer.run_command", fake_run)
+    monkeypatch.setattr("progress.ai.analyzers.claude_code.run_command", fake_run)
 
     title, summary = analyzer.generate_title_and_summary("report")
     assert title == "Progress Report for Open Source Projects"

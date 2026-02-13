@@ -7,7 +7,7 @@ import pytest
 
 from progress.github import sanitize_repo_name, GitClient, resolve_repo_url
 from progress.enums import Protocol
-from progress.repository import RepositoryManager
+from progress.contrib.repo.repository import RepositoryManager
 from progress.errors import CommandException, GitException
 
 
@@ -66,13 +66,14 @@ def test_git_client_initialization():
 
 def test_git_client_get_current_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     mock_repo = SimpleNamespace(
-        head=SimpleNamespace(
-            commit=SimpleNamespace(hexsha="abc123def456")
-        )
+        head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123def456"))
     )
+
     def fake_repo_open(path):
         return mock_repo
+
     monkeypatch.setattr("git.Repo", fake_repo_open)
     client = GitClient("/tmp/test_workspace")
     commit = client.get_current_commit(Path("/tmp/test_workspace/test_repo"))
@@ -81,13 +82,11 @@ def test_git_client_get_current_commit_with_gitpython(monkeypatch):
 
 def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     mock_commit = SimpleNamespace(hexsha="def456")
     mock_repo = SimpleNamespace(
         head=SimpleNamespace(
-            commit=SimpleNamespace(
-                hexsha="abc123",
-                parents=[mock_commit]
-            )
+            commit=SimpleNamespace(hexsha="abc123", parents=[mock_commit])
         )
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
@@ -97,13 +96,9 @@ def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
 
 def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     mock_repo = SimpleNamespace(
-        head=SimpleNamespace(
-            commit=SimpleNamespace(
-                hexsha="abc123",
-                parents=[]
-            )
-        )
+        head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123", parents=[]))
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
@@ -112,6 +107,7 @@ def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
 
 def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     mock_commit1 = SimpleNamespace(message="First commit\n\nDetails here")
     mock_commit2 = SimpleNamespace(message="Second commit")
 
@@ -123,11 +119,13 @@ def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
     mock_repo = SimpleNamespace(
         head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123")),
         commit=mock_commit_fn,
-        iter_commits=lambda rev_range: [mock_commit2, mock_commit1]
+        iter_commits=lambda rev_range: [mock_commit2, mock_commit1],
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    messages = client.get_commit_messages(Path("/tmp/test_workspace"), "old123", "abc123")
+    messages = client.get_commit_messages(
+        Path("/tmp/test_workspace"), "old123", "abc123"
+    )
     assert len(messages) == 2
     assert messages[0] == "Second commit"
     assert messages[1] == "First commit\n\nDetails here"
@@ -144,7 +142,7 @@ def test_git_client_get_commit_count_with_gitpython(monkeypatch):
     mock_repo = SimpleNamespace(
         head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123")),
         commit=mock_commit_fn,
-        iter_commits=lambda rev_range: range(5)
+        iter_commits=lambda rev_range: range(5),
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
@@ -154,6 +152,7 @@ def test_git_client_get_commit_count_with_gitpython(monkeypatch):
 
 def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     mock_repo = SimpleNamespace(
         head=SimpleNamespace(commit=SimpleNamespace(hexsha="abc123"))
     )
@@ -165,6 +164,7 @@ def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
 
 def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
     from types import SimpleNamespace
+
     expected_diff = "@@ file1.py @@\n+new line\n-old line"
     mock_diff = SimpleNamespace(diff=expected_diff)
     mock_repo = SimpleNamespace(
@@ -172,9 +172,9 @@ def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
         head=SimpleNamespace(
             commit=SimpleNamespace(
                 hexsha="abc123",
-                parents=[SimpleNamespace(diff=lambda *a, **k: [mock_diff])]
+                parents=[SimpleNamespace(diff=lambda *a, **k: [mock_diff])],
             )
-        )
+        ),
     )
 
     def fake_repo_diff(old, new, **kwargs):
@@ -194,8 +194,7 @@ def test_git_client_fetch_and_reset_with_gitpython(monkeypatch, tmp_path):
     mock_remote = Mock()
     mock_head = SimpleNamespace(reset=Mock())
     mock_repo = SimpleNamespace(
-        remotes=SimpleNamespace(origin=mock_remote),
-        head=mock_head
+        remotes=SimpleNamespace(origin=mock_remote), head=mock_head
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
 
@@ -303,10 +302,11 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
+
         def fake_clone_or_update(self):
             pass
 
-        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
         assert manager.check(repo) is None
 
 
@@ -363,14 +363,15 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
+
         def fake_clone_or_update(self):
             pass
 
         def fake_update(self, current_commit):
             pass
 
-        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
-        m.setattr("progress.repo.Repo.update", fake_update)
+        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None
         assert report.previous_commit == "b" * 40
@@ -430,14 +431,15 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
+
         def fake_clone_or_update(self):
             pass
 
         def fake_update(self, current_commit):
             pass
 
-        m.setattr("progress.repo.Repo.clone_or_update", fake_clone_or_update)
-        m.setattr("progress.repo.Repo.update", fake_update)
+        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None
         assert report.previous_commit == "o" * 40
@@ -476,7 +478,9 @@ class TestParseRepoName:
         from progress.consts import parse_repo_name
 
         result = parse_repo_name(input_url)
-        assert result == expected, f"Failed for {input_url}: got {result}, expected {expected}"
+        assert result == expected, (
+            f"Failed for {input_url}: got {result}, expected {expected}"
+        )
 
     def test_parse_repo_name_openlist_regression(self):
         """Regression test for OpenList -> OpenLis bug."""

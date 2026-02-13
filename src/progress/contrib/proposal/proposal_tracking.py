@@ -1,20 +1,19 @@
-import logging
-import os
-import shutil
 import fnmatch
+import logging
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .analyzer import ClaudeCodeAnalyzer
-from .config import Config, ProposalTrackerConfig
-from .enums import ProposalEventType
-from .errors import AnalysisException, GitException, ProposalParseError
-from .github import GitClient, sanitize_repo_name
-from .models import DjangoDEP, EIP, PEP, ProposalEvent, ProposalTracker, RustRFC
-from .utils import get_now, run_command
+from ...ai.analyzers.claude_code import ClaudeCodeAnalyzer
+from ...config import Config, ProposalTrackerConfig
+from .models import EIP, PEP, DjangoDEP, ProposalEvent, ProposalTracker, RustRFC
+from ...enums import ProposalEventType
+from ...errors import AnalysisException, GitException, ProposalParseError
+from ...github import GitClient, sanitize_repo_name
+from ...utils import get_now, run_command
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,13 @@ class ProposalTrackerManager:
                     updated += 1
 
         for tr in existing:
-            key = (tr.tracker_type, tr.repo_url, tr.branch, tr.proposal_dir, tr.file_pattern)
+            key = (
+                tr.tracker_type,
+                tr.repo_url,
+                tr.branch,
+                tr.proposal_dir,
+                tr.file_pattern,
+            )
             if key not in desired:
                 tr.delete_instance()
                 deleted += 1
@@ -154,7 +159,9 @@ class ProposalTrackerManager:
                 except Exception as e:
                     logger.warning(f"Proposal tracker check failed for {t_key}: {e}")
                     tracker_statuses[t_key] = "failed"
-            return ProposalCheckAllResult(events=events, tracker_statuses=tracker_statuses)
+            return ProposalCheckAllResult(
+                events=events, tracker_statuses=tracker_statuses
+            )
 
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = {executor.submit(self.check, t): t for t in trackers}
@@ -179,7 +186,12 @@ class ProposalTrackerManager:
         current_commit = self.git.get_current_commit(repo_path)
         old_commit = tracker.last_seen_commit
 
-        from .proposal_parsers import DjangoDEPParser, EIPParser, PEPParser, RustRFCParser
+        from .proposal_parsers import (
+            DjangoDEPParser,
+            EIPParser,
+            PEPParser,
+            RustRFCParser,
+        )
 
         parser = {
             "eip": EIPParser(),
@@ -191,7 +203,9 @@ class ProposalTrackerManager:
             raise ValueError(f"Unknown tracker type: {tracker.tracker_type}")
 
         if not old_commit:
-            result = self._handle_initial_check(tracker, parser, repo_path, current_commit)
+            result = self._handle_initial_check(
+                tracker, parser, repo_path, current_commit
+            )
             tracker.last_check_time = get_now(self.cfg.get_timezone())
             if result.parsed_files > 0:
                 tracker.last_seen_commit = current_commit
@@ -203,7 +217,9 @@ class ProposalTrackerManager:
             tracker.save()
             return []
 
-        changes = self.git.get_changed_file_statuses(repo_path, old_commit, current_commit)
+        changes = self.git.get_changed_file_statuses(
+            repo_path, old_commit, current_commit
+        )
         proposal_files = self._filter_proposal_files(tracker, changes)
         reports: list[ProposalEventReport] = []
 
@@ -317,7 +333,9 @@ class ProposalTrackerManager:
 
         for e in events:
             if e.event_type == ProposalEventType.CONTENT_MODIFIED.value:
-                diff_text = self.git.get_file_diff(repo_path, old_commit, new_commit, rel_path)
+                diff_text = self.git.get_file_diff(
+                    repo_path, old_commit, new_commit, rel_path
+                )
                 sections = self._extract_changed_sections(diff_text)
                 e.metadata["changed_sections"] = sections
                 e.metadata["file_path"] = rel_path
@@ -398,7 +416,9 @@ class ProposalTrackerManager:
         for p in base.rglob("*"):
             if not p.is_file():
                 continue
-            if tracker.file_pattern and not parser.matches_pattern(str(p), tracker.file_pattern):
+            if tracker.file_pattern and not parser.matches_pattern(
+                str(p), tracker.file_pattern
+            ):
                 continue
             matches.append(p)
 
@@ -421,7 +441,9 @@ class ProposalTrackerManager:
 
             parsed_files += 1
 
-            existing = self._get_existing_proposal_model(tracker.tracker_type, data.number)
+            existing = self._get_existing_proposal_model(
+                tracker.tracker_type, data.number
+            )
             self._upsert_proposal_model(
                 tracker.tracker_type,
                 existing,
@@ -442,9 +464,9 @@ class ProposalTrackerManager:
                 created_dt = created_dt.replace(tzinfo=utc)
 
             created_cmp = created_dt or datetime.min.replace(tzinfo=utc)
-            latest_cmp = (latest[0] if latest and latest[0] else None) or datetime.min.replace(
-                tzinfo=utc
-            )
+            latest_cmp = (
+                latest[0] if latest and latest[0] else None
+            ) or datetime.min.replace(tzinfo=utc)
 
             if latest is None or (created_cmp > latest_cmp):
                 latest = (created_dt, p)
@@ -453,7 +475,9 @@ class ProposalTrackerManager:
             logger.warning(
                 f"Initial proposal check found no parsable proposals ({tracker_key}): matched={len(matches)} parsed=0"
             )
-            return InitialCheckResult(reports=[], matched_files=len(matches), parsed_files=0)
+            return InitialCheckResult(
+                reports=[], matched_files=len(matches), parsed_files=0
+            )
 
         latest_rel_path = str(latest[1].relative_to(repo_path))
         try:
@@ -462,7 +486,9 @@ class ProposalTrackerManager:
             logger.warning(
                 f"Initial proposal check could not parse selected example ({tracker_key}): {latest_rel_path}"
             )
-            return InitialCheckResult(reports=[], matched_files=len(matches), parsed_files=parsed_files)
+            return InitialCheckResult(
+                reports=[], matched_files=len(matches), parsed_files=parsed_files
+            )
 
         model = self._get_existing_proposal_model(tracker.tracker_type, data.number)
         model = self._upsert_proposal_model(
@@ -526,20 +552,29 @@ class ProposalTrackerManager:
             parsed_files=parsed_files,
         )
 
-
-    def _handle_deleted_proposal(self, tracker: ProposalTracker, rel_path: str, new_commit: str):
+    def _handle_deleted_proposal(
+        self, tracker: ProposalTracker, rel_path: str, new_commit: str
+    ):
         proposal_number = None
         try:
-            proposal_number = self._extract_number_from_path(tracker.tracker_type, rel_path)
+            proposal_number = self._extract_number_from_path(
+                tracker.tracker_type, rel_path
+            )
         except Exception:
             return []
 
-        existing = self._get_existing_proposal_model(tracker.tracker_type, proposal_number)
+        existing = self._get_existing_proposal_model(
+            tracker.tracker_type, proposal_number
+        )
         if not existing:
             return []
 
         old_status = getattr(existing, "status", None)
-        if old_status and str(old_status).strip().lower() in {"draft", "deferred", "proposed"}:
+        if old_status and str(old_status).strip().lower() in {
+            "draft",
+            "deferred",
+            "proposed",
+        }:
             new_status = "Withdrawn"
             existing.status = new_status
             existing.save()
@@ -575,7 +610,12 @@ class ProposalTrackerManager:
         ]
 
     def _extract_number_from_path(self, tracker_type: str, rel_path: str) -> int:
-        from .proposal_parsers import DjangoDEPParser, EIPParser, PEPParser, RustRFCParser
+        from .proposal_parsers import (
+            DjangoDEPParser,
+            EIPParser,
+            PEPParser,
+            RustRFCParser,
+        )
 
         parser = {
             "eip": EIPParser(),

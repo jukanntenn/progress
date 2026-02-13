@@ -3,6 +3,7 @@
 import os
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from progress.config import Config, RepositoryConfig, StorageType
@@ -22,7 +23,11 @@ def temp_config_file():
 
 def get_notification_channel(config: Config, channel_type: str):
     return next(
-        (channel for channel in config.notification.channels if channel.type == channel_type),
+        (
+            channel
+            for channel in config.notification.channels
+            if channel.type == channel_type
+        ),
         None,
     )
 
@@ -52,7 +57,9 @@ gh_token = "ghp_test_token_12345"
     assert str(config.markpost.url) == "https://markpost.example.com/p/test-key"
     feishu = get_notification_channel(config, "feishu")
     assert feishu is not None
-    assert str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+    assert (
+        str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+    )
     assert config.github.gh_token == "ghp_test_token_12345"
 
     # Verify optional config item defaults
@@ -138,7 +145,9 @@ protocol = "https"
     assert str(config.markpost.url) == "https://markpost.example.com/p/file-key"
     feishu = get_notification_channel(config, "feishu")
     assert feishu is not None
-    assert str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/file"
+    assert (
+        str(feishu.webhook_url) == "https://open.feishu.cn/open-apis/bot/v2/hook/file"
+    )
 
 
 def test_config_file_not_found():

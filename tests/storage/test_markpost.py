@@ -12,4 +12,3 @@ def test_markpost_storage_uploads_and_returns_url():
 
     assert result == "https://example.com/p/123"
     client.upload.assert_called_once_with("Body", title="Title")
-

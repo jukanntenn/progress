@@ -4,13 +4,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from progress.analyzer import ClaudeCodeAnalyzer
+from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from progress.config import Config
 from progress.github import GitClient
 from progress.github_client import GitHubClient
-from progress.models import Repository
-from progress.reporter import MarkdownReporter
-from progress.repository import RepositoryManager
+from progress.db.models import Repository
+from progress.contrib.repo.reporter import MarkdownReporter
+from progress.contrib.repo.repository import RepositoryManager
 
 
 class TestRepositoryManager:
@@ -44,8 +44,8 @@ class TestRepositoryManager:
     @pytest.fixture
     def repo_manager(self, mock_analyzer, mock_reporter, mock_config):
         """Create RepositoryManager instance"""
-        with patch("progress.repository.GitClient"):
-            with patch("progress.repository.GitHubClient"):
+        with patch("progress.contrib.repo.repository.GitClient"):
+            with patch("progress.contrib.repo.repository.GitHubClient"):
                 manager = RepositoryManager(mock_analyzer, mock_reporter, mock_config)
                 return manager
 
@@ -152,7 +152,9 @@ class TestRepositoryManager:
             ]
         }
 
-        repo_manager.analyzer.analyze_releases.side_effect = Exception("AI service unavailable")
+        repo_manager.analyzer.analyze_releases.side_effect = Exception(
+            "AI service unavailable"
+        )
 
         result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
 

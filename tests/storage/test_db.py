@@ -7,7 +7,7 @@ def test_db_storage_creates_report_and_returns_id():
     mock_report = Mock()
     mock_report.id = 123
 
-    with patch("progress.storages.db.Report") as report_model:
+    with patch("progress.db.models.Report") as report_model:
         report_model.create.return_value = mock_report
 
         storage = DBStorage(
@@ -22,4 +22,3 @@ def test_db_storage_creates_report_and_returns_id():
         assert result == "123"
         assert storage.report_id == 123
         report_model.create.assert_called_once()
-

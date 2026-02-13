@@ -1,19 +1,21 @@
 """Markpost client module for publishing content."""
 
 import logging
-from urllib.parse import urlparse
 from typing import NoReturn, Optional
+from urllib.parse import urlparse
 
 import requests
 
-from .config import MarkpostConfig
-from .errors import ClientError, ProgressException
-from .utils import retry, sanitize
+from progress.config import MarkpostConfig
+from progress.errors import ClientError, ProgressException
+from progress.utils import retry, sanitize
 
 logger = logging.getLogger(__name__)
 
 
-def _handle_request_exception(exception: requests.RequestException, operation: str) -> NoReturn:
+def _handle_request_exception(
+    exception: requests.RequestException, operation: str
+) -> NoReturn:
     """Handle RequestException by logging and raising ProgressException.
 
     Args:
@@ -23,10 +25,8 @@ def _handle_request_exception(exception: requests.RequestException, operation: s
     Raises:
         ProgressException: Always raises with formatted error message
     """
-    status_code = getattr(exception.response, 'status_code', 'N/A')
-    logger.error(
-        f"Failed to {operation}: status_code={status_code}"
-    )
+    status_code = getattr(exception.response, "status_code", "N/A")
+    logger.error(f"Failed to {operation}: status_code={status_code}")
     raise ProgressException(
         f"Failed to {operation} (status: {status_code})"
     ) from exception
@@ -48,13 +48,15 @@ class MarkpostClient:
         parsed_url = urlparse(full_url)
 
         if not parsed_url.scheme or not parsed_url.netloc:
-            raise ProgressException("Invalid markpost URL format: missing scheme or netloc")
+            raise ProgressException(
+                "Invalid markpost URL format: missing scheme or netloc"
+            )
 
-        path = parsed_url.path.rstrip('/')
+        path = parsed_url.path.rstrip("/")
         if not path:
             raise ProgressException("Invalid markpost URL: missing path")
 
-        parts = path.split('/')
+        parts = path.split("/")
         if len(parts) < 2:
             raise ProgressException("Invalid markpost URL: path too short")
 
@@ -74,7 +76,11 @@ class MarkpostClient:
 
     @staticmethod
     def _check_http_status(_args, _kwargs, error, _attempt):
-        status_code = getattr(error.response, 'status_code', None) if hasattr(error, 'response') else None
+        status_code = (
+            getattr(error.response, "status_code", None)
+            if hasattr(error, "response")
+            else None
+        )
         if status_code and 400 <= status_code < 500:
             raise ClientError(f"Client error {status_code}: not retrying") from error
 
@@ -83,7 +89,9 @@ class MarkpostClient:
         initial_delay=5,
         backoff="exponential",
         exceptions=(requests.RequestException,),
-        on_retry=lambda args, kwargs, error, attempt: MarkpostClient._check_http_status(args, kwargs, error, attempt),
+        on_retry=lambda args, kwargs, error, attempt: MarkpostClient._check_http_status(
+            args, kwargs, error, attempt
+        ),
     )
     def upload(self, content: str, title: Optional[str] = None) -> str:
         """Upload content to Markpost and return the published URL.
@@ -212,12 +220,12 @@ class MarkpostClient:
             'https://example.com/p/se***ey'
         """
         parsed = urlparse(url)
-        path = parsed.path.rstrip('/')
+        path = parsed.path.rstrip("/")
 
         if path:
-            parts = path.split('/')
+            parts = path.split("/")
             if len(parts) >= 2:
                 parts[-1] = sanitize(parts[-1])
-                path = '/'.join(parts)
+                path = "/".join(parts)
 
         return f"{parsed.scheme}://{parsed.netloc}{path}"

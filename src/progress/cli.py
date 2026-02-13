@@ -1,29 +1,29 @@
 """CLI main entry point."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .analyzer import ClaudeCodeAnalyzer
-from .changelog_tracker import ChangelogTrackerManager
+from .ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from .config import Config
 from .consts import DATABASE_PATH
+from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
+from .contrib.proposal.proposal_tracking import ProposalTrackerManager
+from .contrib.repo.owner import OwnerManager
+from .contrib.repo.reporter import MarkdownReporter
+from .contrib.repo.repository import RepositoryManager
 from .db import close_db, create_tables, init_db, save_report
+from .db.models import DiscoveredRepository, Repository
 from .errors import ProgressException
 from .i18n import gettext as _
 from .i18n import initialize
 from .log import setup as setup_log
-from .markpost import MarkpostClient
-from .models import DiscoveredRepository, Repository
 from .notification import NotificationConfig, create_channel, create_message
-from .owner import OwnerManager
-from .proposal_tracking import ProposalTrackerManager
-from .reporter import MarkdownReporter
-from .repository import RepositoryManager
 from .utils import get_now
+from .utils.markpost import MarkpostClient
 from .web import create_app
 
 logger = logging.getLogger(__name__)
@@ -353,9 +353,7 @@ def _send_entity_notification(
 
     # Sort newest-first
     sorted_repos = sorted(
-        new_repos,
-        key=lambda r: r.get("created_at") or datetime.min,
-        reverse=True
+        new_repos, key=lambda r: r.get("created_at") or datetime.min, reverse=True
     )
 
     # Enrich with AI analysis from database
@@ -469,9 +467,7 @@ def _send_proposal_event_notification(
         summary = f"{len(events)} proposal events"
 
     markpost_url = markpost_client.upload(report_content, title=title)
-    repo_statuses = {
-        f"{e.tracker_type}#{e.proposal_number}": "success" for e in events
-    }
+    repo_statuses = {f"{e.tracker_type}#{e.proposal_number}": "success" for e in events}
     send_notification(
         notification_config,
         title=title,
@@ -509,8 +505,9 @@ def _send_changelog_update_notification(
 
     total_new_versions = sum(len(u.new_entries) for u in updates)
     parts = [f"{u.name} ({len(u.new_entries)})" for u in updates]
-    summary = f"{len(updates)} trackers updated, {total_new_versions} new versions: " + ", ".join(
-        parts[:10]
+    summary = (
+        f"{len(updates)} trackers updated, {total_new_versions} new versions: "
+        + ", ".join(parts[:10])
     )
     if len(parts) > 10:
         summary += f", ... and {len(parts) - 10} more"
@@ -569,8 +566,8 @@ def _run_check_command(config: str, trackers_only: bool = False):
 
         initialize(ui_language=cfg.language)
 
-        markpost_client, repo_manager, proposal_manager, reporter = initialize_components(
-            cfg
+        markpost_client, repo_manager, proposal_manager, reporter = (
+            initialize_components(cfg)
         )
 
         try:
@@ -641,7 +638,9 @@ def _run_check_command(config: str, trackers_only: bool = False):
                 concurrency=cfg.analysis.concurrency,
             )
             high_priority = [
-                e for e in tracker_result.events if proposal_manager.is_high_priority_event(e.event_type)
+                e
+                for e in tracker_result.events
+                if proposal_manager.is_high_priority_event(e.event_type)
             ]
             if high_priority:
                 _send_proposal_event_notification(
@@ -663,11 +662,17 @@ def _run_check_command(config: str, trackers_only: bool = False):
         new_repos = owner_manager.check_all()
         if new_repos:
             for repo_info in new_repos:
-                if not repo_info.get("has_readme") or not repo_info.get("readme_content"):
+                if not repo_info.get("has_readme") or not repo_info.get(
+                    "readme_content"
+                ):
                     continue
 
                 try:
-                    repo_name = repo_info.get("name_with_owner") or repo_info.get("repo_name") or ""
+                    repo_name = (
+                        repo_info.get("name_with_owner")
+                        or repo_info.get("repo_name")
+                        or ""
+                    )
                     description = repo_info.get("description") or ""
                     readme_content = repo_info.get("readme_content") or ""
 
@@ -731,7 +736,9 @@ def track_proposals(ctx):
             concurrency=cfg.analysis.concurrency,
         )
         high_priority = [
-            e for e in result.events if proposal_manager.is_high_priority_event(e.event_type)
+            e
+            for e in result.events
+            if proposal_manager.is_high_priority_event(e.event_type)
         ]
         if high_priority:
             _send_proposal_event_notification(
@@ -775,7 +782,7 @@ def list_proposals(ctx, proposal_type: str | None):
         init_db(DATABASE_PATH)
         create_tables()
 
-        from .models import DjangoDEP, EIP, PEP, RustRFC
+        from .db.models import EIP, PEP, DjangoDEP, RustRFC
 
         rows: list[str] = []
         if proposal_type in (None, "eip"):
@@ -815,7 +822,7 @@ def list_proposal_events(ctx, proposal_type: str, number: int):
         init_db(DATABASE_PATH)
         create_tables()
 
-        from .models import DjangoDEP, EIP, PEP, ProposalEvent, RustRFC
+        from .models import EIP, PEP, DjangoDEP, ProposalEvent, RustRFC
 
         proposal = None
         if proposal_type == "eip":

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .errors import ProposalParseError
+from progress.errors import ProposalParseError
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,9 @@ class ProposalData:
 
     @property
     def content_hash(self) -> str:
-        return hashlib.sha256(self.full_text.encode("utf-8", errors="ignore")).hexdigest()
+        return hashlib.sha256(
+            self.full_text.encode("utf-8", errors="ignore")
+        ).hexdigest()
 
 
 class ProposalParser(ABC):
@@ -37,7 +39,9 @@ class ProposalParser(ABC):
     def get_proposal_number(self, file_path: str) -> int: ...
 
     @abstractmethod
-    def compare(self, old: ProposalData | None, new: ProposalData) -> dict[str, bool]: ...
+    def compare(
+        self, old: ProposalData | None, new: ProposalData
+    ) -> dict[str, bool]: ...
 
     @abstractmethod
     def matches_pattern(self, file_path: str, pattern: str) -> bool: ...
@@ -120,7 +124,7 @@ def _parse_yaml_frontmatter(text: str) -> dict[str, str]:
             current_list = []
             continue
 
-        value = value.strip('"\'')
+        value = value.strip("\"'")
         data[key] = value
 
     if current_key and current_list:
@@ -215,7 +219,9 @@ class EIPParser(ProposalParser):
         name = Path(file_path).name
         m = re.search(r"(?:eip|erc)-(\d+)\.md$", name, flags=re.IGNORECASE)
         if not m:
-            raise ProposalParseError(f"Could not extract EIP number from filename: {name}")
+            raise ProposalParseError(
+                f"Could not extract EIP number from filename: {name}"
+            )
         return int(m.group(1))
 
     def compare(self, old: ProposalData | None, new: ProposalData) -> dict[str, bool]:
@@ -279,7 +285,9 @@ class PEPParser(ProposalParser):
         name = Path(file_path).name
         m = re.search(r"pep-(\d+)\.rst$", name, flags=re.IGNORECASE)
         if not m:
-            raise ProposalParseError(f"Could not extract PEP number from filename: {name}")
+            raise ProposalParseError(
+                f"Could not extract PEP number from filename: {name}"
+            )
         return int(m.group(1))
 
     def compare(self, old: ProposalData | None, new: ProposalData) -> dict[str, bool]:
@@ -337,7 +345,9 @@ class RustRFCParser(ProposalParser):
         name = Path(file_path).name
         m = re.match(r"^(\d+)", name)
         if not m:
-            raise ProposalParseError(f"Could not extract RFC number from filename: {name}")
+            raise ProposalParseError(
+                f"Could not extract RFC number from filename: {name}"
+            )
         return int(m.group(1))
 
     def compare(self, old: ProposalData | None, new: ProposalData) -> dict[str, bool]:
@@ -409,7 +419,9 @@ class DjangoDEPParser(ProposalParser):
         name = Path(file_path).stem
         m = re.search(r"(\d+)", name)
         if not m:
-            raise ProposalParseError(f"Could not extract DEP number from filename: {name}")
+            raise ProposalParseError(
+                f"Could not extract DEP number from filename: {name}"
+            )
         return int(m.group(1))
 
     def compare(self, old: ProposalData | None, new: ProposalData) -> dict[str, bool]:
