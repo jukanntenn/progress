@@ -11,11 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class AutoStorage:
-    def __init__(
-        self, config: Config, *, default_directory: str | Path = "data/reports"
-    ) -> None:
+    def __init__(self, config: Config) -> None:
         self._config = config
-        self._default_directory = default_directory
         self._storage = self._create_storage()
 
     def _create_storage(self):
@@ -23,7 +20,7 @@ class AutoStorage:
         if markpost_cfg and getattr(markpost_cfg, "url", None):
             client = MarkpostClient(markpost_cfg)
             return MarkpostStorage(client)
-        return FileStorage(self._default_directory)
+        return FileStorage()
 
-    def save(self, title: str, body: str | None) -> str:
-        return self._storage.save(title, body)
+    def save(self, title: str, body: str | None, directory: Path) -> str:
+        return self._storage.save(title, body, directory)
