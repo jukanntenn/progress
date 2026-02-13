@@ -173,6 +173,7 @@ def save_report(
     content: str | None = None,
     title: str = "",
     config: Config | None = None,
+    directory: Path | None = None,
 ) -> int:
     """Save report."""
     with database.atomic():
@@ -197,7 +198,9 @@ def save_report(
             commit_count=commit_count,
             markpost_url=markpost_url,
         )
-        result = storage.save(title, content)
+
+        report_dir = directory or Path(config.data_dir) / "reports"
+        result = storage.save(title, content, report_dir)
 
         report_id = getattr(storage, "report_id", None)
         if report_id is None:
