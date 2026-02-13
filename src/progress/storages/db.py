@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class DBStorage:
         self._markpost_url = markpost_url
         self.report_id: int | None = None
 
-    def save(self, title: str, body: str | None) -> str:
+    def save(self, title: str, body: str | None, directory: Path) -> str:
         from progress.db.models import Report
 
         report = Report.create(
