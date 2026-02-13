@@ -109,6 +109,7 @@ def generate_report_title_and_content(
 
 
 def process_reports(
+    config: Config,
     check_result,
     reporter,
     timezone,
@@ -252,6 +253,7 @@ def process_reports(
                         markpost_url="",
                         content=report.content,
                         title="",
+                        config=config,
                     )
                 except Exception as db_error:
                     logger.error(
@@ -301,6 +303,7 @@ def process_reports(
             markpost_url=aggregated_markpost_url,
             content=aggregated_report_with_summary,
             title=unified_title,
+            config=config,
         )
         logger.info("Aggregated report saved to database")
     except Exception as db_error:
@@ -598,6 +601,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
 
             if check_result.reports:
                 process_reports(
+                    cfg,
                     check_result,
                     reporter,
                     cfg.get_timezone(),

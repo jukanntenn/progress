@@ -2,6 +2,7 @@
 
 import logging
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, List, Literal, Optional, Union
 from zoneinfo import ZoneInfo, available_timezones
@@ -194,12 +195,24 @@ class ChangelogTrackerConfig(BaseModel):
     enabled: bool = True
 
 
+class StorageType(str, Enum):
+    DB = "db"
+    FILE = "file"
+    MARKPOST = "markpost"
+    AUTO = "auto"
+
+
+class ReportConfig(BaseModel):
+    storage: StorageType = StorageType.AUTO
+
+
 class Config(BaseSettings):
     """Application configuration."""
 
     language: str = Field(default="en")
     timezone: str = Field(default="UTC")
 
+    report: ReportConfig = Field(default_factory=ReportConfig)
     markpost: MarkpostConfig
     notification: NotificationConfig
     github: GitHubConfig

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from progress.config import Config, RepositoryConfig
+from progress.config import Config, RepositoryConfig, StorageType
 from progress.enums import Protocol
 from progress.errors import ConfigException
 
@@ -600,3 +600,42 @@ def test_repository_config_protocol_rejects_invalid_string():
     with pytest.raises(ValueError) as exc_info:
         RepositoryConfig(url="vitejs/vite", protocol="ftp")
     assert "protocol" in str(exc_info.value).lower()
+
+
+def test_report_config_defaults_to_auto(temp_config_file):
+    content = """
+[markpost]
+url = "https://markpost.example.com/p/test-key"
+
+[notification]
+[[notification.channels]]
+type = "feishu"
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+
+[github]
+gh_token = "ghp_test_token_12345"
+"""
+    Path(temp_config_file).write_text(content)
+    config = Config.load_from_file(temp_config_file)
+    assert config.report.storage == StorageType.AUTO
+
+
+def test_report_config_loads_from_file(temp_config_file):
+    content = """
+[report]
+storage = "file"
+
+[markpost]
+url = "https://markpost.example.com/p/test-key"
+
+[notification]
+[[notification.channels]]
+type = "feishu"
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+
+[github]
+gh_token = "ghp_test_token_12345"
+"""
+    Path(temp_config_file).write_text(content)
+    config = Config.load_from_file(temp_config_file)
+    assert config.report.storage == StorageType.FILE

@@ -8,6 +8,7 @@ from peewee import BooleanField, CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
+from .config import Config
 from .consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from .migration_add_owner_monitoring import apply as migrate_owner_monitoring
 from .models import (
@@ -24,6 +25,7 @@ from .models import (
     RustRFC,
     database_proxy,
 )
+from .storages import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -166,17 +168,35 @@ def save_report(
     markpost_url: str | None = None,
     content: str | None = None,
     title: str = "",
+    config: Config | None = None,
 ) -> int:
     """Save report."""
     with database.atomic():
-        report = Report.create(
-            repo=repo_id,
-            title=title,
+        if config is None:
+            report = Report.create(
+                repo=repo_id,
+                title=title,
+                commit_hash=commit_hash,
+                previous_commit_hash=previous_commit_hash,
+                commit_count=commit_count,
+                markpost_url=markpost_url,
+                content=content,
+            )
+            logger.info(f"Report saved: {report.id}")
+            return report.id
+
+        storage = get_storage(
+            config=config,
+            repo_id=repo_id,
             commit_hash=commit_hash,
             previous_commit_hash=previous_commit_hash,
             commit_count=commit_count,
             markpost_url=markpost_url,
-            content=content,
         )
-        logger.info(f"Report saved: {report.id}")
-        return report.id
+        result = storage.save(title, content)
+
+        report_id = getattr(storage, "report_id", None)
+        if report_id is None:
+            report_id = int(result)
+
+        return report_id
