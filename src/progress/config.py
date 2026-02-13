@@ -4,17 +4,10 @@ import logging
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, List, Literal, Optional, Union
+from typing import List, Literal, Optional
 from zoneinfo import ZoneInfo, available_timezones
 
-from pydantic import (
-    BaseModel,
-    Field,
-    HttpUrl,
-    ValidationError,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, Field, HttpUrl, ValidationError, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -25,18 +18,9 @@ from pydantic_settings import (
 from .consts import REPO_URL_PATTERNS
 from .enums import Protocol
 from .errors import ConfigException
+from .notification.config import NotificationConfig
 
 logger = logging.getLogger(__name__)
-
-
-class FeishuChannelConfig(BaseModel):
-    """Feishu webhook notification channel configuration."""
-
-    type: Literal["feishu"] = "feishu"
-    enabled: bool = True
-
-    webhook_url: HttpUrl
-    timeout: int = Field(default=30, ge=1)
 
 
 class MarkpostConfig(BaseModel):
@@ -45,60 +29,6 @@ class MarkpostConfig(BaseModel):
     url: HttpUrl
     timeout: int = Field(default=30, ge=1)
     max_batch_size: int = Field(default=1048576, gt=0)
-
-
-class EmailChannelConfig(BaseModel):
-    """Email notification channel configuration."""
-
-    type: Literal["email"] = "email"
-    enabled: bool = True
-
-    host: str = ""
-    port: int = Field(default=587, ge=1, le=65535)
-    user: str = ""
-    password: str = ""
-    from_addr: str = "progress@example.com"
-    recipient: List[str] = Field(default_factory=list)
-    starttls: bool = False
-    ssl: bool = False
-
-    @model_validator(mode="after")
-    def validate_email_config(self) -> "EmailChannelConfig":
-        if not self.enabled:
-            return self
-
-        missing_fields = []
-        if not self.host:
-            missing_fields.append("host")
-        if not self.recipient:
-            missing_fields.append("recipient")
-
-        if missing_fields:
-            raise ValueError(
-                f"Missing required fields for email notification: {', '.join(missing_fields)}"
-            )
-
-        return self
-
-
-NotificationChannelConfig = Annotated[
-    Union[FeishuChannelConfig, EmailChannelConfig],
-    Field(discriminator="type"),
-]
-
-
-class NotificationConfig(BaseModel):
-    """Notification configuration."""
-
-    channels: List[NotificationChannelConfig] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_notification_config(self) -> "NotificationConfig":
-        if not self.channels:
-            raise ValueError("At least one notification channel must be configured")
-        if not any(getattr(channel, "enabled", True) for channel in self.channels):
-            raise ValueError("At least one enabled notification channel is required")
-        return self
 
 
 class GitHubConfig(BaseModel):

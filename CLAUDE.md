@@ -56,7 +56,7 @@ progress/
 │       ├── log.py         # Logging
 │       ├── markpost.py    # Markpost functionality
 │       ├── models.py      # Peewee ORM models
-│       ├── notification.py # Notifications
+│       ├── notification/  # Notifications (channels/messages/factory)
 │       ├── notifier.py    # Notifications (legacy)
 │       ├── proposal_parsers.py # Proposal parsing modules
 │       ├── proposal_tracking.py # Proposal tracking logic
@@ -89,6 +89,7 @@ progress/
 │                   └── progress.po
 └── tests/                 # Test files directory
     ├── __init__.py
+    ├── notification/      # Notification framework tests
     ├── test_analyzer.py
     ├── test_config.py
     ├── test_github.py

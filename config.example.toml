@@ -34,6 +34,10 @@ max_batch_size = 1048576
 # Each channel is configured as an array item with a "type" discriminator
 
 [[notification.channels]]
+type = "console"
+enabled = true
+
+[[notification.channels]]
 type = "feishu"
 enabled = true
 # Feishu webhook configuration

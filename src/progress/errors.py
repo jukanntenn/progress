@@ -84,3 +84,9 @@ class ClientError(ProgressException):
     """
 
     pass
+
+
+class ExternalServiceException(ProgressException):
+    """Raised when an external service call fails."""
+
+    pass
