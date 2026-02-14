@@ -13,15 +13,17 @@ from .consts import DATABASE_PATH
 from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
 from .contrib.proposal.proposal_tracking import ProposalTrackerManager
 from .contrib.repo.owner import OwnerManager
+from .contrib.repo.models import DiscoveredRepository
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
 from .db import close_db, create_tables, init_db, save_report
-from .db.models import DiscoveredRepository, Repository
+from .db.models import Repository
 from .errors import ProgressException
 from .i18n import gettext as _
 from .i18n import initialize
 from .log import setup as setup_log
 from .notification import NotificationConfig, create_channel, create_message
+from .storages import FileStorage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
 from .web import create_app
@@ -34,7 +36,9 @@ def initialize_components(cfg):
     init_db(DATABASE_PATH)
     create_tables()
 
-    markpost_client = MarkpostClient(cfg.markpost)
+    markpost_client = None
+    if getattr(cfg.markpost, "enabled", False) and getattr(cfg.markpost, "url", None):
+        markpost_client = MarkpostClient(cfg.markpost)
 
     analyzer = ClaudeCodeAnalyzer(
         max_diff_length=cfg.analysis.max_diff_length,
@@ -241,16 +245,19 @@ def process_reports(
                 logger.info(
                     f"Uploading batch {batch.batch_index + 1}/{batch.total_batches} to Markpost..."
                 )
-                markpost_url = markpost_client.upload_batch(
-                    final_report,
-                    unified_title,
-                    batch_index=batch.batch_index,
-                    total_batches=batch.total_batches,
-                )
-                logger.info(f"Batch {batch.batch_index + 1} uploaded: {markpost_url}")
-                uploaded_urls.append(markpost_url)
-                if batch.batch_index == 0:
-                    first_batch_url = markpost_url
+                if markpost_client is None:
+                    logger.info("Markpost disabled, skipping upload")
+                else:
+                    markpost_url = markpost_client.upload_batch(
+                        final_report,
+                        unified_title,
+                        batch_index=batch.batch_index,
+                        total_batches=batch.total_batches,
+                    )
+                    logger.info(f"Batch {batch.batch_index + 1} uploaded: {markpost_url}")
+                    uploaded_urls.append(markpost_url)
+                    if batch.batch_index == 0:
+                        first_batch_url = markpost_url
 
         except Exception as e:
             error_msg = f"Batch {batch.batch_index + 1}: {str(e)}"
@@ -344,8 +351,9 @@ def process_reports(
 
 
 def _send_entity_notification(
+    config: Config,
     notification_config: NotificationConfig,
-    markpost_client: MarkpostClient,
+    markpost_client: MarkpostClient | None,
     analyzer: ClaudeCodeAnalyzer,
     new_repos: list[dict],
     timezone,
@@ -405,7 +413,15 @@ def _send_entity_notification(
         )
         summary = f"Discovered {len(new_repos)} new repositories"
 
-    markpost_url = markpost_client.upload(report_content, title=title)
+    FileStorage().save(
+        title,
+        report_content,
+        Path(config.data_dir) / "reports" / "repo" / "new",
+    )
+
+    markpost_url = ""
+    if markpost_client is not None:
+        markpost_url = markpost_client.upload(report_content, title=title)
 
     repo_statuses = {
         (r.get("name_with_owner") or r.get("repo_name") or str(r.get("id"))): "success"
@@ -431,8 +447,9 @@ def _send_entity_notification(
 
 
 def _send_proposal_event_notification(
+    config: Config,
     notification_config: NotificationConfig,
-    markpost_client: MarkpostClient,
+    markpost_client: MarkpostClient | None,
     analyzer: ClaudeCodeAnalyzer,
     events,
     timezone,
@@ -468,7 +485,15 @@ def _send_proposal_event_notification(
         )
         summary = f"{len(events)} proposal events"
 
-    markpost_url = markpost_client.upload(report_content, title=title)
+    FileStorage().save(
+        title,
+        report_content,
+        Path(config.data_dir) / "reports" / "proposal",
+    )
+
+    markpost_url = ""
+    if markpost_client is not None:
+        markpost_url = markpost_client.upload(report_content, title=title)
     repo_statuses = {f"{e.tracker_type}#{e.proposal_number}": "success" for e in events}
     send_notification(
         notification_config,
@@ -481,8 +506,9 @@ def _send_proposal_event_notification(
 
 
 def _send_changelog_update_notification(
+    config: Config,
     notification_config: NotificationConfig,
-    markpost_client: MarkpostClient,
+    markpost_client: MarkpostClient | None,
     updates,
     all_results,
     timezone,
@@ -503,7 +529,16 @@ def _send_changelog_update_notification(
     )
 
     title = f"Changelog Updates - {now.strftime('%Y-%m-%d %H:%M')}"
-    markpost_url = markpost_client.upload(report_content, title=title)
+
+    FileStorage().save(
+        title,
+        report_content,
+        Path(config.data_dir) / "reports" / "changelog",
+    )
+
+    markpost_url = ""
+    if markpost_client is not None:
+        markpost_url = markpost_client.upload(report_content, title=title)
 
     total_new_versions = sum(len(u.new_entries) for u in updates)
     parts = [f"{u.name} ({len(u.new_entries)})" for u in updates]
@@ -594,6 +629,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
             ]
             if updates:
                 _send_changelog_update_notification(
+                    cfg,
                     cfg.notification,
                     markpost_client,
                     updates,
@@ -646,6 +682,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
             ]
             if high_priority:
                 _send_proposal_event_notification(
+                    cfg,
                     cfg.notification,
                     markpost_client,
                     repo_manager.analyzer,
@@ -701,6 +738,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
                     repo_info["readme_detail"] = "README analysis failed or timed out."
 
             _send_entity_notification(
+                cfg,
                 cfg.notification,
                 markpost_client,
                 repo_manager.analyzer,
@@ -744,6 +782,7 @@ def track_proposals(ctx):
         ]
         if high_priority:
             _send_proposal_event_notification(
+                cfg,
                 cfg.notification,
                 markpost_client,
                 repo_manager.analyzer,

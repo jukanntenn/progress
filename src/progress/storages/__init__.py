@@ -38,6 +38,12 @@ def get_storage(
     if storage_type == StorageType.MARKPOST:
         if markpost_url is not None:
             return db_storage
+        if not getattr(config.markpost, "enabled", False) or not getattr(
+            config.markpost, "url", None
+        ):
+            raise ConfigException(
+                "markpost.enabled=true and markpost.url are required when report.storage=markpost"
+            )
         return CombinedStorage(
             db_storage,
             MarkpostStorage(MarkpostClient(config.markpost)),

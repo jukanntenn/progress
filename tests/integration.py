@@ -3,16 +3,12 @@
 
 from __future__ import annotations
 
-import argparse
 import os
+import shutil
 import subprocess
 import sys
-import tempfile
-import time
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT_DIR / "src"
@@ -57,12 +53,25 @@ class TestConsole:
 
 
 class GitHubCLI:
-    def __init__(self) -> None:
+    def __init__(self, gh_token: str) -> None:
+        self.gh_token = gh_token
         self.user = self.get_user()
 
-    def _run(
-        self, args: list[str], check: bool = True, env: dict[str, str] | None = None
-    ) -> str:
+    def repo_exists(self, owner: str, name: str) -> bool:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = self.gh_token
+        result = subprocess.run(
+            ["gh", "repo", "view", f"{owner}/{name}"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        return result.returncode == 0
+
+    def _run(self, args: list[str], check: bool = True) -> str:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = self.gh_token
         result = subprocess.run(
             ["gh", *args],
             capture_output=True,
@@ -83,15 +92,6 @@ class GitHubCLI:
     def get_user(self) -> str:
         return self._run(["api", "/user", "--jq", ".login"])
 
-    def get_token(self) -> str:
-        env_token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-        if env_token:
-            return env_token
-        token = self._run(["auth", "token"], check=True)
-        if not token:
-            raise RuntimeError("Unable to obtain GitHub token from gh auth token")
-        return token
-
     def create_repo(
         self, owner: str, name: str, description: str = "", private: bool = False
     ) -> str:
@@ -104,6 +104,7 @@ class GitHubCLI:
             "--confirm",
         ]
         args.append("--private" if private else "--public")
+
         return self._run(args)
 
     def delete_repo(self, owner: str, name: str) -> None:
@@ -129,51 +130,77 @@ class GitHubCLI:
     def add_commit(
         self, owner: str, repo: str, files: dict[str, str], message: str
     ) -> None:
-        with tempfile.TemporaryDirectory(prefix="progress-integration-") as tmpdir:
-            repo_path = Path(tmpdir) / repo
-            subprocess.run(
-                ["gh", "repo", "clone", f"{owner}/{repo}", str(repo_path)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ["git", "checkout", "-B", "main"], cwd=repo_path, check=False
-            )
+        testing_root = ROOT_DIR / "data" / "testing-repos"
+        testing_root.mkdir(parents=True, exist_ok=True)
+        repo_path = testing_root / repo
+        if repo_path.exists():
+            shutil.rmtree(repo_path, ignore_errors=True)
 
-            for rel_path, content in files.items():
-                full_path = repo_path / rel_path
-                full_path.parent.mkdir(parents=True, exist_ok=True)
-                full_path.write_text(content, encoding="utf-8")
+        ssh_key = Path.home() / ".ssh" / "id_wsl"
+        env = os.environ.copy()
+        env["GIT_SSH_COMMAND"] = f"ssh -i {ssh_key} -o IdentitiesOnly=yes"
 
-            subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+        clone_result = subprocess.run(
+            ["git", "clone", f"git@github.com:{owner}/{repo}.git", str(repo_path)],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if clone_result.returncode != 0:
+            repo_path.mkdir(parents=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_path, check=True, capture_output=True
+            )
             subprocess.run(
                 [
                     "git",
-                    "-c",
-                    "user.name=progress-integration",
-                    "-c",
-                    "user.email=progress-integration@example.invalid",
-                    "commit",
-                    "-m",
-                    message,
+                    "remote",
+                    "add",
+                    "origin",
+                    f"git@github.com:{owner}/{repo}.git",
                 ],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,
-                text=True,
             )
-            push = subprocess.run(
-                ["git", "push"],
+
+        for rel_path, content in files.items():
+            full_path = repo_path / rel_path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(content, encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=progress-integration",
+                "-c",
+                "user.email=progress-integration@example.invalid",
+                "commit",
+                "-m",
+                message,
+            ],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        push = subprocess.run(
+            ["git", "push"],
+            cwd=repo_path,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if push.returncode != 0:
+            subprocess.run(
+                ["git", "push", "-u", "origin", "main"],
                 cwd=repo_path,
-                check=False,
-                capture_output=True,
-                text=True,
+                check=True,
+                env=env,
             )
-            if push.returncode != 0:
-                subprocess.run(
-                    ["git", "push", "-u", "origin", "main"], cwd=repo_path, check=True
-                )
 
 
 def _assert(condition: bool, message: str) -> None:
@@ -200,33 +227,66 @@ class CreatedRepo:
 
 
 class IntegrationTest:
-    def __init__(self, *, prefix: str, keep_repos: bool, keep_artifacts: bool) -> None:
-        self.console = TestConsole()
-        self.gh = GitHubCLI()
-        self.owner = self.gh.user
-        self.prefix = prefix
-        self.keep_repos = keep_repos
-        self.keep_artifacts = keep_artifacts
-        self.created_repos: list[CreatedRepo] = []
+    def __init__(self) -> None:
+        from progress.config import Config
 
-        run_id = f"{int(time.time())}"
-        self.base_dir = ROOT_DIR / "data" / "integration" / f"{self.prefix}-{run_id}"
-        self.workspace_dir = self.base_dir / "repos"
-        self.database_path = self.base_dir / "progress.db"
-        self.config_path = self.base_dir / "config.toml"
+        self.console = TestConsole()
+        self.config_path = ROOT_DIR / "config" / "test_integration.toml"
+        config = Config.load_from_file(str(self.config_path))
+        self.gh_token = config.github.gh_token
+        self.gh = GitHubCLI(self.gh_token)
+        self.owner = self.gh.user
+        self.testing_repo_name = "progress-testing"
+        self.proposals_repo_name = "progress-proposals"
+        self.new_repo_name = "progress-testing-new"
+        self.created_repos: list[CreatedRepo] = []
+        self.database_path = ROOT_DIR / "data" / "progress.db"
+        self.reports_dir = ROOT_DIR / "data" / "reports"
+        self.testing_repos_dir = ROOT_DIR / "data" / "testing-repos"
 
     def cleanup_environment(self) -> None:
-        if self.base_dir.exists() and not self.keep_artifacts:
-            shutil.rmtree(self.base_dir, ignore_errors=True)
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        if self.database_path.exists():
+            self.database_path.unlink()
+        if self.reports_dir.exists():
+            shutil.rmtree(self.reports_dir, ignore_errors=True)
+        if self.testing_repos_dir.exists():
+            shutil.rmtree(self.testing_repos_dir, ignore_errors=True)
 
-    def _unique_name(self, suffix: str) -> str:
-        return f"{self.prefix}-{suffix}-{int(time.time())}"
+    def get_latest_report(self, directory: Path) -> Path | None:
+        if not directory.exists():
+            return None
+        files = list(directory.glob("*.md"))
+        if not files:
+            return None
+        return max(files, key=lambda f: int(f.stem))
+
+    def verify_repo_update_report(self, repo: CreatedRepo) -> None:
+        report = self.get_latest_report(self.reports_dir / "repo" / "update")
+        _assert(report is not None, "No repo update report found")
+        content = report.read_text(encoding="utf-8")
+        _assert(repo.slug in content, f"Repo update report missing {repo.slug}")
+
+    def verify_new_repo_report(self, repo: CreatedRepo) -> None:
+        report = self.get_latest_report(self.reports_dir / "repo" / "new")
+        _assert(report is not None, "No new repo report found")
+        content = report.read_text(encoding="utf-8")
+        _assert(repo.slug in content, f"New repo report missing {repo.slug}")
+
+    def verify_proposal_report(self) -> None:
+        report = self.get_latest_report(self.reports_dir / "proposal")
+        _assert(report is not None, "No proposal report found")
+        content = report.read_text(encoding="utf-8")
+        _assert("pep" in content.lower(), "Proposal report missing PEP reference")
+
+    def verify_changelog_report(self) -> None:
+        report = self.get_latest_report(self.reports_dir / "changelog")
+        _assert(report is not None, "No changelog report found")
+        content = report.read_text(encoding="utf-8")
+        _assert(len(content) > 0, "Changelog report is empty")
 
     def create_initial_repos(self) -> tuple[CreatedRepo, CreatedRepo]:
-        repo_main = CreatedRepo(self.owner, self._unique_name("main"))
-        repo_proposals = CreatedRepo(self.owner, self._unique_name("proposals"))
+        repo_main = CreatedRepo(self.owner, self.testing_repo_name)
+        repo_proposals = CreatedRepo(self.owner, self.proposals_repo_name)
 
         self.console.info(f"Creating {repo_main.slug}...")
         self.gh.create_repo(
@@ -289,96 +349,18 @@ class IntegrationTest:
 
         return repo_main, repo_proposals
 
-    def write_config(
+    def run_progress(
         self,
         *,
         repos: list[CreatedRepo],
         proposals_repo: CreatedRepo,
         changelog_repo: CreatedRepo,
     ) -> None:
-        repos_lines = "\n".join(
-            [
-                "\n".join(
-                    [
-                        "[[repos]]",
-                        f'url = "{r.slug}"',
-                        'branch = "main"',
-                        "enabled = true",
-                        "",
-                    ]
-                )
-                for r in repos
-            ]
-        ).rstrip()
-
-        content = (
-            "\n".join(
-                [
-                    'language = "en"',
-                    'timezone = "UTC"',
-                    f'database_path = "{self.database_path.as_posix()}"',
-                    f'workspace_dir = "{self.workspace_dir.as_posix()}"',
-                    "",
-                    "[markpost]",
-                    "enabled = false",
-                    "timeout = 5",
-                    "max_batch_size = 1048576",
-                    "",
-                    "[notification]",
-                    "enabled = false",
-                    "",
-                    "[github]",
-                    'protocol = "https"',
-                    "git_timeout = 600",
-                    "gh_timeout = 300",
-                    "",
-                    "[analysis]",
-                    "max_diff_length = 200000",
-                    "concurrency = 1",
-                    'language = "en"',
-                    "timeout = 60",
-                    "",
-                    repos_lines,
-                    "",
-                    "[[owners]]",
-                    'type = "user"',
-                    f'name = "{self.owner}"',
-                    "enabled = true",
-                    "",
-                    "[[proposal_trackers]]",
-                    'type = "pep"',
-                    f'repo_url = "{proposals_repo.https_url}"',
-                    'branch = "main"',
-                    "enabled = true",
-                    'proposal_dir = "peps"',
-                    'file_pattern = "pep-*.rst"',
-                    "",
-                    "[[changelog_trackers]]",
-                    f'name = "{changelog_repo.slug}"',
-                    f'url = "{changelog_repo.raw_changelog_url}"',
-                    'parser_type = "markdown_heading"',
-                    "enabled = true",
-                    "",
-                ]
-            ).rstrip()
-            + "\n"
-        )
-
-        self.config_path.write_text(content, encoding="utf-8")
-
-    def run_progress(self) -> None:
-        token = self.gh.get_token()
-        env = os.environ.copy()
-        env["PROGRESS_GITHUB__GH_TOKEN"] = token
-        env["PROGRESS_NOTIFICATION__ENABLED"] = "false"
-        env["PROGRESS_MARKPOST__ENABLED"] = "false"
-
         result = subprocess.run(
             ["uv", "run", "progress", "-c", str(self.config_path)],
             cwd=ROOT_DIR,
             capture_output=True,
             text=True,
-            env=env,
         )
         if result.returncode != 0:
             raise TestAssertionError(
@@ -395,13 +377,10 @@ class IntegrationTest:
         min_discovered: int,
         min_events: int,
     ) -> None:
+        from progress.contrib.proposal.models import ProposalEvent
+        from progress.contrib.repo.models import DiscoveredRepository
         from progress.db import close_db, create_tables, init_db
-        from progress.models import (
-            DiscoveredRepository,
-            ProposalEvent,
-            Report,
-            Repository,
-        )
+        from progress.db.models import Report, Repository
 
         init_db(str(self.database_path))
         create_tables()
@@ -503,7 +482,7 @@ class IntegrationTest:
             "Update PEP 1 status and add PEP 3",
         )
 
-        repo_new = CreatedRepo(self.owner, self._unique_name("extra"))
+        repo_new = CreatedRepo(self.owner, self.new_repo_name)
         self.console.info(f"Creating {repo_new.slug}...")
         self.gh.create_repo(
             self.owner, repo_new.name, description="Additional repo for second run"
@@ -525,76 +504,58 @@ class IntegrationTest:
     def run(self) -> int:
         self.console.header("Progress Integration Test")
         try:
-            self.console.step(1, 7, "Preparing environment")
+            self.console.step(1, 6, "Preparing environment")
             self.cleanup_environment()
 
-            self.console.step(2, 7, "Creating initial GitHub repositories")
+            self.console.step(2, 6, "Creating initial GitHub repositories")
             repo_main, repo_proposals = self.create_initial_repos()
 
-            self.console.step(3, 7, "Writing Progress config")
-            self.write_config(
+            self.console.step(3, 6, "Running Progress (first run)")
+            self.run_progress(
                 repos=[repo_main, repo_proposals],
                 proposals_repo=repo_proposals,
                 changelog_repo=repo_main,
             )
 
-            self.console.step(4, 7, "Running Progress (first run)")
-            self.run_progress()
-
-            self.console.step(5, 7, "Verifying database (first run)")
+            self.console.step(4, 6, "Verifying first run results")
             self.verify_database(
                 expected_repo_count=2, min_reports=2, min_discovered=1, min_events=0
             )
+            self.verify_repo_update_report(repo_main)
+            self.verify_proposal_report()
+            self.verify_changelog_report()
 
-            self.console.step(6, 7, "Evolving repositories and updating config")
+            self.console.step(5, 6, "Evolving repositories")
             repo_new = self.evolve_repos(repo_main, repo_proposals)
-            self.write_config(
+
+            self.console.step(6, 6, "Running Progress and verifying (second run)")
+            self.run_progress(
                 repos=[repo_main, repo_proposals, repo_new],
                 proposals_repo=repo_proposals,
                 changelog_repo=repo_main,
             )
-
-            self.console.step(
-                7, 7, "Running Progress and verifying database (second run)"
-            )
-            self.run_progress()
             self.verify_database(
                 expected_repo_count=3, min_reports=4, min_discovered=2, min_events=1
             )
+            self.verify_repo_update_report(repo_main)
+            self.verify_new_repo_report(repo_new)
+            self.verify_proposal_report()
+            self.verify_changelog_report()
 
             self.console.success("All integration checks passed")
             return 0
         except TestAssertionError as e:
             self.console.error(str(e))
-            if self.keep_artifacts:
-                self.console.info(f"Artifacts kept at: {self.base_dir}")
             return 1
         finally:
-            if not self.keep_repos:
-                try:
-                    self.cleanup_repos()
-                except Exception as e:
-                    self.console.error(f"Repository cleanup failed: {e}")
+            try:
+                self.cleanup_repos()
+            except Exception as e:
+                self.console.error(f"Repository cleanup failed: {e}")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Progress standalone integration test")
-    parser.add_argument(
-        "--prefix", default="progress-it", help="Repository name prefix"
-    )
-    parser.add_argument(
-        "--keep-repos", action="store_true", help="Do not delete created GitHub repos"
-    )
-    parser.add_argument(
-        "--keep-artifacts", action="store_true", help="Keep local database/workspace"
-    )
-    args = parser.parse_args()
-
-    test = IntegrationTest(
-        prefix=args.prefix,
-        keep_repos=args.keep_repos,
-        keep_artifacts=args.keep_artifacts,
-    )
+    test = IntegrationTest()
     return test.run()
 
 

@@ -17,7 +17,11 @@ class AutoStorage:
 
     def _create_storage(self):
         markpost_cfg = getattr(self._config, "markpost", None)
-        if markpost_cfg and getattr(markpost_cfg, "url", None):
+        if (
+            markpost_cfg
+            and getattr(markpost_cfg, "enabled", False)
+            and getattr(markpost_cfg, "url", None)
+        ):
             client = MarkpostClient(markpost_cfg)
             return MarkpostStorage(client)
         return FileStorage()

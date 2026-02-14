@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 from zoneinfo import ZoneInfo, available_timezones
 
-from pydantic import BaseModel, Field, HttpUrl, ValidationError, field_validator
+from pydantic import BaseModel, Field, HttpUrl, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -15,7 +15,7 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-from .consts import REPO_URL_PATTERNS
+from .consts import REPO_URL_PATTERNS, WORKSPACE_DIR_DEFAULT
 from .enums import Protocol
 from .errors import ConfigException
 from .notification.config import NotificationConfig
@@ -26,9 +26,29 @@ logger = logging.getLogger(__name__)
 class MarkpostConfig(BaseModel):
     """Markpost configuration."""
 
-    url: HttpUrl
+    enabled: bool = False
+    url: HttpUrl | None = None
     timeout: int = Field(default=30, ge=1)
     max_batch_size: int = Field(default=1048576, gt=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_enabled(cls, values):
+        if not isinstance(values, dict):
+            return values
+
+        if "enabled" not in values:
+            values["enabled"] = bool(values.get("url"))
+        return values
+
+    @model_validator(mode="after")
+    def validate_markpost_config(self) -> "MarkpostConfig":
+        if not self.enabled:
+            return self
+
+        if self.url is None:
+            raise ValueError("markpost.url is required when markpost.enabled is true")
+        return self
 
 
 class GitHubConfig(BaseModel):
@@ -141,10 +161,12 @@ class Config(BaseSettings):
 
     language: str = Field(default="en")
     timezone: str = Field(default="UTC")
+    data_dir: str = Field(default="data")
+    workspace_dir: str = Field(default=WORKSPACE_DIR_DEFAULT)
 
     report: ReportConfig = Field(default_factory=ReportConfig)
-    markpost: MarkpostConfig
-    notification: NotificationConfig
+    markpost: MarkpostConfig = Field(default_factory=MarkpostConfig)
+    notification: NotificationConfig = Field(default_factory=NotificationConfig)
     github: GitHubConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     web: WebConfig = Field(default_factory=WebConfig)
@@ -166,6 +188,19 @@ class Config(BaseSettings):
                 f"Invalid timezone configuration: '{v}'. "
                 "Please use a valid IANA timezone identifier"
             )
+        return v
+
+    @field_validator("repos", "owners", "proposal_trackers", "changelog_trackers", mode="before")
+    @classmethod
+    def coerce_indexed_dict_to_list(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, dict):
+            try:
+                items = sorted(v.items(), key=lambda kv: int(kv[0]))
+            except Exception:
+                return list(v.values())
+            return [value for _key, value in items]
         return v
 
     @classmethod

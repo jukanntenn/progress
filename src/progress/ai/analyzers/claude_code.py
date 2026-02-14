@@ -90,7 +90,14 @@ class ClaudeCodeAnalyzer:
                 len(diff),
             )
             logger.info(f"Analyzing code changes for {repo_name}...")
-            summary, detail = self._run_claude_analysis(diff, prompt)
+            try:
+                summary, detail = self._run_claude_analysis(diff, prompt)
+            except Exception as e:
+                logger.warning(f"Code analysis failed: {e}")
+                summary = _("Code analysis unavailable")
+                detail = _(
+                    "Claude Code analysis failed or timed out. See logs for details."
+                )
 
             return summary, detail, truncated, original_length, len(diff)
 

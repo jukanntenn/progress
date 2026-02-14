@@ -58,11 +58,3 @@ NotificationChannelConfig = Annotated[
 
 class NotificationConfig(BaseModel):
     channels: list[NotificationChannelConfig] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_notification_config(self) -> "NotificationConfig":
-        if not self.channels:
-            raise ValueError("At least one notification channel must be configured")
-        if not any(getattr(channel, "enabled", True) for channel in self.channels):
-            raise ValueError("At least one enabled notification channel is required")
-        return self

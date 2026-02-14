@@ -2,12 +2,14 @@
 
 import logging
 from typing import Optional
+
 from github import (
-    Github,
-    UnknownObjectException,
-    RateLimitExceededException,
     BadCredentialsException,
+    Github,
+    RateLimitExceededException,
+    UnknownObjectException,
 )
+
 from .errors import GitException
 
 logger = logging.getLogger(__name__)
@@ -117,7 +119,7 @@ class GitHubClient:
 
             result = []
             for repo in repos:
-                if source and not repo.source:
+                if source and repo.fork:
                     continue
                 result.append(
                     {

@@ -390,8 +390,8 @@ gh_token = "ghp_test"
 """
     Path(temp_config_file).write_text(content)
 
-    with pytest.raises(ConfigException):
-        Config.load_from_file(temp_config_file)
+    config = Config.load_from_file(temp_config_file)
+    assert config.markpost.enabled is False
 
 
 def test_missing_required_webhook_url(temp_config_file):
@@ -405,8 +405,8 @@ gh_token = "ghp_test"
 """
     Path(temp_config_file).write_text(content)
 
-    with pytest.raises(ConfigException):
-        Config.load_from_file(temp_config_file)
+    config = Config.load_from_file(temp_config_file)
+    assert config.notification.channels == []
 
 
 def test_missing_required_gh_token(temp_config_file):

@@ -57,5 +57,5 @@ def test_notification_channel_discriminator() -> None:
 
 
 def test_notification_config_requires_enabled_channel() -> None:
-    with pytest.raises(ValidationError):
-        NotificationConfig(channels=[ConsoleChannelConfig(enabled=False)])
+    config = NotificationConfig(channels=[ConsoleChannelConfig(enabled=False)])
+    assert config.channels[0].enabled is False
