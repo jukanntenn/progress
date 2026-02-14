@@ -2,8 +2,8 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .models import DiscoveredRepository, GitHubOwner
 from ...github_client import GitHubClient
+from .models import DiscoveredRepository, GitHubOwner
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class OwnerManager:
 
     def check_all(self) -> list[dict]:
         new_repos: list[dict] = []
-        owners = GitHubOwner.select().where(GitHubOwner.enabled == True)
+        owners = GitHubOwner.select().where(GitHubOwner.enabled)
         for owner in owners:
             new_repos.extend(self._check_owner(owner))
         return new_repos

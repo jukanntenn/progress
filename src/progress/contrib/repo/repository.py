@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from progress.config import Config
-from progress.consts import WORKSPACE_DIR_DEFAULT, parse_repo_name
+from progress.consts import WORKSPACE_DIR_DEFAULT
 from progress.db.models import Repository
 from progress.github import GitClient, normalize_repo_url
 from progress.github_client import GitHubClient
@@ -131,10 +131,13 @@ class RepositoryManager:
         Returns:
             SyncResult synchronization result
         """
+        from ...consts import parse_repo_name
+
         database = _get_database()
         configured_urls = set()
         created_count = 0
         updated_count = 0
+        skipped_count = 0
 
         with database.atomic():
             for repo_config in repos_config:
@@ -146,6 +149,18 @@ class RepositoryManager:
                     url, repo_protocol, self.config.github.protocol
                 )
                 name = parse_repo_name(url)
+
+                try:
+                    owner, repo_name = name.split("/", 1)
+                    self.github_client.github.get_repo(f"{owner}/{repo_name}")
+                except Exception:
+                    self.logger.debug(
+                        f"Repository {name} does not exist on GitHub, skipping sync"
+                    )
+                    configured_urls.add(normalized_url)
+                    skipped_count += 1
+                    continue
+
                 configured_urls.add(normalized_url)
 
                 repo, created = Repository.get_or_create(
@@ -194,7 +209,7 @@ class RepositoryManager:
         """
         database = _get_database()
         with database.connection_context():
-            return list(Repository.select().where(Repository.enabled == True))
+            return list(Repository.select().where(Repository.enabled))
 
     def get_by_name(self, name: str) -> Repository | None:
         """Get repository by name.
@@ -263,7 +278,11 @@ class RepositoryManager:
                     tag_name=release["tag_name"]
                 )
                 detail = _(
-                    "**Release Information:**\n\n- **Tag:** {tag_name}\n- **Name:** {name}\n- **Published:** {published}\n\n{notes}"
+                    "**Release Information:**\n\n"
+                    "- **Tag:** {tag_name}\n"
+                    "- **Name:** {name}\n"
+                    "- **Published:** {published}\n\n"
+                    "{notes}"
                 ).format(
                     tag_name=release["tag_name"],
                     name=release.get("title", release["tag_name"]),

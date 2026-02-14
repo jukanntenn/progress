@@ -194,7 +194,7 @@ class Repo:
         lookback_commits = self.config.analysis.first_run_lookback_commits
         total_commits = self.git.get_total_commit_count(self.repo_path)
 
-        if total_commits <= 1:
+        if total_commits == 0:
             return None
 
         effective_lookback = min(lookback_commits, total_commits)
