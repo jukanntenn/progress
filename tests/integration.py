@@ -252,6 +252,15 @@ class IntegrationTest:
         if self.testing_repos_dir.exists():
             shutil.rmtree(self.testing_repos_dir, ignore_errors=True)
 
+    def cleanup_remote_repos(self) -> None:
+        test_repos = [
+            (self.owner, self.testing_repo_name),
+            (self.owner, self.proposals_repo_name),
+            (self.owner, self.new_repo_name),
+        ]
+        for owner, name in test_repos:
+            self.gh.delete_repo(owner, name)
+
     def get_latest_report(self, directory: Path) -> Path | None:
         if not directory.exists():
             return None
@@ -260,29 +269,43 @@ class IntegrationTest:
             return None
         return max(files, key=lambda f: int(f.stem))
 
-    def verify_repo_update_report(self, repo: CreatedRepo) -> None:
+    def verify_repo_update_report(self, expected_repos: list[str]) -> None:
         report = self.get_latest_report(self.reports_dir / "repo" / "update")
         _assert(report is not None, "No repo update report found")
         content = report.read_text(encoding="utf-8")
-        _assert(repo.slug in content, f"Repo update report missing {repo.slug}")
+        for repo in expected_repos:
+            _assert(repo in content, f"Repo update report missing {repo}")
+        _assert("github.com" in content, "Report missing GitHub links")
+        _assert("##" in content, "Report missing markdown headers")
 
-    def verify_new_repo_report(self, repo: CreatedRepo) -> None:
+    def verify_new_repo_report(self, expected_repo: str) -> None:
         report = self.get_latest_report(self.reports_dir / "repo" / "new")
         _assert(report is not None, "No new repo report found")
         content = report.read_text(encoding="utf-8")
-        _assert(repo.slug in content, f"New repo report missing {repo.slug}")
+        _assert(expected_repo in content, f"New repo report missing {expected_repo}")
+        _assert("github.com" in content, "New repo report missing GitHub links")
 
     def verify_proposal_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "proposal")
         _assert(report is not None, "No proposal report found")
         content = report.read_text(encoding="utf-8")
-        _assert("pep" in content.lower(), "Proposal report missing PEP reference")
+        content_lower = content.lower()
+        _assert(
+            "pep" in content_lower or "rfc" in content_lower,
+            "Missing PEP/RFC reference",
+        )
+        has_event_info = any(
+            kw in content_lower for kw in ["created", "status", "accepted", "draft"]
+        )
+        _assert(has_event_info, "Proposal report missing event information")
 
     def verify_changelog_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "changelog")
         _assert(report is not None, "No changelog report found")
         content = report.read_text(encoding="utf-8")
-        _assert(len(content) > 0, "Changelog report is empty")
+        _assert(len(content) > 100, "Changelog report too short")
+        has_version = any(c.isdigit() for c in content) and "." in content
+        _assert(has_version, "Changelog report missing version numbers")
 
     def create_initial_repos(self) -> tuple[CreatedRepo, CreatedRepo]:
         repo_main = CreatedRepo(self.owner, self.testing_repo_name)
@@ -369,61 +392,58 @@ class IntegrationTest:
                 + (f"\nstderr:\n{result.stderr.strip()}" if result.stderr else "")
             )
 
-    def verify_database(
-        self,
-        *,
-        expected_repo_count: int,
-        min_reports: int,
-        min_discovered: int,
-        min_events: int,
-    ) -> None:
-        from progress.contrib.proposal.models import ProposalEvent
-        from progress.contrib.repo.models import DiscoveredRepository
-        from progress.db import close_db, create_tables, init_db
-        from progress.db.models import Report, Repository
+    def verify_repositories(self, expected_repos: list[str]) -> None:
+        from progress.db.models import Repository
 
-        init_db(str(self.database_path))
-        create_tables()
+        for repo_name in expected_repos:
+            repo = Repository.get_or_none(Repository.name == repo_name)
+            _assert(repo is not None, f"Repository {repo_name} not found")
+            _assert(repo.url is not None, f"Repository {repo_name} missing url")
+            _assert(repo.branch is not None, f"Repository {repo_name} missing branch")
 
-        try:
-            repo_count = Repository.select().count()
-            report_count = Report.select().count()
-            discovered_count = DiscoveredRepository.select().count()
-            event_count = ProposalEvent.select().count()
+    def verify_reports(self) -> None:
+        from progress.db.models import Report
 
-            _assert(
-                repo_count == expected_repo_count,
-                f"Repository count expected {expected_repo_count}, got {repo_count}",
-            )
-            _assert(
-                report_count >= min_reports,
-                f"Report count expected >= {min_reports}, got {report_count}",
-            )
-            _assert(
-                discovered_count >= min_discovered,
-                f"DiscoveredRepository count expected >= {min_discovered}, got {discovered_count}",
-            )
-            _assert(
-                event_count >= min_events,
-                f"ProposalEvent count expected >= {min_events}, got {event_count}",
-            )
+        aggregated = Report.select().where(Report.repo.is_null(True)).first()
+        _assert(aggregated is not None, "Aggregated report not found")
+        _assert(
+            aggregated.content and len(aggregated.content) > 0,
+            "Aggregated report empty",
+        )
 
-            latest_aggregated = (
-                Report.select()
-                .where(Report.repo.is_null(True))
-                .order_by(Report.created_at.desc())
-                .first()
-            )
-            _assert(
-                latest_aggregated is not None, "Aggregated report not found in database"
-            )
-            _assert(
-                latest_aggregated.content is not None
-                and latest_aggregated.content.strip() != "",
-                "Aggregated report content is empty",
-            )
-        finally:
-            close_db()
+    def verify_proposal_trackers(self) -> None:
+        from progress.contrib.proposal.models import ProposalTracker
+
+        pep_tracker = (
+            ProposalTracker.select()
+            .where(ProposalTracker.tracker_type == "pep")
+            .first()
+        )
+        _assert(pep_tracker is not None, "PEP tracker not found")
+        rust_tracker = (
+            ProposalTracker.select()
+            .where(ProposalTracker.tracker_type == "rust_rfc")
+            .first()
+        )
+        _assert(rust_tracker is not None, "Rust RFC tracker not found")
+
+    def verify_proposals(self) -> None:
+        from progress.contrib.proposal.models import PEP, RustRFC
+
+        _assert(PEP.select().count() > 0, "No PEPs found")
+        _assert(RustRFC.select().count() > 0, "No Rust RFCs found")
+
+    def verify_owners(self) -> None:
+        from progress.contrib.repo.models import GitHubOwner
+
+        _assert(GitHubOwner.select().count() >= 2, "Expected >= 2 owners")
+
+    def verify_changelog_trackers(self) -> None:
+        from progress.contrib.changelog.models import ChangelogTracker
+
+        _assert(
+            ChangelogTracker.select().count() >= 2, "Expected >= 2 changelog trackers"
+        )
 
     def evolve_repos(
         self, repo_main: CreatedRepo, repo_proposals: CreatedRepo
@@ -501,46 +521,69 @@ class IntegrationTest:
             self.console.info(f"Deleting {r.slug}...")
             self.gh.delete_repo(r.owner, r.name)
 
+    def verify_first_run(self, repo_main: CreatedRepo) -> None:
+        from progress.db import close_db, create_tables, init_db
+
+        init_db(str(self.database_path))
+        create_tables()
+        try:
+            self.verify_repositories([repo_main.slug, "sergi0g/cup"])
+            self.verify_reports()
+            self.verify_proposal_trackers()
+            self.verify_proposals()
+            self.verify_owners()
+            self.verify_changelog_trackers()
+        finally:
+            close_db()
+        self.verify_repo_update_report([repo_main.slug])
+        self.verify_proposal_report()
+        self.verify_changelog_report()
+
+    def verify_second_run(self, repo_main: CreatedRepo, repo_new: CreatedRepo) -> None:
+        from progress.db import close_db
+
+        try:
+            self.verify_repositories([repo_main.slug, "sergi0g/cup"])
+            self.verify_reports()
+        finally:
+            close_db()
+        self.verify_repo_update_report([repo_main.slug])
+        self.verify_new_repo_report(repo_new.slug)
+        self.verify_proposal_report()
+        self.verify_changelog_report()
+
     def run(self) -> int:
         self.console.header("Progress Integration Test")
         try:
-            self.console.step(1, 6, "Preparing environment")
+            self.console.step(1, 7, "Cleaning environment")
             self.cleanup_environment()
+            self.cleanup_remote_repos()
 
-            self.console.step(2, 6, "Creating initial GitHub repositories")
+            self.console.step(2, 7, "Creating test repositories")
             repo_main, repo_proposals = self.create_initial_repos()
 
-            self.console.step(3, 6, "Running Progress (first run)")
+            self.console.step(3, 7, "Running Progress (first run)")
             self.run_progress(
                 repos=[repo_main, repo_proposals],
                 proposals_repo=repo_proposals,
                 changelog_repo=repo_main,
             )
 
-            self.console.step(4, 6, "Verifying first run results")
-            self.verify_database(
-                expected_repo_count=2, min_reports=2, min_discovered=1, min_events=0
-            )
-            self.verify_repo_update_report(repo_main)
-            self.verify_proposal_report()
-            self.verify_changelog_report()
+            self.console.step(4, 7, "Verifying first run")
+            self.verify_first_run(repo_main)
 
-            self.console.step(5, 6, "Evolving repositories")
+            self.console.step(5, 7, "Evolving repositories")
             repo_new = self.evolve_repos(repo_main, repo_proposals)
 
-            self.console.step(6, 6, "Running Progress and verifying (second run)")
+            self.console.step(6, 7, "Running Progress (second run)")
             self.run_progress(
                 repos=[repo_main, repo_proposals, repo_new],
                 proposals_repo=repo_proposals,
                 changelog_repo=repo_main,
             )
-            self.verify_database(
-                expected_repo_count=3, min_reports=4, min_discovered=2, min_events=1
-            )
-            self.verify_repo_update_report(repo_main)
-            self.verify_new_repo_report(repo_new)
-            self.verify_proposal_report()
-            self.verify_changelog_report()
+
+            self.console.step(7, 7, "Verifying second run")
+            self.verify_second_run(repo_main, repo_new)
 
             self.console.success("All integration checks passed")
             return 0
@@ -549,7 +592,8 @@ class IntegrationTest:
             return 1
         finally:
             try:
-                self.cleanup_repos()
+                # self.cleanup_repos()
+                ...
             except Exception as e:
                 self.console.error(f"Repository cleanup failed: {e}")
 

@@ -130,7 +130,7 @@ class TestRepo:
         assert result is None
 
     def test_get_diff_first_check_insufficient_history(self):
-        """Test get_diff returns None when repository has only one commit"""
+        """Test get_diff uses recent mode when repository has only one commit"""
         model = Mock(spec=Repository)
         model.url = "https://github.com/owner/repo.git"
         model.branch = "main"
@@ -140,6 +140,9 @@ class TestRepo:
         git.workspace_dir = Path("/tmp/workspace")
         git.get_current_commit = Mock(return_value="abc123")
         git.get_total_commit_count = Mock(return_value=1)
+        git.get_recent_commit_hashes = Mock(return_value=["abc123"])
+        git.get_recent_commit_messages = Mock(return_value=["msg"])
+        git.get_recent_commit_patches = Mock(return_value="diff content")
         git.fetch_and_reset = Mock()
 
         config = Mock(spec=Config)
@@ -152,7 +155,13 @@ class TestRepo:
         with patch.object(repo, "clone_or_update"):
             result = repo.get_diff()
 
-        assert result is None
+        assert result is not None
+        diff, previous_commit, commit_count, commit_messages, is_range_check = result
+        assert diff == "diff content"
+        assert previous_commit == "abc123"
+        assert commit_count == 1
+        assert commit_messages == ["msg"]
+        assert is_range_check is False
 
     def test_get_diff_first_check_range_mode(self):
         """Test get_diff uses old..new range when total commits > lookback"""

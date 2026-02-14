@@ -267,7 +267,7 @@ def test_git_client_recent_commit_helpers(monkeypatch):
 
 
 def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
-    """Test: First check skips when repo has <= 1 commit"""
+    """Test: First check works when repo has 1 commit"""
 
     class FakeGitClient:
         workspace_dir = Path("/tmp")
@@ -278,9 +278,23 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         def get_total_commit_count(self, repo_path):
             return 1
 
+        def get_recent_commit_hashes(self, repo_path, max_count):
+            assert max_count == 1
+            return ["c" * 40]
+
+        def get_recent_commit_messages(self, repo_path, max_count):
+            assert max_count == 1
+            return ["m"]
+
+        def get_recent_commit_patches(self, repo_path, max_count):
+            assert max_count == 1
+            return "diff"
+
     class FakeAnalyzer:
         def analyze_diff(self, repo_name, branch, diff, commit_messages):
-            raise AssertionError("Should not analyze when total commits <= 1")
+            assert diff == "diff"
+            assert commit_messages == ["m"]
+            return ("report", "detail", False, 4, 4)
 
     repo = SimpleNamespace(
         id=1,
@@ -306,8 +320,18 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         def fake_clone_or_update(self):
             pass
 
+        def fake_check_releases(self):
+            return None
+
+        def fake_update(self, current_commit):
+            pass
+
         m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
-        assert manager.check(repo) is None
+        m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
+        m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
+        report = manager.check(repo)
+        assert report is not None
+        assert report.commit_count == 1
 
 
 def test_repository_manager_first_check_uses_range_when_history_sufficient(monkeypatch):
