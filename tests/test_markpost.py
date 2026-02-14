@@ -149,6 +149,8 @@ class TestUpload:
         """Test 5XX errors are retried (3 attempts total)."""
         call_count = []
 
+        monkeypatch.setattr("progress.utils.time.sleep", lambda _seconds: None)
+
         class FakeResponse:
             status_code = 500
             text = '{"error": "Internal server error"}'

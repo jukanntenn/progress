@@ -66,6 +66,8 @@ class EIP(BaseModel):
     last_check_time = DateTimeField(null=True)
     analysis_summary = TextField(null=True)
     analysis_detail = TextField(null=True)
+    created_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
 
     class Meta:
         table_name = "eips"
@@ -88,8 +90,10 @@ class RustRFC(BaseModel):
     last_check_time = DateTimeField(null=True)
     analysis_summary = TextField(null=True)
     analysis_detail = TextField(null=True)
+    created_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
 
-    class Models:
+    class Meta:
         table_name = "rust_rfcs"
         indexes = ((("rfc_number",), True),)
 
@@ -112,6 +116,8 @@ class PEP(BaseModel):
     last_check_time = DateTimeField(null=True)
     analysis_summary = TextField(null=True)
     analysis_detail = TextField(null=True)
+    created_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
 
     class Meta:
         table_name = "peps"
@@ -134,6 +140,8 @@ class DjangoDEP(BaseModel):
     last_check_time = DateTimeField(null=True)
     analysis_summary = TextField(null=True)
     analysis_detail = TextField(null=True)
+    created_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
 
     class Meta:
         table_name = "django_deps"

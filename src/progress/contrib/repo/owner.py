@@ -11,9 +11,11 @@ UTC = ZoneInfo("UTC")
 MAX_README_LENGTH = 50000
 
 
-def _parse_github_datetime(value: str | None) -> datetime | None:
+def _parse_github_datetime(value: str | datetime | None) -> datetime | None:
     if not value:
         return None
+    if isinstance(value, datetime):
+        return value
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (ValueError, TypeError):

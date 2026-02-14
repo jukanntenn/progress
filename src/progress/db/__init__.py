@@ -55,6 +55,20 @@ def migrate_database():
 
     migrate_owner_monitoring(database)
 
+    def _table_exists(table_name: str) -> bool:
+        row = database.execute_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    def _existing_columns(table_name: str) -> set[str]:
+        cursor = database.execute_sql(f"PRAGMA table_info({table_name})")
+        return {row[1] for row in cursor.fetchall()}
+
+    if _table_exists("rustrfc") and not _table_exists("rust_rfcs"):
+        database.execute_sql("ALTER TABLE rustrfc RENAME TO rust_rfcs")
+
     cursor = database.execute_sql("PRAGMA table_info(reports)")
     existing_columns = {row[1] for row in cursor.fetchall()}
 
@@ -120,6 +134,42 @@ def migrate_database():
             ),
         )
         logger.info("Migration completed: release tracking columns added")
+
+    proposal_tables = ["eips", "peps", "django_deps", "rust_rfcs"]
+    for table in proposal_tables:
+        if not _table_exists(table):
+            continue
+        cols = _existing_columns(table)
+        migrations = []
+        if "created_at" not in cols:
+            migrations.append(
+                migrator.add_column(table, "created_at", DateTimeField(null=True))
+            )
+        if "updated_at" not in cols:
+            migrations.append(
+                migrator.add_column(table, "updated_at", DateTimeField(null=True))
+            )
+        if migrations:
+            logger.info(
+                f"Migrating: Adding created_at/updated_at columns to {table} table"
+            )
+            migrate(*migrations)
+            logger.info(f"Migration completed: {table} timestamps added")
+
+    if _table_exists("discovered_repositories"):
+        cols = _existing_columns("discovered_repositories")
+        if "updated_at" not in cols:
+            logger.info(
+                "Migrating: Adding 'updated_at' column to discovered_repositories table"
+            )
+            migrate(
+                migrator.add_column(
+                    "discovered_repositories",
+                    "updated_at",
+                    DateTimeField(null=True),
+                )
+            )
+            logger.info("Migration completed: 'updated_at' column added")
 
 
 def close_db():

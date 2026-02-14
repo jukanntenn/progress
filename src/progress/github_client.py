@@ -1,6 +1,7 @@
 """GitHub API client using PyGithub"""
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from github import (
@@ -119,14 +120,32 @@ class GitHubClient:
 
             result = []
             for repo in repos:
-                if source and repo.fork:
-                    continue
+                if source:
+                    fork_attr = getattr(repo, "fork", None)
+                    is_fork = fork_attr if isinstance(fork_attr, bool) else False
+                    if is_fork:
+                        continue
+
+                    source_attr = getattr(repo, "source", None)
+                    if isinstance(source_attr, bool) and not source_attr:
+                        continue
+                created_at = getattr(repo, "created_at", None)
+                updated_at = getattr(repo, "updated_at", None)
+
+                if isinstance(created_at, datetime):
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+                    created_at = created_at.isoformat().replace("+00:00", "Z")
+                if isinstance(updated_at, datetime):
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
+                    updated_at = updated_at.isoformat().replace("+00:00", "Z")
                 result.append(
                     {
                         "nameWithOwner": repo.full_name,
                         "description": repo.description,
-                        "createdAt": repo.created_at,
-                        "updatedAt": repo.updated_at,
+                        "createdAt": created_at,
+                        "updatedAt": updated_at,
                     }
                 )
                 if len(result) >= limit:

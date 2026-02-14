@@ -47,6 +47,7 @@ class DiscoveredRepository(BaseModel):
     repo_url = CharField()
     description = TextField(null=True)
     discovered_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
     has_readme = BooleanField(default=False)
     readme_summary = TextField(null=True)
     readme_detail = TextField(null=True)
