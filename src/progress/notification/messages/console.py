@@ -6,6 +6,7 @@ from ...i18n import gettext as _
 from ..channels.console import ConsoleChannel
 from ..utils import (
     ChangelogEntry,
+    DiscoveredRepo,
     NotificationType,
     add_batch_indicator,
     compute_notification_stats,
@@ -24,6 +25,7 @@ class ConsoleMessage(Message):
         repo_statuses: Mapping[str, str] | None = None,
         notification_type: NotificationType = "repo_update",
         changelog_entries: list[ChangelogEntry] | None = None,
+        discovered_repos: list[DiscoveredRepo] | None = None,
         batch_index: int | None = None,
         total_batches: int | None = None,
     ) -> None:
@@ -35,6 +37,7 @@ class ConsoleMessage(Message):
         self._repo_statuses = repo_statuses
         self._notification_type = notification_type
         self._changelog_entries = changelog_entries
+        self._discovered_repos = discovered_repos
         self._batch_index = batch_index
         self._total_batches = total_batches
 
@@ -47,6 +50,8 @@ class ConsoleMessage(Message):
         )
         if self._notification_type == "changelog":
             return self._build_changelog_payload(title_with_batch)
+        if self._notification_type == "discovered_repos":
+            return self._build_discovered_repos_payload(title_with_batch)
         return self._build_default_payload(title_with_batch)
 
     def _build_default_payload(self, title: str) -> str:
@@ -72,6 +77,18 @@ class ConsoleMessage(Message):
         for entry in self._changelog_entries or []:
             name_and_version = f"{entry.name} {entry.version}".strip()
             lines.append(f"• {name_and_version} - {entry.url}")
+        if self._markpost_url:
+            lines.extend(["", self._markpost_url])
+        return "\n".join(lines)
+
+    def _build_discovered_repos_payload(self, title: str) -> str:
+        lines = [title, ""]
+        repos = self._discovered_repos or []
+        visible = repos[:5]
+        for repo in visible:
+            lines.append(f"{repo.name} - {repo.url}")
+        if len(repos) > 5:
+            lines.append(f"... and {len(repos) - 5} more")
         if self._markpost_url:
             lines.extend(["", self._markpost_url])
         return "\n".join(lines)

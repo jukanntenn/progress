@@ -28,7 +28,7 @@ from .notification import (
     create_message,
     create_proposal_message,
 )
-from .notification.utils import ChangelogEntry
+from .notification.utils import ChangelogEntry, DiscoveredRepo
 from .storages import FileStorage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
@@ -434,18 +434,22 @@ def _send_entity_notification(
     if markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
 
-    repo_statuses = {
-        (r.get("name_with_owner") or r.get("repo_name") or str(r.get("id"))): "success"
-        for r in new_repos
-    }
+    discovered_repos = [
+        DiscoveredRepo(
+            name=r.get("name_with_owner") or r.get("repo_name") or str(r.get("id")),
+            url=r.get("repo_url") or f"https://github.com/{r.get('name_with_owner', '')}",
+        )
+        for r in sorted_repos
+    ]
 
     send_notification(
         notification_config,
         title=title,
         summary=summary or f"Discovered {len(new_repos)} new repositories",
-        total_commits=len(new_repos),
+        total_commits=0,
         markpost_url=markpost_url,
-        repo_statuses=repo_statuses,
+        notification_type="discovered_repos",
+        discovered_repos=discovered_repos,
     )
 
     for r in new_repos:

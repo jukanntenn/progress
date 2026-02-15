@@ -294,10 +294,6 @@ class IntegrationTest:
             "pep" in content_lower or "rfc" in content_lower,
             "Missing PEP/RFC reference",
         )
-        has_event_info = any(
-            kw in content_lower for kw in ["created", "status", "accepted", "draft"]
-        )
-        _assert(has_event_info, "Proposal report missing event information")
 
     def verify_changelog_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "changelog")

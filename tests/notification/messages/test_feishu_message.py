@@ -4,7 +4,7 @@ import json
 
 from progress.notification.channels.feishu import FeishuChannel
 from progress.notification.messages.feishu import FeishuMessage, FeishuProposalMessage
-from progress.notification.utils import ChangelogEntry
+from progress.notification.utils import ChangelogEntry, DiscoveredRepo
 
 
 def test_feishu_message_get_payload_returns_json_card() -> None:
@@ -57,6 +57,65 @@ def test_feishu_message_changelog_renders_bullet_list() -> None:
     content_elements = [e for e in elements if e.get("tag") == "div"]
     assert any("React v19.0.0" in e["text"]["content"] for e in content_elements)
     assert any("Vue v3.5.0" in e["text"]["content"] for e in content_elements)
+
+
+def test_feishu_message_discovered_repos_renders_repo_links() -> None:
+    channel = FeishuChannel(webhook_url="https://example.com/webhook", timeout=30)
+    repos = [
+        DiscoveredRepo(name="owner1/repo1", url="https://github.com/owner1/repo1"),
+        DiscoveredRepo(name="owner2/repo2", url="https://github.com/owner2/repo2"),
+    ]
+    message = FeishuMessage(
+        channel,
+        title="New Repos Discovered",
+        summary="",
+        total_commits=0,
+        markpost_url="https://example.com/report",
+        notification_type="discovered_repos",
+        discovered_repos=repos,
+    )
+
+    payload = message.get_payload()
+    parsed = json.loads(payload)
+
+    assert parsed["card"]["card_link"]["url"] == "https://example.com/report"
+    elements = parsed["card"]["elements"]
+    content_elements = [e for e in elements if e.get("tag") == "div"]
+    assert any(
+        "[owner1/repo1](https://github.com/owner1/repo1)" in e["text"]["content"]
+        for e in content_elements
+    )
+    assert any(
+        "[owner2/repo2](https://github.com/owner2/repo2)" in e["text"]["content"]
+        for e in content_elements
+    )
+
+
+def test_feishu_message_discovered_repos_truncates_at_5() -> None:
+    channel = FeishuChannel(webhook_url="https://example.com/webhook", timeout=30)
+    repos = [
+        DiscoveredRepo(
+            name=f"owner/repo{i}", url=f"https://github.com/owner/repo{i}"
+        )
+        for i in range(8)
+    ]
+    message = FeishuMessage(
+        channel,
+        title="New Repos",
+        summary="",
+        total_commits=0,
+        notification_type="discovered_repos",
+        discovered_repos=repos,
+    )
+
+    payload = message.get_payload()
+    parsed = json.loads(payload)
+
+    elements = parsed["card"]["elements"]
+    content_elements = [e for e in elements if e.get("tag") == "div"]
+    repo_links = [e for e in content_elements if "github.com" in e["text"]["content"]]
+    assert len(repo_links) == 5
+    assert any("... and 3 more" in e["text"]["content"] for e in content_elements)
 
 
 def test_feishu_proposal_message_renders_filenames_and_card_link() -> None:

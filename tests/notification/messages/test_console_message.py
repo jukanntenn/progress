@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from progress.notification.channels.console import ConsoleChannel
 from progress.notification.messages.console import ConsoleMessage, ConsoleProposalMessage
-from progress.notification.utils import ChangelogEntry
+from progress.notification.utils import ChangelogEntry, DiscoveredRepo
 
 
 def test_console_message_get_payload_includes_title_and_summary() -> None:
@@ -61,4 +61,26 @@ def test_console_proposal_message_renders_filenames_and_report_link() -> None:
     assert "📄 eip-1.md" in payload
     assert "📄 eip-2.md" in payload
     assert "... and 3 more" in payload
+    assert "https://example.com/report" in payload
+
+
+def test_console_message_discovered_repos_renders_repo_list() -> None:
+    channel = ConsoleChannel()
+    repos = [
+        DiscoveredRepo(name="owner1/repo1", url="https://github.com/owner1/repo1"),
+        DiscoveredRepo(name="owner2/repo2", url="https://github.com/owner2/repo2"),
+    ]
+    message = ConsoleMessage(
+        channel,
+        title="New Repos Discovered",
+        summary="",
+        total_commits=0,
+        markpost_url="https://example.com/report",
+        notification_type="discovered_repos",
+        discovered_repos=repos,
+    )
+
+    payload = message.get_payload()
+    assert "owner1/repo1" in payload
+    assert "owner2/repo2" in payload
     assert "https://example.com/report" in payload

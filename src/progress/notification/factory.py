@@ -58,6 +58,7 @@ def create_message(
                 repo_statuses=kwargs.get("repo_statuses"),
                 notification_type=kwargs.get("notification_type", "repo_update"),
                 changelog_entries=kwargs.get("changelog_entries"),
+                discovered_repos=kwargs.get("discovered_repos"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
             )
@@ -71,6 +72,7 @@ def create_message(
                 repo_statuses=kwargs.get("repo_statuses"),
                 notification_type=kwargs.get("notification_type", "repo_update"),
                 changelog_entries=kwargs.get("changelog_entries"),
+                discovered_repos=kwargs.get("discovered_repos"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
             )
@@ -84,6 +86,7 @@ def create_message(
                 repo_statuses=kwargs.get("repo_statuses"),
                 notification_type=kwargs.get("notification_type", "repo_update"),
                 changelog_entries=kwargs.get("changelog_entries"),
+                discovered_repos=kwargs.get("discovered_repos"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
             )

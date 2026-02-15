@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from progress.notification.channels.email import EmailChannel
 from progress.notification.messages.email import EmailMessage, EmailProposalMessage
-from progress.notification.utils import ChangelogEntry
+from progress.notification.utils import ChangelogEntry, DiscoveredRepo
 
 
 def test_email_message_get_payload_includes_subject_and_html() -> None:
@@ -62,6 +62,37 @@ def test_email_message_changelog_renders_bullet_list() -> None:
     payload = message.get_payload()
     assert "React" in payload and "v19.0.0" in payload
     assert "Vue" in payload and "v3.5.0" in payload
+
+
+def test_email_message_discovered_repos_renders_repo_links() -> None:
+    channel = EmailChannel(
+        host="smtp.example.com",
+        port=587,
+        user="user@example.com",
+        password="pass",
+        from_addr="from@example.com",
+        recipient=["to@example.com"],
+        starttls=False,
+        ssl=False,
+    )
+    repos = [
+        DiscoveredRepo(name="owner1/repo1", url="https://github.com/owner1/repo1"),
+        DiscoveredRepo(name="owner2/repo2", url="https://github.com/owner2/repo2"),
+    ]
+    message = EmailMessage(
+        channel,
+        title="New Repos Discovered",
+        summary="",
+        total_commits=0,
+        markpost_url="https://example.com/report",
+        notification_type="discovered_repos",
+        discovered_repos=repos,
+    )
+
+    payload = message.get_payload()
+    assert "owner1/repo1" in payload
+    assert "https://github.com/owner1/repo1" in payload
+    assert "owner2/repo2" in payload
 
 
 def test_email_proposal_message_renders_filenames_and_report_link() -> None:

@@ -14,6 +14,12 @@ class ChangelogEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscoveredRepo:
+    name: str
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
 class NotificationStats:
     total_repos: int
     success_count: int
