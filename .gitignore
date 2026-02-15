@@ -233,6 +233,7 @@ openspec/
 
 # Git worktrees for isolated development
 .worktrees/
+docs/plans/
 
 # Frontend build
 src/progress/web/dist/

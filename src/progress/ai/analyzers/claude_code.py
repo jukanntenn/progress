@@ -271,7 +271,8 @@ class ClaudeCodeAnalyzer:
         output = ""
         try:
             output = run_command(
-                [self.claude_code_path, "-p", prompt],
+                [self.claude_code_path, "-p"],
+                input=prompt,
                 timeout=self.timeout,
                 check=False,
             )
@@ -372,7 +373,8 @@ class ClaudeCodeAnalyzer:
         output = ""
         try:
             output = run_command(
-                [self.claude_code_path, "-p", prompt],
+                [self.claude_code_path, "-p"],
+                input=prompt,
                 timeout=self.timeout,
                 check=False,
             )
@@ -437,7 +439,8 @@ Here is the aggregated report:
         try:
             logger.info("Generating title and summary with Claude...")
             output = run_command(
-                [self.claude_code_path, "-p", prompt],
+                [self.claude_code_path, "-p"],
+                input=prompt,
                 timeout=self.timeout,
                 check=False,
             ).strip()
