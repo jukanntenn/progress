@@ -1,5 +1,3 @@
-# New repositories discovered {{ report_date }}
-
 {% for repo in repos %}
 ## [{{ repo.owner_name }}/{{ repo.repo_name }}]({{ repo.repo_url }})
 
@@ -7,7 +5,9 @@
 > {{ repo.description }}
 {% endif %}
 
-{% if repo.readme_summary %}{{ repo.readme_summary }}{% endif %}
+{% if repo.readme_summary %}
+{{ repo.readme_summary }}
+{% endif %}
 
 {% if repo.readme_detail %}
 <details>
@@ -18,9 +18,9 @@
 </details>
 {% endif %}
 
-🗓{{ repo.discovered_at }}
+⌚️{{ repo.discovered_at }}
 
 {% if not loop.last %}
-
----{% endif %}
+---
+{% endif %}
 {% endfor %}
