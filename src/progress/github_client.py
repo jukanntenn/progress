@@ -1,6 +1,7 @@
 """GitHub API client using PyGithub"""
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -26,12 +27,22 @@ class GitHubClient:
             token: GitHub personal access token (optional)
             proxy: Proxy URL for API requests (optional)
         """
-        self.github = Github(token)
         if proxy:
-            self.github.set_proxy(proxy)
+            self._configure_proxy(proxy)
+        self.github = Github(token)
         logger.debug(
             f"GitHubClient initialized (token: {token[:8] + '...' if token else 'None'})"
         )
+
+    @staticmethod
+    def _configure_proxy(proxy: str) -> None:
+        os.environ["HTTP_PROXY"] = proxy
+        os.environ["HTTPS_PROXY"] = proxy
+        os.environ["http_proxy"] = proxy
+        os.environ["https_proxy"] = proxy
+        if proxy.startswith(("socks4://", "socks4a://", "socks5://", "socks5h://")):
+            os.environ["ALL_PROXY"] = proxy
+            os.environ["all_proxy"] = proxy
 
     def list_releases(
         self,

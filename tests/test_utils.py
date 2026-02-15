@@ -80,7 +80,7 @@ class TestRetry:
 
         @retry(times=3, initial_delay=0.1, backoff="exponential")
         def func():
-            call_times.append(time.time())
+            call_times.append(time.monotonic())
             if len(call_times) < 2:
                 raise ValueError("fail")
             return "success"
@@ -96,7 +96,7 @@ class TestRetry:
 
         @retry(times=4, initial_delay=0.05, backoff="fixed")
         def func():
-            call_times.append(time.time())
+            call_times.append(time.monotonic())
             if len(call_times) < 3:
                 raise ValueError("fail")
             return "success"

@@ -1,5 +1,6 @@
 """GitHub API client unit tests"""
 
+import os
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
@@ -12,19 +13,31 @@ from progress.errors import GitException
 def test_github_client_initialization():
     """Test: GitHubClient initializes with token and proxy"""
     mock_github = Mock()
-    with patch("progress.github_client.Github", return_value=mock_github) as mock_ctor:
-        GitHubClient(token="test_token", proxy="http://proxy")
-        mock_ctor.assert_called_once_with("test_token")
-        mock_github.set_proxy.assert_called_once_with("http://proxy")
+    with patch.dict(os.environ, {}, clear=True):
+        with patch(
+            "progress.github_client.Github", return_value=mock_github
+        ) as mock_ctor:
+            GitHubClient(token="test_token", proxy="http://proxy")
+            mock_ctor.assert_called_once_with("test_token")
+            assert os.environ["HTTP_PROXY"] == "http://proxy"
+            assert os.environ["HTTPS_PROXY"] == "http://proxy"
+            assert os.environ["http_proxy"] == "http://proxy"
+            assert os.environ["https_proxy"] == "http://proxy"
 
 
 def test_github_client_initialization_without_proxy():
     """Test: GitHubClient initializes without proxy"""
     mock_github = Mock()
-    with patch("progress.github_client.Github", return_value=mock_github) as mock_ctor:
-        GitHubClient(token="test_token")
-        mock_ctor.assert_called_once_with("test_token")
-        mock_github.set_proxy.assert_not_called()
+    with patch.dict(os.environ, {}, clear=True):
+        with patch(
+            "progress.github_client.Github", return_value=mock_github
+        ) as mock_ctor:
+            GitHubClient(token="test_token")
+            mock_ctor.assert_called_once_with("test_token")
+            assert "HTTP_PROXY" not in os.environ
+            assert "HTTPS_PROXY" not in os.environ
+            assert "http_proxy" not in os.environ
+            assert "https_proxy" not in os.environ
 
 
 class TestListReleases:
