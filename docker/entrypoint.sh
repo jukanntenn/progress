@@ -51,30 +51,8 @@ start_web_service() {
         web_host=${web_host:-0.0.0.0}
         web_port=${web_port:-5000}
 
-        # Try gunicorn first, fallback to python
-        if command -v gunicorn >/dev/null 2>&1; then
-            log "Using gunicorn to start web service..."
-            gunicorn -w 2 -b "$web_host:$web_port" \
-                --access-logfile - \
-                --error-logfile - \
-                --log-level info \
-                --capture-output \
-                "progress.web:create_app()" &
-        else
-            log "Gunicorn not found, using Flask development server..."
-            cat > /tmp/run_web.py << 'EOFPYTHON'
-import sys
-sys.path.insert(0, '/app/src')
-
-from progress.config import Config
-from progress.web import create_app
-
-config = Config.load_from_file('/app/config.toml')
-app = create_app(config)
-app.run(host='0.0.0.0', port=5000, debug=False)
-EOFPYTHON
-            python /tmp/run_web.py &
-        fi
+        log "Starting FastAPI web service with uvicorn..."
+        uvicorn "progress.api:create_app" --factory --host "$web_host" --port "$web_port" --log-level info &
 
         local web_pid=$!
         sleep 2

@@ -1,6 +1,7 @@
 """CLI main entry point."""
 
 import logging
+import os
 from datetime import datetime
 from pathlib import Path, PurePath
 
@@ -32,7 +33,6 @@ from .notification.utils import ChangelogEntry, DiscoveredRepo
 from .storages import FileStorage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
-from .web import create_app
 
 logger = logging.getLogger(__name__)
 
@@ -914,14 +914,12 @@ def list_proposal_events(ctx, proposal_type: str, number: int):
 @cli.command(name="serve")
 @click.option("--host", "-h", default=None, help="Override host from config")
 @click.option("--port", "-p", default=None, type=int, help="Override port from config")
-@click.option(
-    "--debug/--no-debug",
-    default=None,
-    help="Enable/disable debug mode (auto-enable in dev)",
-)
+@click.option("--reload/--no-reload", default=True, help="Enable/disable auto-reload")
 @click.pass_context
-def serve(ctx, host, port, debug):
+def serve(ctx, host, port, reload):
     """Start development server with hot reload."""
+    import uvicorn
+
     config_path = ctx.obj["config_path"]
 
     try:
@@ -933,25 +931,23 @@ def serve(ctx, host, port, debug):
         host = host or cfg.web.host
         port = port or cfg.web.port
 
-        if debug is None:
-            debug = True
-
-        if debug:
+        if reload:
             logger.warning(
-                "Debug mode is enabled. This should NOT be used in production."
+                "Hot reload is enabled. This should NOT be used in production."
             )
-            if not hasattr(cfg.web, "debug") or not cfg.web.debug:
-                logger.warning(
-                    "Consider setting [web] debug = true in config.toml for development."
-                )
 
-        app = create_app(cfg)
+        os.environ["CONFIG_FILE"] = config_path
 
-        logger.info(f"Starting development server on {host}:{port}")
-        logger.info(f"Debug mode: {'enabled' if debug else 'disabled'}")
-        logger.info(f"Hot reload: {'enabled' if debug else 'disabled'}")
+        logger.info(f"Starting server on {host}:{port}")
+        logger.info(f"Hot reload: {'enabled' if reload else 'disabled'}")
 
-        app.run(host=host, port=port, debug=debug, use_reloader=debug)
+        uvicorn.run(
+            "progress.api:create_app",
+            host=host,
+            port=port,
+            reload=reload,
+            factory=True,
+        )
 
     except ProgressException as e:
         logger.error(f"Application error: {e}", exc_info=True)

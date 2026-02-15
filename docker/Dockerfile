@@ -1,3 +1,15 @@
+FROM node:20-slim AS frontend
+
+WORKDIR /app/src/progress/web
+
+RUN corepack enable && corepack prepare pnpm@9.15.6 --activate
+
+COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml* ./
+RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
+
+COPY src/progress/web/ ./
+RUN pnpm build
+
 FROM python:3.13-slim AS builder
 
 ARG BUILDPLATFORM
@@ -65,6 +77,7 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /root/.local/bin /root/.local/bin
 COPY --from=builder /app/src/progress/locales /app/src/progress/locales
+COPY --from=frontend /app/src/progress/web/dist /app/src/progress/web/dist
 
 WORKDIR /app
 

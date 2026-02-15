@@ -64,7 +64,8 @@ progress/
 │       ├── repository.py  # Extended repository operations
 │       ├── reporter.py    # Markdown report generator
 │       ├── utils.py       # Utility functions
-│       └── web.py         # Web service (Flask)
+│       ├── api/           # Web API + static serving (FastAPI)
+│       └── web/           # Frontend (React + Vite)
 │       ├── templates/     # Jinja2 template files
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
@@ -78,10 +79,6 @@ progress/
 │       │   ├── proposal_rejected_prompt.j2
 │       │   ├── proposal_status_change_prompt.j2
 │       │   ├── proposal_withdrawn_prompt.j2
-│       │   └── web/       # Web UI templates
-│       │       ├── list.html
-│       │       ├── detail.html
-│       │       └── 404.html
 │       └── locales/       # Localization files
 │           ├── progress.pot
 │           └── zh-hans/
@@ -103,8 +100,11 @@ progress/
 ## Commands
 
 - Install dependencies: `uv sync`
+- Install frontend dependencies: `cd src/progress/web && pnpm install`
 - Run application: `uv run progress -c config.toml`
 - Run unit tests: `uv run pytest -v`
+- Start dev server (backend): `uv run progress -c config.toml serve --reload`
+- Start dev server (frontend): `cd src/progress/web && pnpm dev`
 
 ## Proposal Tracking
 
@@ -117,7 +117,9 @@ progress/
 - Programming Language: Python 3.12+
 - Package and Project Manager: uv 0.9+
 - CLI Framework: Click 8.3+
-- Web Framework: Flask 3.0+
+- Web Framework: FastAPI 0.115+
+- Frontend: React 18 + TypeScript + Vite 5 + Tailwind CSS
+- Frontend Package Manager: pnpm
 - RSS Generation: feedgen
 - Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)
 - Containerized development and deployment: Docker

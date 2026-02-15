@@ -2,17 +2,22 @@
 
 ## Development Server
 
-Start the Flask development server with hot reload enabled:
+Run backend and frontend in separate terminals:
 
 ```bash
-uv run progress serve
+# Terminal 1: Backend (FastAPI)
+uv run progress serve --reload
+
+# Terminal 2: Frontend (Vite)
+cd src/progress/web
+pnpm dev
 ```
 
 ### Command Options
 
 - `--host/-h`: Override host from config (default: from config file)
 - `--port/-p`: Override port from config (default: from config file)
-- `--debug/--no-debug`: Enable/disable debug mode (default: enabled)
+- `--reload/--no-reload`: Enable/disable hot reload (default: enabled)
 
 ### Examples
 
@@ -20,8 +25,8 @@ uv run progress serve
 # Custom host and port
 uv run progress serve --host 127.0.0.1 --port 8000
 
-# Disable debug mode
-uv run progress serve --no-debug
+# Disable hot reload
+uv run progress serve --no-reload
 
 # With custom config
 uv run progress -c custom.toml serve
@@ -29,6 +34,6 @@ uv run progress -c custom.toml serve
 
 ## Production Deployment
 
-Use Docker with gunicorn for production. The development server is for local development only.
+Use Docker with uvicorn for production. The development servers are for local development only.
 
-**Security Warning**: Debug mode is enabled by default in `progress serve`. Never use debug mode in production.
+**Security Warning**: Hot reload is enabled by default in `progress serve`. Never use it in production.

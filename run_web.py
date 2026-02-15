@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Web server startup script for local development."""
 
+import os
 import sys
 from pathlib import Path
 
 from progress.config import Config
-from progress.web import create_app
 
 
 def main():
@@ -23,15 +23,23 @@ def main():
         print("Please set [web] enabled = true in config.toml")
         sys.exit(1)
 
-    app = create_app(config)
-
     host = config.web.host
     port = config.web.port
 
     print(f"Starting web service on http://{host}:{port}")
     print("Press Ctrl+C to stop")
 
-    app.run(host=host, port=port, debug=False)
+    os.environ["CONFIG_FILE"] = config_path
+
+    import uvicorn
+
+    uvicorn.run(
+        "progress.api:create_app",
+        host=host,
+        port=port,
+        factory=True,
+        reload=False,
+    )
 
 
 if __name__ == "__main__":

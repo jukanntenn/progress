@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-5 dark:from-gray-900 dark:to-gray-800;
+}
+
+.prose h1 {
+  @apply mb-5 mt-10 border-b border-gray-200 pb-3 text-3xl font-bold tracking-tight dark:border-gray-700;
+}
+.prose h2 {
+  @apply mb-5 mt-10 border-b-2 border-gray-200 pb-3 text-2xl font-bold dark:border-gray-700;
+}
+.prose h3 {
+  @apply relative mb-4 mt-8 pl-4 text-xl font-semibold;
+}
+.prose h3::before {
+  content: '';
+  @apply absolute bottom-0.5 left-0 top-0.5 w-1 rounded bg-gradient-to-b from-blue-600 to-blue-700;
+}
+.prose p {
+  @apply mb-6 leading-relaxed;
+}
+.prose ul,
+.prose ol {
+  @apply mb-6 pl-7;
+}
+.prose li {
+  @apply mb-2 leading-relaxed;
+}
+.prose code {
+  @apply break-words rounded border border-gray-200 bg-gray-100 px-1.5 py-0.5 text-sm dark:border-gray-700 dark:bg-gray-900;
+}
+.prose pre {
+  @apply mb-6 overflow-x-auto rounded-lg border border-gray-700 bg-gray-900 p-5;
+}
+.prose pre code {
+  @apply border-0 bg-transparent p-0;
+}
+.prose a {
+  @apply text-blue-600 no-underline hover:underline dark:text-blue-400;
+}
+.prose blockquote {
+  @apply mb-6 rounded-r-lg border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-white py-5 pl-5 pr-7 dark:from-gray-800 dark:to-gray-900;
+}
+.prose table {
+  @apply mb-6 w-full overflow-hidden rounded-lg border-collapse;
+}
+.prose th,
+.prose td {
+  @apply border border-gray-200 px-4 py-3 text-left dark:border-gray-700;
+}
+.prose th {
+  @apply bg-gray-50 font-semibold dark:bg-gray-800;
+}
+
