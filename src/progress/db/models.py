@@ -15,7 +15,6 @@ from peewee import (
     TextField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
-from playhouse.sqlite_ext import JSONField
 
 UTC = ZoneInfo("UTC")
 

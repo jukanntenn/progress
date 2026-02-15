@@ -72,16 +72,6 @@ class ProposalTrackerManager:
             )
 
         existing = list(ProposalTracker.select())
-        existing_keys = {
-            (
-                tr.tracker_type,
-                tr.repo_url,
-                tr.branch,
-                tr.proposal_dir,
-                tr.file_pattern,
-            )
-            for tr in existing
-        }
 
         created = 0
         updated = 0
@@ -136,7 +126,7 @@ class ProposalTrackerManager:
         }
 
     def list_enabled(self) -> list[ProposalTracker]:
-        return list(ProposalTracker.select().where(ProposalTracker.enabled == True))
+        return list(ProposalTracker.select().where(ProposalTracker.enabled))
 
     def check_all(
         self,

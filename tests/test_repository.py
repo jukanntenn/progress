@@ -1,14 +1,10 @@
 """RepositoryManager unit tests"""
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
-from progress.config import Config
-from progress.github import GitClient
-from progress.github_client import GitHubClient
-from progress.db.models import Repository
 from progress.contrib.repo.reporter import MarkdownReporter
 from progress.contrib.repo.repository import RepositoryManager
 
@@ -137,6 +133,37 @@ class TestRepositoryManager:
         assert result[2]["tag_name"] == "v1.0.0"
         assert result[2]["ai_summary"] == "**Summary of v1.0.0**"
         assert result[2]["ai_detail"] == "**Detail of v1.0.0**"
+
+    def test_analyze_all_releases_includes_diff_content(self, repo_manager):
+        release_data = {
+            "is_first_check": False,
+            "releases": [
+                {
+                    "tag_name": "v2.0.0",
+                    "title": "Release 2.0.0",
+                    "notes": "Major update",
+                    "published_at": "2024-02-01T00:00:00Z",
+                    "commit_hash": "new123",
+                }
+            ],
+        }
+
+        mock_repo_obj = Mock()
+        mock_repo_obj.repo_path = "/tmp/repo"
+        mock_repo_obj.git.get_commit_diff.return_value = "diff text"
+
+        repo_manager.analyzer.analyze_releases.return_value = ("Summary", "Detail")
+
+        repo_manager._analyze_all_releases(
+            "test/repo",
+            "main",
+            release_data,
+            mock_repo_obj,
+            previous_release_commit="old456",
+        )
+
+        call_args = repo_manager.analyzer.analyze_releases.call_args
+        assert call_args[0][2]["diff_content"] == "diff text"
 
     def test_analyze_all_releases_with_analysis_error(self, repo_manager):
         """Test graceful handling when AI analysis fails"""

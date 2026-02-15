@@ -307,6 +307,12 @@ class IntegrationTest:
         has_version = any(c.isdigit() for c in content) and "." in content
         _assert(has_version, "Changelog report missing version numbers")
 
+    def verify_release_in_report(self) -> None:
+        report = self.get_latest_report(self.reports_dir / "repo" / "update")
+        _assert(report is not None, "No repo update report found")
+        content = report.read_text(encoding="utf-8")
+        _assert("🚀" in content, "No release found in report (missing 🚀 marker)")
+
     def create_initial_repos(self) -> tuple[CreatedRepo, CreatedRepo]:
         repo_main = CreatedRepo(self.owner, self.testing_repo_name)
         repo_proposals = CreatedRepo(self.owner, self.proposals_repo_name)
@@ -536,6 +542,7 @@ class IntegrationTest:
         finally:
             close_db()
         self.verify_repo_update_report([repo_main.slug])
+        self.verify_release_in_report()
         self.verify_proposal_report()
         self.verify_changelog_report()
 
@@ -548,6 +555,7 @@ class IntegrationTest:
         finally:
             close_db()
         self.verify_repo_update_report([repo_main.slug])
+        self.verify_release_in_report()
         self.verify_new_repo_report(repo_new.slug)
         self.verify_proposal_report()
         self.verify_changelog_report()

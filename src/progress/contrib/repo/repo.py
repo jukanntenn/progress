@@ -314,6 +314,7 @@ class Repo:
         Returns:
             Dict with list of release data, or None if no new releases:
             - releases: list of dicts with tag_name, title, notes, published_at, commit_hash
+            - is_first_check: True if this is the first release check
         """
         try:
             owner, repo_name = self.slug.split("/")
@@ -326,56 +327,76 @@ class Repo:
             logger.debug(f"No releases found for {self.slug}")
             return None
 
-        new_releases = []
         last_check_time = self.model.last_release_check_time
 
-        from datetime import datetime
+        from datetime import datetime, timezone
+
+        if isinstance(last_check_time, str):
+            try:
+                last_check_time = datetime.fromisoformat(last_check_time)
+            except ValueError:
+                last_check_time = None
+        if isinstance(last_check_time, datetime) and last_check_time.tzinfo is None:
+            last_check_time = last_check_time.replace(tzinfo=timezone.utc)
+
+        is_first_check = last_check_time is None
+
+        releases_to_process: list[dict] = []
+        releases_with_time: list[tuple[datetime, dict]] = []
 
         for r in releases:
             published_at_str = r.get("publishedAt")
-            if published_at_str:
-                try:
-                    published_at = datetime.fromisoformat(
-                        published_at_str.replace("Z", "+00:00")
-                    )
-                    if last_check_time is None or published_at > last_check_time:
-                        try:
-                            commit_hash = self.github_client.get_release_commit(
-                                owner, repo_name, r["tagName"]
-                            )
-                        except GitException as e:
-                            logger.warning(
-                                f"Failed to get commit hash for {r['tagName']}: {e}"
-                            )
-                            commit_hash = None
+            if not published_at_str:
+                continue
+            try:
+                published_at = datetime.fromisoformat(
+                    published_at_str.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                logger.debug(f"Could not parse publishedAt: {published_at_str}")
+                continue
 
-                        try:
-                            notes = self.github_client.get_release_body(
-                                owner, repo_name, r["tagName"]
-                            )
-                        except GitException as e:
-                            logger.warning(
-                                f"Failed to get release notes for {r['tagName']}: {e}"
-                            )
-                            notes = ""
+            if is_first_check:
+                releases_with_time.append((published_at, r))
+            elif last_check_time is not None and published_at > last_check_time:
+                releases_to_process.append(r)
 
-                        new_releases.append(
-                            {
-                                "tag_name": r["tagName"],
-                                "title": r["name"],
-                                "notes": notes,
-                                "published_at": r["publishedAt"],
-                                "commit_hash": commit_hash,
-                            }
-                        )
-                except (ValueError, TypeError):
-                    logger.debug(f"Could not parse publishedAt: {published_at_str}")
-                    continue
+        if is_first_check:
+            if releases_with_time:
+                releases_to_process = [max(releases_with_time, key=lambda x: x[0])[1]]
 
-        if not new_releases:
+        if not releases_to_process:
             return None
 
-        return {"releases": new_releases}
+        new_releases = []
+        for r in releases_to_process:
+            try:
+                commit_hash = self.github_client.get_release_commit(
+                    owner, repo_name, r["tagName"]
+                )
+            except GitException as e:
+                logger.warning(f"Failed to get commit hash for {r['tagName']}: {e}")
+                commit_hash = None
+
+            try:
+                notes = self.github_client.get_release_body(
+                    owner, repo_name, r["tagName"]
+                )
+            except GitException as e:
+                logger.warning(f"Failed to get release notes for {r['tagName']}: {e}")
+                notes = ""
+
+            new_releases.append(
+                {
+                    "tag_name": r["tagName"],
+                    "title": r.get("name"),
+                    "notes": notes,
+                    "published_at": r.get("publishedAt"),
+                    "commit_hash": commit_hash,
+                }
+            )
+
+        return {"releases": new_releases, "is_first_check": is_first_check}
 
     def get_commit_messages(
         self, old_commit: Optional[str], new_commit: str

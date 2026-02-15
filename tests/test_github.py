@@ -6,9 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from progress.github import sanitize_repo_name, GitClient, resolve_repo_url
-from progress.enums import Protocol
 from progress.contrib.repo.repository import RepositoryManager
-from progress.errors import CommandException, GitException
 
 
 # ========== Test Cases ==========
@@ -326,7 +324,9 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         def fake_update(self, current_commit):
             pass
 
-        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr(
+            "progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update
+        )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
@@ -394,7 +394,9 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         def fake_update(self, current_commit):
             pass
 
-        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr(
+            "progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update
+        )
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None
@@ -462,7 +464,9 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         def fake_update(self, current_commit):
             pass
 
-        m.setattr("progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update)
+        m.setattr(
+            "progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update
+        )
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None

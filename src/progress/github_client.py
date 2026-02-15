@@ -66,11 +66,16 @@ class GitHubClient:
                     continue
                 if exclude_pre_releases and release.prerelease:
                     continue
+                published_at = release.published_at
+                if isinstance(published_at, datetime):
+                    if published_at.tzinfo is None:
+                        published_at = published_at.replace(tzinfo=timezone.utc)
+                    published_at = published_at.isoformat().replace("+00:00", "Z")
                 result.append(
                     {
                         "tagName": release.tag_name,
                         "name": release.title,
-                        "publishedAt": release.published_at,
+                        "publishedAt": published_at,
                     }
                 )
                 if len(result) >= limit:

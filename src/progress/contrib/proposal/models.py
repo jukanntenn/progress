@@ -5,17 +5,16 @@ from zoneinfo import ZoneInfo
 from peewee import (
     BooleanField,
     CharField,
-    DatabaseProxy,
     DateTimeField,
     ForeignKeyField,
     IntegerField,
-    Model,
     TextField,
 )
-from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 from playhouse.sqlite_ext import JSONField
 
 from progress.db.models import BaseModel
+
+logger = logging.getLogger(__name__)
 
 UTC = ZoneInfo("UTC")
 

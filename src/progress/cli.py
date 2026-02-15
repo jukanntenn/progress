@@ -254,7 +254,9 @@ def process_reports(
                         batch_index=batch.batch_index,
                         total_batches=batch.total_batches,
                     )
-                    logger.info(f"Batch {batch.batch_index + 1} uploaded: {markpost_url}")
+                    logger.info(
+                        f"Batch {batch.batch_index + 1} uploaded: {markpost_url}"
+                    )
                     uploaded_urls.append(markpost_url)
                     if batch.batch_index == 0:
                         first_batch_url = markpost_url

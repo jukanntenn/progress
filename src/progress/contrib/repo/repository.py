@@ -228,14 +228,21 @@ class RepositoryManager:
             return None
 
     def _analyze_all_releases(
-        self, repo_name: str, branch: str, release_data: dict
+        self,
+        repo_name: str,
+        branch: str,
+        release_data: dict,
+        repo_obj=None,
+        previous_release_commit: str | None = None,
     ) -> list:
         """Analyze all releases individually.
 
         Args:
             repo_name: Repository name
             branch: Branch name
-            release_data: Dict with releases list
+            release_data: Dict with releases list and is_first_check flag
+            repo_obj: Repo instance for diff computation
+            previous_release_commit: Previous release commit hash for diff
 
         Returns:
             List of release dicts with added ai_summary and ai_detail fields
@@ -243,18 +250,33 @@ class RepositoryManager:
         from datetime import datetime
 
         releases = release_data["releases"]
+        is_first_check = release_data.get("is_first_check", False)
+
+        def parse_published_at(value: str | None) -> datetime:
+            if not value:
+                return datetime.min
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return datetime.min
+
         releases.sort(
-            key=lambda r: datetime.fromisoformat(
-                r["published_at"].replace("Z", "+00:00")
-            ),
+            key=lambda r: parse_published_at(r.get("published_at")),
             reverse=True,
         )
 
         analyzed_releases = []
 
-        for release in release_data["releases"]:
+        for i, release in enumerate(releases):
+            diff_content = None
+            if not is_first_check and repo_obj and previous_release_commit:
+                diff_content = self._get_release_diff(
+                    repo_obj,
+                    previous_release_commit,
+                    release.get("commit_hash"),
+                )
             single_release_data = {
-                "is_first_check": False,
+                "is_first_check": is_first_check,
                 "latest_release": {
                     "tag": release["tag_name"],
                     "name": release["title"],
@@ -262,8 +284,10 @@ class RepositoryManager:
                     "published_at": release["published_at"],
                     "commit_hash": release.get("commit_hash"),
                 },
-                "intermediate_releases": [],
-                "diff_content": None,
+                "intermediate_releases": releases[i + 1 :]
+                if i < len(releases) - 1
+                else [],
+                "diff_content": diff_content,
             }
 
             try:
@@ -300,6 +324,22 @@ class RepositoryManager:
 
         return analyzed_releases
 
+    def _get_release_diff(
+        self,
+        repo_obj,
+        previous_commit: str | None,
+        current_commit: str | None,
+    ) -> str | None:
+        if not previous_commit or not current_commit:
+            return None
+        try:
+            return repo_obj.git.get_commit_diff(
+                repo_obj.repo_path, previous_commit, current_commit
+            )
+        except Exception as e:
+            self.logger.warning(f"Failed to get release diff: {e}")
+            return None
+
     def check(self, repo: Repository) -> RepositoryReport | None:
         """Check code changes and releases for a single repository.
 
@@ -326,18 +366,32 @@ class RepositoryManager:
 
         # Check releases (independent from commits)
         releases_list = None
-        release_data = repo_obj.check_releases()
+        try:
+            release_data = repo_obj.check_releases()
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to check releases for {repo.name}: {e}",
+                exc_info=True,
+            )
+            release_data = None
         if release_data:
             try:
-                self.logger.info(
-                    f"Found {len(release_data['releases'])} new releases, analyzing..."
-                )
+                is_first_check = release_data.get("is_first_check", False)
+                releases = release_data["releases"]
+                self.logger.info(f"Found {len(releases)} release(s), analyzing...")
+                previous_release_commit = None
+                if not is_first_check and repo.last_release_commit_hash:
+                    previous_release_commit = repo.last_release_commit_hash
                 releases_list = self._analyze_all_releases(
-                    str(repo.name), str(repo.branch), release_data
+                    str(repo.name),
+                    str(repo.branch),
+                    release_data,
+                    repo_obj,
+                    previous_release_commit,
                 )
 
-                latest = release_data["releases"][0]
-                commit_hash = latest.get("commit_hash")
+                latest = releases_list[0] if releases_list else None
+                commit_hash = latest.get("commit_hash") if latest else None
                 if commit_hash:
                     repo_obj.update_releases(latest["tag_name"], commit_hash)
             except Exception as e:

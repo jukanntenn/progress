@@ -1,8 +1,9 @@
 """Release analysis unit tests (simplified)"""
 
-from unittest.mock import Mock, patch, MagicMock
-import pytest
 import json
+from unittest.mock import patch
+
+import pytest
 
 from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from progress.errors import AnalysisException
@@ -106,8 +107,6 @@ class TestRunClaudeReleaseAnalysisBasic:
 
     def test_claude_not_found_raises_exception(self, analyzer_config):
         """Test that Claude not found raises AnalysisException."""
-        from progress.errors import CommandException
-
         with patch("progress.ai.analyzers.claude_code.run_command") as mock_cmd:
             error = FileNotFoundError("Claude Code not found")
             mock_cmd.side_effect = error

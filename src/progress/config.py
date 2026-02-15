@@ -4,10 +4,17 @@ import logging
 import re
 from enum import Enum
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal
 from zoneinfo import ZoneInfo, available_timezones
 
-from pydantic import BaseModel, Field, HttpUrl, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -190,7 +197,9 @@ class Config(BaseSettings):
             )
         return v
 
-    @field_validator("repos", "owners", "proposal_trackers", "changelog_trackers", mode="before")
+    @field_validator(
+        "repos", "owners", "proposal_trackers", "changelog_trackers", mode="before"
+    )
     @classmethod
     def coerce_indexed_dict_to_list(cls, v):
         if v is None:

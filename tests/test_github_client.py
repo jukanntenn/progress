@@ -1,7 +1,10 @@
 """GitHub API client unit tests"""
 
-import pytest
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
+
+import pytest
+
 from progress.github_client import GitHubClient
 from progress.errors import GitException
 
@@ -10,7 +13,7 @@ def test_github_client_initialization():
     """Test: GitHubClient initializes with token and proxy"""
     mock_github = Mock()
     with patch("progress.github_client.Github", return_value=mock_github) as mock_ctor:
-        client = GitHubClient(token="test_token", proxy="http://proxy")
+        GitHubClient(token="test_token", proxy="http://proxy")
         mock_ctor.assert_called_once_with("test_token")
         mock_github.set_proxy.assert_called_once_with("http://proxy")
 
@@ -19,7 +22,7 @@ def test_github_client_initialization_without_proxy():
     """Test: GitHubClient initializes without proxy"""
     mock_github = Mock()
     with patch("progress.github_client.Github", return_value=mock_github) as mock_ctor:
-        client = GitHubClient(token="test_token")
+        GitHubClient(token="test_token")
         mock_ctor.assert_called_once_with("test_token")
         mock_github.set_proxy.assert_not_called()
 
@@ -33,14 +36,14 @@ class TestListReleases:
         mock_release1 = Mock()
         mock_release1.tag_name = "v1.0.0"
         mock_release1.title = "Version 1.0.0"
-        mock_release1.published_at = "2024-01-01T00:00:00Z"
+        mock_release1.published_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
         mock_release1.draft = False
         mock_release1.prerelease = False
 
         mock_release2 = Mock()
         mock_release2.tag_name = "v2.0.0"
         mock_release2.title = "Version 2.0.0"
-        mock_release2.published_at = "2024-02-01T00:00:00Z"
+        mock_release2.published_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
         mock_release2.draft = False
         mock_release2.prerelease = False
 
@@ -57,6 +60,8 @@ class TestListReleases:
         assert len(releases) == 2
         assert releases[0]["tagName"] == "v2.0.0"
         assert releases[1]["tagName"] == "v1.0.0"
+        assert releases[0]["publishedAt"] == "2024-02-01T00:00:00Z"
+        assert releases[1]["publishedAt"] == "2024-01-01T00:00:00Z"
 
     def test_success_no_releases(self):
         """Test repository with no releases."""

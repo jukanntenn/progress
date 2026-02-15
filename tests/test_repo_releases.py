@@ -85,6 +85,7 @@ class TestCheckReleasesBasic:
         result = repo.check_releases()
 
         assert result is not None
+        assert result["is_first_check"] is True
         assert "releases" in result
         assert len(result["releases"]) == 1
         assert result["releases"][0]["tag_name"] == "v1.0.0"
@@ -99,6 +100,37 @@ class TestCheckReleasesBasic:
         mock_github_client.get_release_body.assert_called_once_with(
             "test", "repo", "v1.0.0"
         )
+
+    def test_first_check_returns_only_latest_release(
+        self, mock_repository, mock_git_client, mock_config, mock_github_client
+    ):
+        mock_github_client.list_releases.return_value = [
+            {
+                "tagName": "v1.0.0",
+                "name": "Version 1.0.0",
+                "publishedAt": "2024-01-01T00:00:00Z",
+            },
+            {
+                "tagName": "v2.0.0",
+                "name": "Version 2.0.0",
+                "publishedAt": "2024-02-01T00:00:00Z",
+            },
+        ]
+        mock_github_client.get_release_commit.return_value = "abc123def456"
+        mock_github_client.get_release_body.return_value = "Release notes"
+
+        repo = Repo(
+            mock_repository,
+            mock_git_client,
+            mock_config,
+            github_client=mock_github_client,
+        )
+        result = repo.check_releases()
+
+        assert result is not None
+        assert result["is_first_check"] is True
+        assert len(result["releases"]) == 1
+        assert result["releases"][0]["tag_name"] == "v2.0.0"
 
     def test_first_check_no_releases(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
@@ -171,11 +203,42 @@ class TestCheckReleasesBasic:
         result = repo.check_releases()
 
         assert result is not None
+        assert result["is_first_check"] is False
         assert "releases" in result
         assert len(result["releases"]) == 2
         tag_names = [r["tag_name"] for r in result["releases"]]
         assert "v1.1.0" in tag_names
         assert "v2.0.0" in tag_names
+
+    def test_incremental_check_accepts_string_last_check_time(
+        self, mock_repository, mock_git_client, mock_config, mock_github_client
+    ):
+        repo = Repo(
+            mock_repository,
+            mock_git_client,
+            mock_config,
+            github_client=mock_github_client,
+        )
+        repo.model.last_release_tag = "v1.0.0"
+        repo.model.last_release_commit_hash = "oldhash"
+        repo.model.last_release_check_time = "2024-01-01 00:00:00+00:00"
+
+        mock_github_client.list_releases.return_value = [
+            {
+                "tagName": "v1.1.0",
+                "publishedAt": "2024-01-15T00:00:00Z",
+                "name": "v1.1.0",
+            },
+        ]
+        mock_github_client.get_release_commit.return_value = "abc123"
+        mock_github_client.get_release_body.return_value = "Release notes"
+
+        result = repo.check_releases()
+
+        assert result is not None
+        assert result["is_first_check"] is False
+        assert len(result["releases"]) == 1
+        assert result["releases"][0]["tag_name"] == "v1.1.0"
 
 
 class TestUpdateReleases:
