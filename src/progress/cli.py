@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -11,7 +11,7 @@ from .ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from .config import Config
 from .consts import DATABASE_PATH
 from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
-from .contrib.proposal.proposal_tracking import ProposalTrackerManager
+from .contrib.proposal.proposal_tracking import ProposalTrackerManager, TRACKER_REPO_URLS
 from .contrib.repo.owner import OwnerManager
 from .contrib.repo.models import DiscoveredRepository
 from .contrib.repo.reporter import MarkdownReporter
@@ -22,7 +22,13 @@ from .errors import ProgressException
 from .i18n import gettext as _
 from .i18n import initialize
 from .log import setup as setup_log
-from .notification import NotificationConfig, create_channel, create_message
+from .notification import (
+    NotificationConfig,
+    create_channel,
+    create_message,
+    create_proposal_message,
+)
+from .notification.utils import ChangelogEntry
 from .storages import FileStorage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
@@ -65,7 +71,10 @@ def send_notification(notification_config: NotificationConfig, **data) -> None:
     failures = 0
     for channel_config in enabled_channels:
         channel = create_channel(channel_config)
-        message = create_message(channel_config, channel, **data)
+        if data.get("filenames") is not None:
+            message = create_proposal_message(channel_config, channel, **data)
+        else:
+            message = create_message(channel_config, channel, **data)
         if not message.send(fail_silently=True):
             failures += 1
 
@@ -464,6 +473,7 @@ def _send_proposal_event_notification(
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    env.filters["basename"] = lambda p: PurePath(p).name
     template = env.get_template("proposal_events_report.j2")
 
     grouped: dict[str, list] = {}
@@ -474,18 +484,16 @@ def _send_proposal_event_notification(
         grouped[k] = sorted(grouped[k], key=lambda x: (x.proposal_number, x.event_type))
 
     report_content = template.render(
-        now=now.strftime("%Y-%m-%d %H:%M"),
         grouped_events=grouped,
+        tracker_urls=TRACKER_REPO_URLS,
     )
 
     try:
         title, summary = analyzer.generate_title_and_summary(report_content)
     except Exception as e:
         logger.warning(f"Failed to generate title/summary for proposal events: {e}")
-        title = _("Progress Report for Open Source Projects - {date}").format(
-            date=now.strftime("%Y-%m-%d %H:%M")
-        )
-        summary = f"{len(events)} proposal events"
+        title = "Proposal Updates"
+        summary = ""
 
     FileStorage().save(
         title,
@@ -496,14 +504,17 @@ def _send_proposal_event_notification(
     markpost_url = ""
     if markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
-    repo_statuses = {f"{e.tracker_type}#{e.proposal_number}": "success" for e in events}
+
+    filenames = [PurePath(e.file_path).name for e in events][:5]
+    more_count = max(0, len(events) - len(filenames))
     send_notification(
         notification_config,
         title=title,
         summary=summary,
         total_commits=len(events),
         markpost_url=markpost_url,
-        repo_statuses=repo_statuses,
+        filenames=filenames,
+        more_count=more_count,
     )
 
 
@@ -551,14 +562,10 @@ def _send_changelog_update_notification(
     if len(parts) > 10:
         summary += f", ... and {len(parts) - 10} more"
 
-    repo_statuses = {}
-    for r in all_results:
-        if r.status == "success" and r.new_entries:
-            repo_statuses[r.name] = "success"
-        elif r.status == "failed":
-            repo_statuses[r.name] = "failed"
-        else:
-            repo_statuses[r.name] = "skipped"
+    changelog_entries = [
+        ChangelogEntry(name=u.name, version=u.new_entries[0].version, url=u.url)
+        for u in updates
+    ]
 
     send_notification(
         notification_config,
@@ -566,7 +573,8 @@ def _send_changelog_update_notification(
         summary=summary,
         total_commits=total_new_versions,
         markpost_url=markpost_url,
-        repo_statuses=repo_statuses,
+        notification_type="changelog",
+        changelog_entries=changelog_entries,
     )
 
 

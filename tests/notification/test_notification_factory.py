@@ -5,8 +5,13 @@ from progress.notification.config import (
     EmailChannelConfig,
     FeishuChannelConfig,
 )
-from progress.notification.factory import create_channel, create_message
+from progress.notification.factory import create_channel, create_message, create_proposal_message
 from progress.notification.messages import ConsoleMessage, EmailMessage, FeishuMessage
+from progress.notification.messages import (
+    ConsoleProposalMessage,
+    EmailProposalMessage,
+    FeishuProposalMessage,
+)
 
 
 def test_create_channel_returns_console_channel() -> None:
@@ -68,3 +73,34 @@ def test_create_message_returns_email_message() -> None:
     channel = create_channel(config)
     message = create_message(config, channel, title="T", summary="S", total_commits=1)
     assert isinstance(message, EmailMessage)
+
+
+def test_create_proposal_message_returns_console_proposal_message() -> None:
+    config = ConsoleChannelConfig(enabled=True)
+    channel = create_channel(config)
+    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    assert isinstance(message, ConsoleProposalMessage)
+
+
+def test_create_proposal_message_returns_feishu_proposal_message() -> None:
+    config = FeishuChannelConfig(
+        webhook_url="https://example.com/webhook",
+        timeout=30,
+    )
+    channel = create_channel(config)
+    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    assert isinstance(message, FeishuProposalMessage)
+
+
+def test_create_proposal_message_returns_email_proposal_message() -> None:
+    config = EmailChannelConfig(
+        host="smtp.example.com",
+        port=587,
+        user="user@example.com",
+        password="pass",
+        from_addr="from@example.com",
+        recipient=["to@example.com"],
+    )
+    channel = create_channel(config)
+    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    assert isinstance(message, EmailProposalMessage)

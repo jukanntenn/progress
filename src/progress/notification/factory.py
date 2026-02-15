@@ -5,7 +5,15 @@ from typing import Any
 from ..errors import ProgressException
 from .channels import ConsoleChannel, EmailChannel, FeishuChannel
 from .config import NotificationChannelConfig
-from .messages import ConsoleMessage, EmailMessage, FeishuMessage, Message
+from .messages import (
+    ConsoleMessage,
+    ConsoleProposalMessage,
+    EmailMessage,
+    EmailProposalMessage,
+    FeishuMessage,
+    FeishuProposalMessage,
+    Message,
+)
 
 
 def create_channel(
@@ -48,6 +56,8 @@ def create_message(
                 total_commits=kwargs.get("total_commits", 0),
                 markpost_url=kwargs.get("markpost_url"),
                 repo_statuses=kwargs.get("repo_statuses"),
+                notification_type=kwargs.get("notification_type", "repo_update"),
+                changelog_entries=kwargs.get("changelog_entries"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
             )
@@ -59,6 +69,8 @@ def create_message(
                 total_commits=kwargs.get("total_commits", 0),
                 markpost_url=kwargs.get("markpost_url"),
                 repo_statuses=kwargs.get("repo_statuses"),
+                notification_type=kwargs.get("notification_type", "repo_update"),
+                changelog_entries=kwargs.get("changelog_entries"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
             )
@@ -70,8 +82,44 @@ def create_message(
                 total_commits=kwargs.get("total_commits", 0),
                 markpost_url=kwargs.get("markpost_url"),
                 repo_statuses=kwargs.get("repo_statuses"),
+                notification_type=kwargs.get("notification_type", "repo_update"),
+                changelog_entries=kwargs.get("changelog_entries"),
                 batch_index=kwargs.get("batch_index"),
                 total_batches=kwargs.get("total_batches"),
+            )
+        case _:
+            raise ProgressException(f"Unknown notification channel type: {config.type}")
+
+
+def create_proposal_message(
+    config: NotificationChannelConfig,
+    channel: ConsoleChannel | FeishuChannel | EmailChannel,
+    **kwargs: Any,
+) -> Message:
+    match config.type:
+        case "console":
+            return ConsoleProposalMessage(
+                channel,
+                title=kwargs.get("title", ""),
+                markpost_url=kwargs.get("markpost_url"),
+                filenames=kwargs.get("filenames"),
+                more_count=kwargs.get("more_count", 0),
+            )
+        case "feishu":
+            return FeishuProposalMessage(
+                channel,
+                title=kwargs.get("title", ""),
+                markpost_url=kwargs.get("markpost_url"),
+                filenames=kwargs.get("filenames"),
+                more_count=kwargs.get("more_count", 0),
+            )
+        case "email":
+            return EmailProposalMessage(
+                channel,
+                title=kwargs.get("title", ""),
+                markpost_url=kwargs.get("markpost_url"),
+                filenames=kwargs.get("filenames"),
+                more_count=kwargs.get("more_count", 0),
             )
         case _:
             raise ProgressException(f"Unknown notification channel type: {config.type}")

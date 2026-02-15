@@ -17,6 +17,13 @@ from ...utils import get_now, run_command
 
 logger = logging.getLogger(__name__)
 
+TRACKER_REPO_URLS = {
+    "rust_rfc": "https://github.com/rust-lang/rfcs",
+    "eip": "https://github.com/ethereum/EIPs",
+    "pep": "https://github.com/python/peps",
+    "django_dep": "https://github.com/django/deps",
+}
+
 
 @dataclass(frozen=True)
 class ProposalEventReport:
@@ -31,6 +38,7 @@ class ProposalEventReport:
     analysis_summary: str | None
     analysis_detail: str | None
     file_path: str
+    file_url: str
 
 
 @dataclass(frozen=True)
@@ -320,6 +328,7 @@ class ProposalTrackerManager:
         old_model = self._get_existing_proposal_model(tracker.tracker_type, data.number)
         events = self._detect_proposal_events(tracker.tracker_type, old_model, data)
         reports: list[ProposalEventReport] = []
+        file_url = self._build_file_url(tracker, new_commit, rel_path)
 
         for e in events:
             if e.event_type == ProposalEventType.CONTENT_MODIFIED.value:
@@ -386,6 +395,7 @@ class ProposalTrackerManager:
                     analysis_summary=proposal_model.analysis_summary,
                     analysis_detail=proposal_model.analysis_detail,
                     file_path=rel_path,
+                    file_url=file_url,
                 )
             )
 
@@ -517,6 +527,7 @@ class ProposalTrackerManager:
             {"file_path": latest_rel_path, "initial_check": True},
         )
 
+        file_url = self._build_file_url(tracker, new_commit, latest_rel_path)
         reports = [
             ProposalEventReport(
                 tracker_type=tracker.tracker_type,
@@ -530,6 +541,7 @@ class ProposalTrackerManager:
                 analysis_summary=model.analysis_summary,
                 analysis_detail=model.analysis_detail,
                 file_path=latest_rel_path,
+                file_url=file_url,
             )
         ]
 
@@ -583,6 +595,7 @@ class ProposalTrackerManager:
             {"deleted": True, "file_path": rel_path},
         )
 
+        file_url = self._build_file_url(tracker, new_commit, rel_path)
         return [
             ProposalEventReport(
                 tracker_type=tracker.tracker_type,
@@ -596,8 +609,30 @@ class ProposalTrackerManager:
                 analysis_summary=getattr(existing, "analysis_summary", None),
                 analysis_detail=getattr(existing, "analysis_detail", None),
                 file_path=rel_path,
+                file_url=file_url,
             )
         ]
+
+    @staticmethod
+    def _build_file_url(tracker: ProposalTracker, commit_hash: str, rel_path: str) -> str:
+        repo_url = str(getattr(tracker, "repo_url", "") or "")
+        base_url = ""
+        if repo_url.startswith("https://github.com/"):
+            base_url = repo_url.removesuffix(".git")
+        elif repo_url.startswith("git@github.com:"):
+            base_url = "https://github.com/" + repo_url[len("git@github.com:") :].removesuffix(
+                ".git"
+            )
+        elif repo_url.startswith("ssh://git@github.com/"):
+            base_url = "https://github.com/" + repo_url[
+                len("ssh://git@github.com/") :
+            ].removesuffix(".git")
+        else:
+            base_url = TRACKER_REPO_URLS.get(tracker.tracker_type, "")
+
+        if not base_url:
+            return ""
+        return f"{base_url}/blob/{commit_hash}/{rel_path}"
 
     def _extract_number_from_path(self, tracker_type: str, rel_path: str) -> int:
         from .proposal_parsers import (

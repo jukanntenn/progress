@@ -1,23 +1,33 @@
-# Proposal events ({{ now }})
-
 {% for tracker_type, items in grouped_events.items() %}
+{% set tracker_url = tracker_urls.get(tracker_type) %}
+{% if tracker_url %}
+## [{{ tracker_type }}]({{ tracker_url }})
+{% else %}
 ## {{ tracker_type }}
+{% endif %}
 
 {% for e in items %}
-### {{ e.title }} ({{ e.tracker_type }} #{{ e.proposal_number }})
+{% set file_name = e.file_path | basename %}
+{% if e.file_url %}
+📄 [{{ file_name }}]({{ e.file_url }})
+{% else %}
+📄 {{ file_name }}
+{% endif %}
 
-- Event: {{ e.event_type }}
-{% if e.old_status is not none or e.new_status is not none %}- Status: {{ e.old_status or "" }}{% if e.new_status %} -> {{ e.new_status }}{% endif %}
-{% endif %}- Commit: {{ e.commit_hash }}
-- File: {{ e.file_path }}
-{% if e.analysis_summary %}
 #### Summary
-{{ e.analysis_summary }}
-{% endif %}
-{% if e.analysis_detail %}
-#### Detail
-{{ e.analysis_detail }}
-{% endif %}
 
+{{ e.analysis_summary or "No summary available." }}
+
+<details>
+<summary>Click to view detailed analysis</summary>
+
+{{ e.analysis_detail or "No detailed analysis available." }}
+
+</details>
+
+{% if not loop.last %}
+---
+
+{% endif %}
 {% endfor %}
 {% endfor %}

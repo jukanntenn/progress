@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Literal, Mapping
+
+NotificationType = Literal["repo_update", "changelog", "proposal", "discovered_repos"]
+
+
+@dataclass(frozen=True, slots=True)
+class ChangelogEntry:
+    name: str
+    version: str
+    url: str
 
 
 @dataclass(frozen=True, slots=True)

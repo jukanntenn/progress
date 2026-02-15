@@ -1,3 +1,8 @@
+# New repositories discovered
+
+_Generated at {{ report_date }}_
+
+{% if repos %}
 {% for repo in repos %}
 ## [{{ repo.owner_name }}/{{ repo.repo_name }}]({{ repo.repo_url }})
 
@@ -18,9 +23,12 @@
 </details>
 {% endif %}
 
-⌚️{{ repo.discovered_at }}
+🗓{{ repo.discovered_at }}
 
 {% if not loop.last %}
 ---
 {% endif %}
 {% endfor %}
+{% else %}
+_No repositories discovered._
+{% endif %}

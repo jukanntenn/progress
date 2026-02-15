@@ -8,15 +8,19 @@ from .config import (
     NotificationChannelConfig,
     NotificationConfig,
 )
-from .factory import create_channel, create_message
+from .factory import create_channel, create_message, create_proposal_message
+from .utils import ChangelogEntry, NotificationType
 
 __all__ = [
     "Channel",
+    "ChangelogEntry",
     "ConsoleChannelConfig",
     "EmailChannelConfig",
     "FeishuChannelConfig",
     "NotificationChannelConfig",
     "NotificationConfig",
+    "NotificationType",
     "create_channel",
     "create_message",
+    "create_proposal_message",
 ]
