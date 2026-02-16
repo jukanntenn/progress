@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
-import { Settings, Rss, Moon, Sun, SunMoon } from 'lucide-react'
+import { Settings, Rss, Contrast, Moon, Sun } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LanguageSelector } from './LanguageSelector'
@@ -106,7 +106,7 @@ export function Header() {
                 aria-label={t(`nav.theme.${preference}`)}
               >
                 {preference === 'system' ? (
-                  <SunMoon className="h-4 w-4" />
+                  <Contrast className="h-4 w-4" />
                 ) : preference === 'dark' ? (
                   <Moon className="h-4 w-4" />
                 ) : (
