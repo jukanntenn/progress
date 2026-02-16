@@ -1,0 +1,13 @@
+{
+  "nav": {
+    "settings": "设置",
+    "rss": "RSS 订阅",
+    "language": "语言",
+    "darkMode": "深色模式",
+    "lightMode": "浅色模式"
+  },
+  "languages": {
+    "en": "English",
+    "zh-Hans": "简体中文"
+  }
+}

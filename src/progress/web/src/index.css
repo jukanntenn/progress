@@ -1016,6 +1016,10 @@
     animation: slide-out-right 0.15s var(--ease-immediate);
   }
 
+  .animate-slide-down {
+    animation: slide-down 150ms var(--ease-out-expo);
+  }
+
   /* Focus Ring Utilities */
   .ring-focus {
     @apply ring-2 ring-ring ring-offset-2 ring-offset-background;

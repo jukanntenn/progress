@@ -2,6 +2,8 @@ import { cn } from '@/lib/utils'
 import { Menu, X, Settings, Rss, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { LanguageSelector } from './LanguageSelector'
 
 /**
  * Header Component
@@ -11,6 +13,7 @@ import { Link, useLocation } from 'react-router-dom'
  * Includes skip-to-content link for accessibility.
  */
 export function Header() {
+  const { t } = useTranslation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const location = useLocation()
@@ -39,17 +42,7 @@ export function Header() {
     }
   }
 
-  const navItems = [
-    { href: '/config', label: 'Config', icon: Settings },
-    { href: '/api/v1/rss', label: 'RSS Feed', icon: Rss, external: true },
-  ]
-
-  const isActive = (href: string) => {
-    if (href === '/config') {
-      return location.pathname === '/config'
-    }
-    return false
-  }
+  const isConfigActive = location.pathname === '/config'
 
   return (
     <>
@@ -96,50 +89,39 @@ export function Header() {
           </Link>
 
           <div className="hidden md:flex md:items-center md:gap-1">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const active = isActive(item.href)
+            <Link
+              to="/config"
+              className={cn(
+                'inline-flex items-center justify-center',
+                'h-9 w-9 rounded-md',
+                'transition-all duration-200 ease-out active:scale-95',
+                isConfigActive
+                  ? 'text-foreground bg-glass-bg-primary/60 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+              )}
+              title={t('nav.settings')}
+              aria-label={t('nav.settings')}
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
 
-              if (item.external) {
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'inline-flex items-center gap-2 px-3 py-2',
-                      'text-sm font-medium',
-                      'rounded-md',
-                      'transition-all duration-200 ease-out',
-                      'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </a>
-                )
-              }
+            <a
+              href="/api/v1/rss"
+              className={cn(
+                'inline-flex items-center justify-center',
+                'h-9 w-9 rounded-md',
+                'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                'transition-all duration-200 ease-out active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+              )}
+              title={t('nav.rss')}
+              aria-label={t('nav.rss')}
+            >
+              <Rss className="h-4 w-4" />
+            </a>
 
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    'inline-flex items-center gap-2 px-3 py-2',
-                    'text-sm font-medium',
-                    'rounded-md',
-                    'transition-all duration-200 ease-out',
-                    active
-                      ? 'text-foreground bg-glass-bg-primary/60 shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })}
+            <LanguageSelector />
 
             <button
               type="button"
@@ -151,7 +133,8 @@ export function Header() {
                 'transition-all duration-200 ease-out active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
               )}
-              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
+              aria-label={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
             >
               {isDarkMode ? (
                 <Sun className="h-4 w-4" />
@@ -193,52 +176,43 @@ export function Header() {
             )}
           >
             <div className="flex flex-col gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const active = isActive(item.href)
+              <Link
+                to="/config"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  'inline-flex items-center justify-center',
+                  'h-11 w-11 rounded-md mx-3',
+                  'transition-all duration-200 ease-out',
+                  isConfigActive
+                    ? 'text-foreground bg-glass-bg-primary/60 shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+                )}
+                title={t('nav.settings')}
+                aria-label={t('nav.settings')}
+              >
+                <Settings className="h-5 w-5" />
+              </Link>
 
-                if (item.external) {
-                  return (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        'inline-flex items-center gap-3 px-3 py-3',
-                        'text-sm font-medium',
-                        'rounded-md',
-                        'transition-all duration-200 ease-out',
-                        'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span>{item.label}</span>
-                    </a>
-                  )
-                }
+              <a
+                href="/api/v1/rss"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  'inline-flex items-center justify-center',
+                  'h-11 w-11 rounded-md mx-3',
+                  'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                  'transition-all duration-200 ease-out',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+                )}
+                title={t('nav.rss')}
+                aria-label={t('nav.rss')}
+              >
+                <Rss className="h-5 w-5" />
+              </a>
 
-                return (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={cn(
-                      'inline-flex items-center gap-3 px-3 py-3',
-                      'text-sm font-medium',
-                      'rounded-md',
-                      'transition-all duration-200 ease-out',
-                      active
-                        ? 'text-foreground bg-glass-bg-primary/60 shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
+              <div className="px-3 py-1">
+                <LanguageSelector />
+              </div>
 
               <button
                 type="button"
@@ -251,14 +225,14 @@ export function Header() {
                   'transition-all duration-200 ease-out',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
                 )}
-                aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-label={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
               >
                 {isDarkMode ? (
                   <Sun className="h-5 w-5" />
                 ) : (
                   <Moon className="h-5 w-5" />
                 )}
-                <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                <span>{isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}</span>
               </button>
             </div>
           </div>
