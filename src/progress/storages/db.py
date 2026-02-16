@@ -8,12 +8,14 @@ class DBStorage:
     def __init__(
         self,
         *,
-        repo_id: int | None,
-        commit_hash: str,
-        previous_commit_hash: str,
-        commit_count: int,
-        markpost_url: str | None,
+        report_type: str = "repo_update",
+        repo_id: int | None = None,
+        commit_hash: str = "",
+        previous_commit_hash: str | None = None,
+        commit_count: int = 0,
+        markpost_url: str | None = None,
     ) -> None:
+        self._report_type = report_type
         self._repo_id = repo_id
         self._commit_hash = commit_hash
         self._previous_commit_hash = previous_commit_hash
@@ -25,6 +27,7 @@ class DBStorage:
         from progress.db.models import Report
 
         report = Report.create(
+            report_type=self._report_type,
             repo=self._repo_id,
             title=title,
             commit_hash=self._commit_hash,
@@ -34,5 +37,5 @@ class DBStorage:
             content=body,
         )
         self.report_id = report.id
-        logger.info(f"Report saved: {report.id}")
+        logger.info(f"Report saved: {report.id} (type={self._report_type})")
         return str(report.id)

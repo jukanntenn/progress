@@ -18,7 +18,7 @@ from .contrib.repo.models import DiscoveredRepository
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
 from .db import close_db, create_tables, init_db, save_report
-from .db.models import Repository
+from .db.models import Report, Repository
 from .errors import ProgressException
 from .i18n import gettext as _
 from .i18n import initialize
@@ -30,7 +30,7 @@ from .notification import (
     create_proposal_message,
 )
 from .notification.utils import ChangelogEntry, DiscoveredRepo
-from .storages import FileStorage
+from .storages import get_storage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
 
@@ -424,15 +424,27 @@ def _send_entity_notification(
         )
         summary = f"Discovered {len(new_repos)} new repositories"
 
-    FileStorage().save(
+    storage = get_storage(
+        config=config,
+        report_type="repo_new",
+        commit_count=len(new_repos),
+    )
+    result = storage.save(
         title,
         report_content,
         Path(config.data_dir) / "reports" / "repo" / "new",
     )
 
-    markpost_url = ""
-    if markpost_client is not None:
+    markpost_url = result if result.startswith("http") else ""
+    if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
+        report_id = getattr(storage, "report_id", None)
+        if report_id is not None:
+            (
+                Report.update(markpost_url=markpost_url)
+                .where(Report.id == report_id)
+                .execute()
+            )
 
     discovered_repos = [
         DiscoveredRepo(
@@ -469,7 +481,6 @@ def _send_proposal_event_notification(
     events,
     timezone,
 ) -> None:
-    now = get_now(timezone)
     template_dir = Path(__file__).parent / "templates"
     env = Environment(
         loader=FileSystemLoader(template_dir),
@@ -499,15 +510,27 @@ def _send_proposal_event_notification(
         title = "Proposal Updates"
         summary = ""
 
-    FileStorage().save(
+    storage = get_storage(
+        config=config,
+        report_type="proposal",
+        commit_count=len(events),
+    )
+    result = storage.save(
         title,
         report_content,
         Path(config.data_dir) / "reports" / "proposal",
     )
 
-    markpost_url = ""
-    if markpost_client is not None:
+    markpost_url = result if result.startswith("http") else ""
+    if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
+        report_id = getattr(storage, "report_id", None)
+        if report_id is not None:
+            (
+                Report.update(markpost_url=markpost_url)
+                .where(Report.id == report_id)
+                .execute()
+            )
 
     filenames = [PurePath(e.file_path).name for e in events][:5]
     more_count = max(0, len(events) - len(filenames))
@@ -547,17 +570,29 @@ def _send_changelog_update_notification(
 
     title = f"Changelog Updates - {now.strftime('%Y-%m-%d %H:%M')}"
 
-    FileStorage().save(
+    total_new_versions = sum(len(u.new_entries) for u in updates)
+    storage = get_storage(
+        config=config,
+        report_type="changelog",
+        commit_count=total_new_versions,
+    )
+    result = storage.save(
         title,
         report_content,
         Path(config.data_dir) / "reports" / "changelog",
     )
 
-    markpost_url = ""
-    if markpost_client is not None:
+    markpost_url = result if result.startswith("http") else ""
+    if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
+        report_id = getattr(storage, "report_id", None)
+        if report_id is not None:
+            (
+                Report.update(markpost_url=markpost_url)
+                .where(Report.id == report_id)
+                .execute()
+            )
 
-    total_new_versions = sum(len(u.new_entries) for u in updates)
     parts = [f"{u.name} ({len(u.new_entries)})" for u in updates]
     summary = (
         f"{len(updates)} trackers updated, {total_new_versions} new versions: "

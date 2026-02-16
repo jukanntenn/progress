@@ -13,15 +13,17 @@ from .markpost import MarkpostStorage
 def get_storage(
     *,
     config: Config,
-    repo_id: int | None,
-    commit_hash: str,
-    previous_commit_hash: str,
-    commit_count: int,
-    markpost_url: str | None,
+    report_type: str = "repo_update",
+    repo_id: int | None = None,
+    commit_hash: str = "",
+    previous_commit_hash: str | None = None,
+    commit_count: int = 0,
+    markpost_url: str | None = None,
 ) -> Storage:
     storage_type = config.report.storage
 
     db_storage = DBStorage(
+        report_type=report_type,
         repo_id=repo_id,
         commit_hash=commit_hash,
         previous_commit_hash=previous_commit_hash,

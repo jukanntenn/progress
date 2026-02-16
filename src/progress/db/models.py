@@ -16,6 +16,8 @@ from peewee import (
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
+from progress.enums import ReportType
+
 UTC = ZoneInfo("UTC")
 
 # Use DatabaseProxy for deferred database binding
@@ -60,6 +62,7 @@ class Repository(BaseModel):
 class Report(BaseModel):
     """Report model"""
 
+    report_type = CharField(default=ReportType.REPO_UPDATE.value)
     repo = ForeignKeyField(
         Repository,
         backref="reports",

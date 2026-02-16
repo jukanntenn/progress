@@ -20,3 +20,10 @@ class ProposalEventType(Enum):
     CONTENT_MODIFIED = "content_modified"
     RESURRECTED = "resurrected"
     SUPERSEDED = "superseded"
+
+
+class ReportType(str, Enum):
+    REPO_UPDATE = "repo_update"
+    REPO_NEW = "repo_new"
+    PROPOSAL = "proposal"
+    CHANGELOG = "changelog"

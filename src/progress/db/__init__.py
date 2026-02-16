@@ -83,17 +83,37 @@ def migrate_database():
         )
         logger.info("Migration completed: 'title' column added")
 
+    if "report_type" not in existing_columns:
+        logger.info("Migrating: Adding 'report_type' column to reports table")
+        migrate(
+            migrator.add_column(
+                "reports",
+                "report_type",
+                CharField(default="repo_update"),
+            )
+        )
+        database.execute_sql(
+            "UPDATE reports SET report_type = 'repo_update' WHERE report_type IS NULL OR report_type = ''"
+        )
+        logger.info("Migration completed: 'report_type' column added")
+
     cursor = database.execute_sql("PRAGMA table_info(reports)")
     columns_info = cursor.fetchall()
+    columns = {c[1] for c in columns_info}
     repo_column_info = next((c for c in columns_info if c[1] == "repo_id"), None)
 
     if repo_column_info and repo_column_info[3] != 0:
         logger.info("Migrating: Making 'repo' column nullable in reports table")
+        title_expr = "title" if "title" in columns else "''"
+        report_type_expr = (
+            "report_type" if "report_type" in columns else "'repo_update'"
+        )
         database.execute_sql(
             "CREATE TABLE reports_new ("
             "id INTEGER PRIMARY KEY,"
             "repo_id INTEGER NULL REFERENCES repositories(id) ON DELETE CASCADE,"
             "title VARCHAR NOT NULL DEFAULT '',"
+            "report_type VARCHAR NOT NULL DEFAULT 'repo_update',"
             "commit_hash VARCHAR NOT NULL,"
             "previous_commit_hash VARCHAR,"
             "commit_count INTEGER NOT NULL DEFAULT 1,"
@@ -102,9 +122,9 @@ def migrate_database():
             "created_at VARCHAR NOT NULL)"
         )
         database.execute_sql(
-            "INSERT INTO reports_new (id, repo_id, commit_hash, previous_commit_hash, "
+            "INSERT INTO reports_new (id, repo_id, title, report_type, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at) "
-            "SELECT id, repo_id, commit_hash, previous_commit_hash, "
+            f"SELECT id, repo_id, {title_expr}, {report_type_expr}, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at FROM reports"
         )
         database.execute_sql("DROP TABLE reports")
@@ -224,11 +244,13 @@ def save_report(
     title: str = "",
     config: Config | None = None,
     directory: Path | None = None,
+    report_type: str = "repo_update",
 ) -> int:
     """Save report."""
     with database.atomic():
         if config is None:
             report = Report.create(
+                report_type=report_type,
                 repo=repo_id,
                 title=title,
                 commit_hash=commit_hash,
@@ -242,6 +264,7 @@ def save_report(
 
         storage = get_storage(
             config=config,
+            report_type=report_type,
             repo_id=repo_id,
             commit_hash=commit_hash,
             previous_commit_hash=previous_commit_hash,
