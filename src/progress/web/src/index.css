@@ -1470,6 +1470,35 @@
   background: rgb(var(--glass-bg-tertiary) / var(--glass-opacity-tertiary));
 }
 
+.prose details {
+  @apply mb-6 rounded-lg overflow-hidden;
+  background: rgb(var(--glass-bg-tertiary) / 0.3);
+  border: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.5));
+}
+
+.prose summary {
+  @apply cursor-pointer px-5 py-3 font-medium select-none;
+  @apply hover:bg-accent/30;
+  transition: background-color var(--duration-normal) var(--ease-immediate);
+}
+
+.prose details[open] summary {
+  @apply border-b;
+  border-color: rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.4));
+}
+
+.prose details > *:not(summary) {
+  @apply px-5 py-4;
+}
+
+.prose summary::marker {
+  color: rgb(var(--text-tertiary));
+}
+
+.prose summary::-webkit-details-marker {
+  color: rgb(var(--text-tertiary));
+}
+
 /* ========================================
    THEME TRANSITION
    ======================================== */

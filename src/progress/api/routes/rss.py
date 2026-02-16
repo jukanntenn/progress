@@ -4,25 +4,11 @@ import pytz
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from feedgen.feed import FeedGenerator
-from markdown_it import MarkdownIt
-from mdit_py_plugins.footnote import footnote_plugin
-from mdit_py_plugins.front_matter import front_matter_plugin
 
 from ...db.models import Report
+from ..markdown import render_markdown
 
 router = APIRouter(tags=["rss"])
-
-mdit = (
-    MarkdownIt("commonmark", {"breaks": True, "html": True})
-    .use(front_matter_plugin)
-    .use(footnote_plugin)
-)
-
-
-def render_markdown(content: str) -> str:
-    if not content:
-        return ""
-    return mdit.render(content)
 
 
 @router.get("/rss")
@@ -65,4 +51,3 @@ def get_rss(request: Request, timezone_str: str = "UTC", language: str = "en"):
 
     rss_feed = fg.rss_str(pretty=True)
     return Response(content=rss_feed, media_type="application/rss+xml; charset=utf-8")
-

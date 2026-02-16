@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ...db.models import Report
+from ..markdown import render_markdown
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -95,5 +96,5 @@ def get_report(report_id: int, timezone_str: str = "UTC"):
         title=report.title,
         created_at=format_datetime(report.created_at, timezone),
         markpost_url=report.markpost_url,
-        content=report.content or "",
+        content=render_markdown(report.content or ""),
     )

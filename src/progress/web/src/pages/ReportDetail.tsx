@@ -2,7 +2,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { SkeletonText } from '@/components/ui/skeleton'
 import { Header, PageContainer } from '@/components/layout'
 import { useReport } from '@/hooks/api'
-import ReactMarkdown from 'react-markdown'
 import { useParams } from 'react-router-dom'
 import { ArrowUpRight, Calendar, ExternalLink } from 'lucide-react'
 
@@ -79,9 +78,10 @@ export default function ReportDetail() {
               </div>
             </header>
 
-            <article className="prose max-w-none text-base leading-relaxed prose-gray dark:prose-invert">
-              <ReactMarkdown>{report.content}</ReactMarkdown>
-            </article>
+            <article
+              className="prose max-w-none text-base leading-relaxed prose-gray dark:prose-invert"
+              dangerouslySetInnerHTML={{ __html: report.content }}
+            />
           </CardContent>
         </Card>
       </PageContainer>

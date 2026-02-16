@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from progress.db.models import Report
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -46,3 +48,18 @@ def test_get_report_not_found(client: TestClient):
     assert response.status_code == 404
     assert response.json()["detail"] == "Report not found"
 
+
+def test_get_report_renders_markdown(client: TestClient):
+    report = Report.create(
+        title="Test Report",
+        content="# Heading\n\n<details><summary>Click</summary>Content</details>",
+        repo=None,
+        commit_hash="test_commit",
+    )
+
+    response = client.get(f"/api/v1/reports/{report.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "<h1>Heading</h1>" in data["content"]
+    assert "<details>" in data["content"]
+    assert "<summary>Click</summary>" in data["content"]
