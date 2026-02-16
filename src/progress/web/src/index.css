@@ -1500,14 +1500,6 @@
 }
 
 /* ========================================
-   THEME TRANSITION
-   ======================================== */
-
-html {
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* ========================================
    REDUCED MOTION
    Users who prefer reduced motion get minimal animations
    ======================================== */
