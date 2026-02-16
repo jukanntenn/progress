@@ -58,16 +58,7 @@ export default function ReportList() {
       <Header />
       <PageContainer size="narrow">
         <Card>
-          <CardHeader className="pb-4">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
-              Progress Reports
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {data?.total || 0} reports total
-            </p>
-          </CardHeader>
-
-          <CardContent className="pt-0">
+          <CardContent>
             <ul className="divide-y divide-border/30">
               {data?.reports.map((report, idx) => (
                 <li
@@ -102,7 +93,7 @@ export default function ReportList() {
                           )}
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 mt-0.5" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
                     </div>
                   </Link>
                 </li>

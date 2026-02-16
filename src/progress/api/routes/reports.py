@@ -8,7 +8,7 @@ from ...db.models import Report
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-PAGE_SIZE = 50
+PAGE_SIZE = 10
 
 
 class ReportResponse(BaseModel):
@@ -97,4 +97,3 @@ def get_report(report_id: int, timezone_str: str = "UTC"):
         markpost_url=report.markpost_url,
         content=report.content or "",
     )
-

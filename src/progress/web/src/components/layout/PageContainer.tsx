@@ -31,9 +31,9 @@ export function PageContainer({
     <main
       id="main-content"
       className={cn(
-        'mx-auto px-4 py-8',
-        'sm:px-6 lg:px-8',
-        'lg:py-10',
+        'mx-auto px-4 py-4',
+        'sm:px-6 sm:py-8',
+        'lg:px-8 lg:py-10',
         containerSizes[size],
         'animate-fade-in',
         'min-h-[calc(100vh-4rem)]',
