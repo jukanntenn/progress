@@ -1,15 +1,16 @@
+{% set success_count = repo_statuses.values() | select('equalto', 'success') | list | length %}
+{% set failed_count = repo_statuses.values() | select('equalto', 'failed') | list | length %}
+{% set skipped_count = repo_statuses.values() | select('equalto', 'skipped') | list | length %}
+
+<details>
+<summary>✅ {{ success_count }} | ❌ {{ failed_count }} | ➖ {{ skipped_count }}</summary>
+
+{% for repo_name, status in repo_statuses.items() %}{% if status == "success" %}✅{% elif status == "failed" %}❌{% else %}➖{% endif %} {{ repo_name }}
+{% endfor %}
+</details>
+
 {% for content in rendered_reports %}
 {{ content }}
-{% endfor %}
-
-{% for repo_name, status in repo_statuses.items() %}
-{% if status == "success" %}
-✅ {{ repo_name }}
-{% elif status == "failed" %}
-❌ {{ repo_name }}
-{% elif status == "skipped" %}
-➖ {{ repo_name }}
-{% endif %}
 {% endfor %}
 
 ---
