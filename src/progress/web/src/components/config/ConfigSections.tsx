@@ -422,8 +422,9 @@ export function ConfigSections({
           {section.description && (
             <p className="mb-4 text-sm text-muted-foreground">{section.description}</p>
           )}
-          <div className="space-y-6">
-            {section.fields.map((field) => {
+          <Card>
+            <CardContent className="space-y-6 pt-6">
+              {section.fields.map((field) => {
               const value = getAtPath(configDraft, field.path)
               const setValue = (v: unknown) => onConfigChange(setAtPath(configDraft, field.path, v))
 
@@ -448,7 +449,8 @@ export function ConfigSections({
 
               return <SimpleField key={field.path} field={field} value={value} onChange={setValue} />
             })}
-          </div>
+            </CardContent>
+          </Card>
         </section>
       ))}
     </div>

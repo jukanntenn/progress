@@ -78,7 +78,7 @@ export default function ReportList() {
                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
                     `}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <h2 className="text-base font-semibold text-foreground group-hover:text-gray-600 transition-colors duration-150 truncate">
                           {report.title || 'Untitled Report'}
