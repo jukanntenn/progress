@@ -1,10 +1,12 @@
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import VisualConfigEditor from '@/components/config/VisualConfigEditor'
 import { Dialog } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Header, PageContainer } from '@/components/layout'
 import {
   saveConfigData,
   saveConfigToml,
@@ -14,7 +16,7 @@ import {
   validateConfigData,
 } from '@/hooks/api'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { RotateCcw, Save, Check, AlertCircle, FileCode, Settings2 } from 'lucide-react'
 
 export default function Config() {
   const { data, error, isLoading, mutate } = useConfig()
@@ -121,115 +123,167 @@ export default function Config() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto my-8 max-w-6xl px-8 py-10">
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-      </div>
+      <>
+        <Header />
+        <PageContainer size="wide">
+          <Card>
+            <CardHeader className="border-b border-border/30">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-7 w-48" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-20" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="py-6">
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-48" />
+                <Skeleton className="h-96 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        </PageContainer>
+      </>
     )
   }
 
   if (error) {
     return (
-      <div className="mx-auto my-8 max-w-6xl px-8 py-10">
-        <Card>
-          <CardContent>
-            <p className="text-red-500">Failed to load configuration</p>
-            <Link
-              to="/"
-              className="text-blue-600 hover:underline dark:text-blue-400"
-            >
-              Back to list
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <Header />
+        <PageContainer size="wide">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="text-error mb-4 text-lg font-medium">Failed to load configuration</div>
+              <p className="text-muted-foreground">Unable to load the configuration file.</p>
+            </CardContent>
+          </Card>
+        </PageContainer>
+      </>
     )
   }
 
   return (
-    <div className="mx-auto my-8 max-w-6xl px-8 py-10 lg:my-10">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <Link to="/" className="text-xl font-bold text-gray-900 dark:text-white">
-              Progress
-            </Link>
-            <div className="flex items-center gap-3">
+    <>
+      <Header />
+      <PageContainer size="wide">
+        <Card>
+          <CardHeader className="border-b border-border/30">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-bold text-foreground">Configuration Editor</h1>
+                <p className="text-sm text-muted-foreground mt-1">{data?.path}</p>
+              </div>
+
               {tab === 'toml' && (
-                <>
-                  <Button variant="outline" onClick={handleResetToml}>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetToml}
+                    leftIcon={<RotateCcw className="h-4 w-4" />}
+                  >
                     Reset
                   </Button>
-                  <Button onClick={handleSaveToml} disabled={!isTomlModified || isSaving}>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveToml}
+                    disabled={!isTomlModified || isSaving}
+                    loading={isSaving}
+                    leftIcon={<Save className="h-4 w-4" />}
+                  >
                     {isSaving ? 'Saving...' : 'Save'}
                   </Button>
-                </>
+                </div>
               )}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              Configuration Editor
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Path: {data?.path}
-            </p>
-          </div>
+          </CardHeader>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'visual' | 'toml')}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="visual">Visual</TabsTrigger>
-              <TabsTrigger value="toml">TOML</TabsTrigger>
-            </TabsList>
+          <CardContent className="py-6">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as 'visual' | 'toml')}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="visual">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Visual
+                </TabsTrigger>
+                <TabsTrigger value="toml">
+                  <FileCode className="h-4 w-4 mr-2" />
+                  TOML
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="visual">
-              {schemaLoading && (
-                <p className="text-gray-600 dark:text-gray-400">Loading schema...</p>
-              )}
-              {schemaError && (
-                <p className="text-red-500">Failed to load config schema</p>
-              )}
-              {schema && (
-                <VisualConfigEditor
-                  schema={schema}
-                  configDraft={configDraft}
-                  onConfigChange={setConfigDraft}
-                  onSave={handleSaveVisual}
-                  onValidate={handleValidateVisual}
-                  isSaving={isSaving}
-                  isModified={isVisualModified}
+              <TabsContent value="visual">
+                {schemaLoading && (
+                  <div className="space-y-4 animate-pulse">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                )}
+                {schemaError && (
+                  <div className="py-8 text-center">
+                    <AlertCircle className="h-8 w-8 text-error mx-auto mb-3" />
+                    <p className="text-error font-medium">Failed to load config schema</p>
+                  </div>
+                )}
+                {schema && (
+                  <VisualConfigEditor
+                    schema={schema}
+                    configDraft={configDraft}
+                    onConfigChange={setConfigDraft}
+                    onSave={handleSaveVisual}
+                    onValidate={handleValidateVisual}
+                    isSaving={isSaving}
+                    isModified={isVisualModified}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="toml">
+                <Textarea
+                  value={tomlContent}
+                  onChange={(e) => handleTomlChange(e.target.value)}
+                  className="h-[calc(100vh-340px)] min-h-[400px] font-mono text-sm"
+                  spellCheck={false}
                 />
-              )}
-            </TabsContent>
+                <div className="mt-4 flex items-center gap-2 text-sm">
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${
+                      isTomlModified
+                        ? 'text-warning-600 dark:text-warning-500'
+                        : 'text-success-600 dark:text-success-500'
+                    }`}
+                  >
+                    {isTomlModified ? (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-warning-500 animate-pulse" />
+                        Unsaved changes
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        No changes
+                      </>
+                    )}
+                  </span>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
-            <TabsContent value="toml">
-              <Textarea
-                value={tomlContent}
-                onChange={(e) => handleTomlChange(e.target.value)}
-                className="h-[calc(100vh-340px)]"
-                spellCheck={false}
-              />
-              <div className="mt-4 flex items-center gap-2 text-sm">
-                <span className={`h-2 w-2 rounded-full ${isTomlModified ? 'bg-yellow-500' : 'bg-green-500'}`} />
-                <span className="text-gray-600 dark:text-gray-400">
-                  {isTomlModified ? 'Unsaved changes' : 'No changes'}
-                </span>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={showValidationDialog}
-        onClose={() => setShowValidationDialog(false)}
-        title="Validation Errors"
-      >
-        <pre className="whitespace-pre-wrap break-words text-sm text-gray-900 dark:text-gray-100">
-          {validationError}
-        </pre>
-      </Dialog>
-    </div>
+        <Dialog
+          open={showValidationDialog}
+          onClose={() => setShowValidationDialog(false)}
+          title="Validation Errors"
+        >
+          <pre className="whitespace-pre-wrap break-words text-sm text-foreground bg-muted p-4 rounded-lg overflow-auto max-h-[60vh]">
+            {validationError}
+          </pre>
+        </Dialog>
+      </PageContainer>
+    </>
   )
 }
