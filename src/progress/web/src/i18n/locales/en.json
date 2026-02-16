@@ -4,7 +4,12 @@
     "rss": "RSS Feed",
     "language": "Language",
     "darkMode": "Dark Mode",
-    "lightMode": "Light Mode"
+    "lightMode": "Light Mode",
+    "theme": {
+      "system": "Follow system theme",
+      "light": "Switch to dark mode",
+      "dark": "Switch to light mode"
+    }
   },
   "languages": {
     "en": "English",

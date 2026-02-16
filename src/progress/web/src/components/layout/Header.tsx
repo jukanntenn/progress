@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
-import { Menu, X, Settings, Rss, Moon, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useTheme } from '@/hooks/useTheme'
+import { Menu, X, Settings, Rss, Moon, Sun, SunMoon } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LanguageSelector } from './LanguageSelector'
@@ -15,32 +16,8 @@ import { LanguageSelector } from './LanguageSelector'
 export function Header() {
   const { t } = useTranslation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(false)
   const location = useLocation()
-
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark') ||
-      document.documentElement.getAttribute('data-theme') === 'dark' ||
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-    setIsDarkMode(isDark)
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches)
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
-
-  const toggleDarkMode = () => {
-    const newIsDark = !isDarkMode
-    setIsDarkMode(newIsDark)
-    if (newIsDark) {
-      document.documentElement.classList.add('dark')
-      document.documentElement.setAttribute('data-theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      document.documentElement.removeAttribute('data-theme')
-    }
-  }
+  const { preference, cycleTheme } = useTheme()
 
   const isConfigActive = location.pathname === '/config'
 
@@ -125,7 +102,7 @@ export function Header() {
 
             <button
               type="button"
-              onClick={toggleDarkMode}
+              onClick={cycleTheme}
               className={cn(
                 'inline-flex items-center justify-center',
                 'h-9 w-9 rounded-md',
@@ -133,13 +110,15 @@ export function Header() {
                 'transition-all duration-200 ease-out active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
               )}
-              title={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
-              aria-label={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
+              title={t(`nav.theme.${preference}`)}
+              aria-label={t(`nav.theme.${preference}`)}
             >
-              {isDarkMode ? (
-                <Sun className="h-4 w-4" />
-              ) : (
+              {preference === 'system' ? (
+                <SunMoon className="h-4 w-4" />
+              ) : preference === 'dark' ? (
                 <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
               )}
             </button>
           </div>
@@ -216,7 +195,7 @@ export function Header() {
 
               <button
                 type="button"
-                onClick={toggleDarkMode}
+                onClick={cycleTheme}
                 className={cn(
                   'inline-flex items-center gap-3 px-3 py-3',
                   'text-sm font-medium',
@@ -225,14 +204,17 @@ export function Header() {
                   'transition-all duration-200 ease-out',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
                 )}
-                aria-label={isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}
+                title={t(`nav.theme.${preference}`)}
+                aria-label={t(`nav.theme.${preference}`)}
               >
-                {isDarkMode ? (
-                  <Sun className="h-5 w-5" />
-                ) : (
+                {preference === 'system' ? (
+                  <SunMoon className="h-5 w-5" />
+                ) : preference === 'dark' ? (
                   <Moon className="h-5 w-5" />
+                ) : (
+                  <Sun className="h-5 w-5" />
                 )}
-                <span>{isDarkMode ? t('nav.lightMode') : t('nav.darkMode')}</span>
+                <span>{t(`nav.theme.${preference}`)}</span>
               </button>
             </div>
           </div>

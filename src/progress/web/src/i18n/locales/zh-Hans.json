@@ -4,7 +4,12 @@
     "rss": "RSS 订阅",
     "language": "语言",
     "darkMode": "深色模式",
-    "lightMode": "浅色模式"
+    "lightMode": "浅色模式",
+    "theme": {
+      "system": "跟随系统主题",
+      "light": "切换到深色模式",
+      "dark": "切换到浅色模式"
+    }
   },
   "languages": {
     "en": "English",
