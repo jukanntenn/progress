@@ -15,7 +15,7 @@ export default function ReportList() {
     return (
       <>
         <Header />
-        <PageContainer size="narrow">
+        <PageContainer size="medium">
           <Card>
             <CardHeader>
               <div className="h-8 w-40 bg-muted rounded animate-pulse" />
@@ -34,7 +34,7 @@ export default function ReportList() {
     return (
       <>
         <Header />
-        <PageContainer size="narrow">
+        <PageContainer size="medium">
           <Card>
             <CardContent className="py-12 text-center">
               <div className="text-error mb-4 text-lg font-medium">Failed to load reports</div>
@@ -56,7 +56,7 @@ export default function ReportList() {
   return (
     <>
       <Header />
-      <PageContainer size="narrow">
+      <PageContainer size="medium">
         <Card>
           <CardContent>
             <ul className="divide-y divide-border/30">

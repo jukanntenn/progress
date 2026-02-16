@@ -150,7 +150,7 @@ export default function Config() {
     return (
       <>
         <Header />
-        <PageContainer size="wide">
+        <PageContainer size="medium">
           <div className="space-y-4">
             <Skeleton className="h-7 w-48" />
             <div className="flex gap-2">
@@ -168,7 +168,7 @@ export default function Config() {
     return (
       <>
         <Header />
-        <PageContainer size="wide">
+        <PageContainer size="medium">
           <div className="py-12 text-center">
             <div className="text-error mb-4 text-lg font-medium">Failed to load configuration</div>
             <p className="text-muted-foreground">Unable to load the configuration file.</p>
@@ -188,7 +188,7 @@ export default function Config() {
   return (
     <>
       <Header />
-      <PageContainer size="wide">
+      <PageContainer size="medium">
         <div className="mb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

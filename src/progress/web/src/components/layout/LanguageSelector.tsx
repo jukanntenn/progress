@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
-  en: 'EN',
-  'zh-Hans': '中文',
+  en: 'English',
+  'zh-Hans': '简体中文',
 }
 
 export function LanguageSelector() {
@@ -54,10 +54,10 @@ export function LanguageSelector() {
         aria-haspopup="listbox"
       >
         <Globe className="h-4 w-4" />
-        <span>{currentLabel}</span>
+        <span className="hidden sm:inline">{currentLabel}</span>
         <ChevronDown
           className={cn(
-            'h-3 w-3 transition-transform duration-200',
+            'hidden sm:block h-3 w-3 transition-transform duration-200',
             isOpen && 'rotate-180'
           )}
         />
@@ -81,7 +81,7 @@ export function LanguageSelector() {
               type="button"
               onClick={() => handleLanguageChange(lang)}
               className={cn(
-                'w-full flex items-center gap-2',
+                'w-full flex items-center',
                 'px-3 py-2 rounded-md',
                 'text-sm text-left',
                 'transition-colors duration-150',
@@ -93,10 +93,7 @@ export function LanguageSelector() {
               role="option"
               aria-selected={currentLanguage === lang}
             >
-              <span className="min-w-8">{LANGUAGE_LABELS[lang]}</span>
-              <span className="truncate">
-                {lang === 'en' ? t('languages.en') : t('languages.zh-Hans')}
-              </span>
+              {LANGUAGE_LABELS[lang]}
             </button>
           ))}
         </div>

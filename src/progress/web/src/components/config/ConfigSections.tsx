@@ -417,7 +417,7 @@ export function ConfigSections({
   return (
     <div className="space-y-8">
       {sections.map((section) => (
-        <section key={section.id} id={section.id} className="py-6 first:pt-0">
+        <section key={section.id} id={section.id} className="scroll-mt-20 py-6 first:pt-0">
           <h2 className="mb-1 text-xl font-bold text-foreground">{section.title}</h2>
           {section.description && (
             <p className="mb-4 text-sm text-muted-foreground">{section.description}</p>

@@ -14,7 +14,7 @@ export default function ReportDetail() {
     return (
       <>
         <Header />
-        <PageContainer size="narrow">
+        <PageContainer size="medium">
           <Card>
             <CardContent className="py-6">
               <div className="mb-6 h-4 w-20 bg-muted rounded animate-pulse" />
@@ -34,7 +34,7 @@ export default function ReportDetail() {
     return (
       <>
         <Header />
-        <PageContainer size="narrow">
+        <PageContainer size="medium">
           <Card>
             <CardContent className="py-12 text-center">
               <div className="text-error mb-4 text-lg font-medium">Report not found</div>
@@ -49,7 +49,7 @@ export default function ReportDetail() {
   return (
     <>
       <Header />
-      <PageContainer size="narrow">
+      <PageContainer size="medium">
         <Card>
           <CardContent className="py-6">
             <header className="mb-8 border-b border-border/30 pb-6">
