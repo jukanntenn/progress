@@ -28,7 +28,7 @@ function resolveTheme(preference: ThemePreference): ResolvedTheme {
   return preference
 }
 
-function applyTheme(theme: ResolvedTheme): void {
+function applyThemeSync(theme: ResolvedTheme): void {
   const root = document.documentElement
   if (theme === 'dark') {
     root.classList.add('dark')
@@ -36,6 +36,14 @@ function applyTheme(theme: ResolvedTheme): void {
   } else {
     root.classList.remove('dark')
     root.removeAttribute('data-theme')
+  }
+}
+
+function applyTheme(theme: ResolvedTheme): void {
+  if (document.startViewTransition) {
+    document.startViewTransition(() => applyThemeSync(theme))
+  } else {
+    applyThemeSync(theme)
   }
 }
 
