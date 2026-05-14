@@ -1,55 +1,23 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/session-start.py",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/inject-subagent-context.py",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "check",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/ralph-loop.py",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
+    "SessionStart": [],
+    "PreToolUse": [],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use.py"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/lint.py"
           },
           {
             "type": "command",
-            "command": "(FILE_PATH=$(jq -r '.tool_input.file_path // empty'); [ -n \"$FILE_PATH\" ] && uv run ruff format \"$FILE_PATH\" >/dev/null 2>&1 &) ; exit 0"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/format.py"
           }
         ]
       }
-    ]
-  }
+    ],
+    "SubagentStop": []
+  },
+  "enabledPlugins": {}
 }

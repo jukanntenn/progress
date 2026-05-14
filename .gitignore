@@ -238,3 +238,5 @@ docs/plans/
 # Frontend build
 src/progress/web/dist/
 src/progress/web/node_modules/
+
+.fa/
