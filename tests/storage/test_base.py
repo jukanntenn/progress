@@ -1,12 +1,10 @@
-from pathlib import Path
-
 from progress.storages.base import Storage
 
 
-def test_storage_protocol_requires_directory():
+def test_storage_protocol():
     class TestStorage:
-        def save(self, title: str, body: str | None, directory: Path) -> str:
-            return ""
+        def save(self, title: str, bodies: list[str]) -> list[str]:
+            return []
 
     storage: Storage = TestStorage()
     assert hasattr(storage, "save")

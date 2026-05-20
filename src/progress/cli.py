@@ -8,13 +8,16 @@ from pathlib import Path, PurePath
 import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .ai.analyzers.claude_code import ClaudeCodeAnalyzer
+from .ai import Analyzer, create_analyzer
 from .config import Config
 from .consts import DATABASE_PATH
 from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
-from .contrib.proposal.proposal_tracking import ProposalTrackerManager, TRACKER_REPO_URLS
-from .contrib.repo.owner import OwnerManager
+from .contrib.proposal.proposal_tracking import (
+    TRACKER_REPO_URLS,
+    ProposalTrackerManager,
+)
 from .contrib.repo.models import DiscoveredRepository
+from .contrib.repo.owner import OwnerManager
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
 from .db import close_db, create_tables, init_db, save_report
@@ -30,7 +33,6 @@ from .notification import (
     create_proposal_message,
 )
 from .notification.utils import ChangelogEntry, DiscoveredRepo
-from .storages import get_storage
 from .utils import get_now
 from .utils.markpost import MarkpostClient
 
@@ -38,19 +40,14 @@ logger = logging.getLogger(__name__)
 
 
 def initialize_components(cfg):
-    """Initialize application components from configuration."""
     init_db(DATABASE_PATH)
     create_tables()
 
     markpost_client = None
-    if getattr(cfg.markpost, "enabled", False) and getattr(cfg.markpost, "url", None):
+    if cfg.markpost.enabled and cfg.markpost.url:
         markpost_client = MarkpostClient(cfg.markpost)
 
-    analyzer = ClaudeCodeAnalyzer(
-        max_diff_length=cfg.analysis.max_diff_length,
-        timeout=cfg.analysis.timeout,
-        language=cfg.analysis.language,
-    )
+    analyzer = create_analyzer(config=cfg.analysis)
     reporter = MarkdownReporter()
 
     repo_manager = RepositoryManager(analyzer, reporter, cfg)
@@ -60,7 +57,12 @@ def initialize_components(cfg):
     return markpost_client, repo_manager, proposal_manager, reporter
 
 
-def send_notification(notification_config: NotificationConfig, **data) -> None:
+def send_notification(
+    notification_config: NotificationConfig,
+    *,
+    is_proposal: bool = False,
+    **data,
+) -> None:
     if not notification_config.channels:
         return
 
@@ -71,17 +73,61 @@ def send_notification(notification_config: NotificationConfig, **data) -> None:
     failures = 0
     for channel_config in enabled_channels:
         channel = create_channel(channel_config)
-        if data.get("filenames") is not None:
-            message = create_proposal_message(channel_config, channel, **data)
+        if is_proposal:
+            message = create_proposal_message(channel_config, channel)
+            context = _build_proposal_context(channel_config.type, **data)
         else:
-            message = create_message(channel_config, channel, **data)
-        if not message.send(fail_silently=True):
+            message = create_message(channel_config, channel)
+            context = _build_notification_context(channel_config.type, **data)
+        if not message.send(context, fail_silently=True):
             failures += 1
 
     if failures:
         logger.warning(
             "Some notifications failed: %s/%s", failures, len(enabled_channels)
         )
+
+
+def _build_notification_context(channel_type: str, **data):
+    from .notification import ConsoleContext, EmailContext, FeishuContext
+
+    kwargs = dict(
+        title=data.get("title", ""),
+        summary=data.get("summary", ""),
+        total_commits=data.get("total_commits", 0),
+        markpost_url=data.get("markpost_url"),
+        repo_statuses=data.get("repo_statuses"),
+        notification_type=data.get("notification_type", "repo_update"),
+        changelog_entries=data.get("changelog_entries"),
+        discovered_repos=data.get("discovered_repos"),
+        batch_index=data.get("batch_index"),
+        total_batches=data.get("total_batches"),
+    )
+    if channel_type == "feishu":
+        return FeishuContext(**kwargs)
+    if channel_type == "email":
+        return EmailContext(**kwargs)
+    return ConsoleContext(**kwargs)
+
+
+def _build_proposal_context(channel_type: str, **data):
+    from .notification import (
+        ConsoleProposalContext,
+        EmailProposalContext,
+        FeishuProposalContext,
+    )
+
+    kwargs = dict(
+        title=data.get("title", ""),
+        markpost_url=data.get("markpost_url"),
+        filenames=data.get("filenames"),
+        more_count=data.get("more_count", 0),
+    )
+    if channel_type == "feishu":
+        return FeishuProposalContext(**kwargs)
+    if channel_type == "email":
+        return EmailProposalContext(**kwargs)
+    return ConsoleProposalContext(**kwargs)
 
 
 def add_batch_suffix(title: str, batch_index: int, total_batches: int) -> str:
@@ -100,25 +146,45 @@ def add_batch_suffix(title: str, batch_index: int, total_batches: int) -> str:
     return title
 
 
-def generate_report_title_and_content(
-    analyzer, aggregated_report, timezone, batch_context=None
-):
-    """Generate report title and final content using analyzer or fallback to default.
+def _generate_title_and_summary(
+    analyzer: Analyzer, aggregated_report: str, language: str
+) -> tuple[str, str]:
+    prompt = f"""Your task: Analyze the aggregated code change report below and generate a title and summary.
 
-    Args:
-        analyzer: ClaudeCodeAnalyzer instance
-        aggregated_report: Complete aggregated markdown report
-        timezone: Timezone for timestamps
-        batch_context: Optional dict with batch info:
-            - batch_index: int (0-based)
-            - total_batches: int
-    """
+Language requirement: The user-configured output language is "{language}". Use this language for ALL your output.
+
+CRITICAL FORMAT REQUIREMENTS:
+1. Output EXACTLY two lines
+2. Line 1 MUST start with "TITLE:" followed by the title
+3. Line 2 MUST start with "SUMMARY:" followed by the summary
+4. Do NOT output any other text
+
+Content requirements:
+1. The title must be concise (maximum 10 words)
+2. The summary must be a single paragraph (3-5 sentences)
+"""
+    output = analyzer.analyze(content=aggregated_report, prompt=prompt).strip()
+    title = _("Progress Report for Open Source Projects")
+    summary = _("A progress report for open source projects.")
+    for line in output.split("\n"):
+        if line.startswith("TITLE:"):
+            title = line[6:].strip()
+        elif line.startswith("SUMMARY:"):
+            summary = line[8:].strip()
+    return title, summary
+
+
+def generate_report_title_and_content(
+    analyzer: Analyzer, aggregated_report, timezone, language, batch_context=None
+):
     batch_index = batch_context.get("batch_index", 0) if batch_context else 0
     total_batches = batch_context.get("total_batches", 1) if batch_context else 1
 
     try:
         logger.info("Generating title and summary with Claude...")
-        title, summary = analyzer.generate_title_and_summary(aggregated_report)
+        title, summary = _generate_title_and_summary(
+            analyzer, aggregated_report, language
+        )
         final_report = (
             f"{summary.strip()}\n\n{aggregated_report}"
             if summary.strip()
@@ -157,7 +223,7 @@ def process_reports(
         check_result: CheckAllResult from repository check
         reporter: MarkdownReporter instance
         timezone: Timezone for timestamps
-        analyzer: ClaudeCodeAnalyzer instance
+        analyzer: Analyzer instance
         markpost_client: MarkpostClient instance
         notification_config: NotificationConfig instance
         max_batch_size: Maximum batch size in bytes (from config)
@@ -188,8 +254,8 @@ def process_reports(
 
     logger.info("Generating unified title and summary...")
     try:
-        unified_title, unified_summary = analyzer.generate_title_and_summary(
-            full_aggregated_report
+        unified_title, unified_summary = _generate_title_and_summary(
+            analyzer, full_aggregated_report, config.analysis.language
         )
         logger.info(f"Generated unified title: {unified_title}")
     except Exception as e:
@@ -284,15 +350,12 @@ def process_reports(
             if repo:
                 try:
                     save_report(
+                        config=config,
                         repo_id=repo.id,
                         commit_hash=report.current_commit,
                         previous_commit_hash=report.previous_commit or "",
                         commit_count=report.commit_count,
-                        markpost_url="",
                         content=report.content,
-                        title="",
-                        config=config,
-                        directory=Path(config.data_dir) / "reports" / "repo" / "update",
                     )
                 except Exception as db_error:
                     logger.error(
@@ -334,15 +397,11 @@ def process_reports(
 
         aggregated_markpost_url = first_batch_url if len(batches) == 1 else ""
         save_report(
-            repo_id=None,
-            commit_hash="",
-            previous_commit_hash="",
+            config=config,
             commit_count=check_result.total_commits,
             markpost_url=aggregated_markpost_url,
             content=aggregated_report_with_summary,
             title=unified_title,
-            config=config,
-            directory=Path(config.data_dir) / "reports" / "repo" / "update",
         )
         logger.info("Aggregated report saved to database")
     except Exception as db_error:
@@ -365,7 +424,7 @@ def _send_entity_notification(
     config: Config,
     notification_config: NotificationConfig,
     markpost_client: MarkpostClient | None,
-    analyzer: ClaudeCodeAnalyzer,
+    analyzer: Analyzer,
     new_repos: list[dict],
     timezone,
 ) -> None:
@@ -415,7 +474,9 @@ def _send_entity_notification(
     report_content = reporter.generate_discovered_repos_report(sorted_repos, timezone)
 
     try:
-        title, summary = analyzer.generate_title_and_summary(report_content)
+        title, summary = _generate_title_and_summary(
+            analyzer, report_content, config.analysis.language
+        )
     except Exception as e:
         logger.warning(f"Failed to generate title/summary for owner monitoring: {e}")
         now = get_now(timezone)
@@ -424,32 +485,24 @@ def _send_entity_notification(
         )
         summary = f"Discovered {len(new_repos)} new repositories"
 
-    storage = get_storage(
+    report_id = save_report(
         config=config,
+        title=title,
+        content=report_content,
         report_type="repo_new",
         commit_count=len(new_repos),
     )
-    result = storage.save(
-        title,
-        report_content,
-        Path(config.data_dir) / "reports" / "repo" / "new",
-    )
-
-    markpost_url = result if result.startswith("http") else ""
+    report = Report.get_by_id(report_id)
+    markpost_url = report.markpost_url or ""
     if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
-        report_id = getattr(storage, "report_id", None)
-        if report_id is not None:
-            (
-                Report.update(markpost_url=markpost_url)
-                .where(Report.id == report_id)
-                .execute()
-            )
+        Report.update(markpost_url=markpost_url).where(Report.id == report_id).execute()
 
     discovered_repos = [
         DiscoveredRepo(
             name=r.get("name_with_owner") or r.get("repo_name") or str(r.get("id")),
-            url=r.get("repo_url") or f"https://github.com/{r.get('name_with_owner', '')}",
+            url=r.get("repo_url")
+            or f"https://github.com/{r.get('name_with_owner', '')}",
         )
         for r in sorted_repos
     ]
@@ -477,7 +530,7 @@ def _send_proposal_event_notification(
     config: Config,
     notification_config: NotificationConfig,
     markpost_client: MarkpostClient | None,
-    analyzer: ClaudeCodeAnalyzer,
+    analyzer: Analyzer,
     events,
     timezone,
 ) -> None:
@@ -504,38 +557,32 @@ def _send_proposal_event_notification(
     )
 
     try:
-        title, summary = analyzer.generate_title_and_summary(report_content)
+        title, summary = _generate_title_and_summary(
+            analyzer, report_content, config.analysis.language
+        )
     except Exception as e:
         logger.warning(f"Failed to generate title/summary for proposal events: {e}")
         title = "Proposal Updates"
         summary = ""
 
-    storage = get_storage(
+    report_id = save_report(
         config=config,
+        title=title,
+        content=report_content,
         report_type="proposal",
         commit_count=len(events),
     )
-    result = storage.save(
-        title,
-        report_content,
-        Path(config.data_dir) / "reports" / "proposal",
-    )
-
-    markpost_url = result if result.startswith("http") else ""
+    report = Report.get_by_id(report_id)
+    markpost_url = report.markpost_url or ""
     if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
-        report_id = getattr(storage, "report_id", None)
-        if report_id is not None:
-            (
-                Report.update(markpost_url=markpost_url)
-                .where(Report.id == report_id)
-                .execute()
-            )
+        Report.update(markpost_url=markpost_url).where(Report.id == report_id).execute()
 
     filenames = [PurePath(e.file_path).name for e in events][:5]
     more_count = max(0, len(events) - len(filenames))
     send_notification(
         notification_config,
+        is_proposal=True,
         title=title,
         summary=summary,
         total_commits=len(events),
@@ -571,27 +618,18 @@ def _send_changelog_update_notification(
     title = f"Changelog Updates - {now.strftime('%Y-%m-%d %H:%M')}"
 
     total_new_versions = sum(len(u.new_entries) for u in updates)
-    storage = get_storage(
+    report_id = save_report(
         config=config,
+        title=title,
+        content=report_content,
         report_type="changelog",
         commit_count=total_new_versions,
     )
-    result = storage.save(
-        title,
-        report_content,
-        Path(config.data_dir) / "reports" / "changelog",
-    )
-
-    markpost_url = result if result.startswith("http") else ""
+    report = Report.get_by_id(report_id)
+    markpost_url = report.markpost_url or ""
     if not markpost_url and markpost_client is not None:
         markpost_url = markpost_client.upload(report_content, title=title)
-        report_id = getattr(storage, "report_id", None)
-        if report_id is not None:
-            (
-                Report.update(markpost_url=markpost_url)
-                .where(Report.id == report_id)
-                .execute()
-            )
+        Report.update(markpost_url=markpost_url).where(Report.id == report_id).execute()
 
     parts = [f"{u.name} ({len(u.new_entries)})" for u in updates]
     summary = (
@@ -764,10 +802,14 @@ def _run_check_command(config: str, trackers_only: bool = False):
                     description = repo_info.get("description") or ""
                     readme_content = repo_info.get("readme_content") or ""
 
-                    summary, detail = repo_manager.analyzer.analyze_readme(
+                    from .contrib.repo.analysis import analyze_readme
+
+                    summary, detail = analyze_readme(
+                        repo_manager.analyzer,
                         repo_name,
                         description,
                         readme_content,
+                        cfg.analysis.language,
                     )
                     repo_info["readme_summary"] = summary
                     repo_info["readme_detail"] = detail
@@ -849,7 +891,7 @@ def sync_proposal_trackers(ctx):
     try:
         cfg = Config.load_from_file(config)
         initialize(ui_language=cfg.language)
-        _, _, _, proposal_manager, _ = initialize_components(cfg)
+        _, _, proposal_manager, _ = initialize_components(cfg)
         result = proposal_manager.sync(cfg.proposal_trackers)
         click.echo(str(result))
     finally:
@@ -912,7 +954,7 @@ def list_proposal_events(ctx, proposal_type: str, number: int):
         init_db(DATABASE_PATH)
         create_tables()
 
-        from .models import EIP, PEP, DjangoDEP, ProposalEvent, RustRFC
+        from .db.models import EIP, PEP, DjangoDEP, ProposalEvent, RustRFC
 
         proposal = None
         if proposal_type == "eip":

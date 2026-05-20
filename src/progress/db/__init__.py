@@ -8,14 +8,13 @@ from peewee import CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
-from progress.config import Config
+from progress.config import Config, StorageType
 from progress.consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from progress.db.models import (
     Report,
     Repository,
     database_proxy,
 )
-from progress.storages import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -235,48 +234,37 @@ def create_tables():
 
 
 def save_report(
-    repo_id: int | None,
-    commit_hash: str,
-    previous_commit_hash: str,
-    commit_count: int,
+    *,
+    config: Config | None = None,
+    repo_id: int | None = None,
+    commit_hash: str = "",
+    previous_commit_hash: str | None = None,
+    commit_count: int = 0,
     markpost_url: str | None = None,
     content: str | None = None,
     title: str = "",
-    config: Config | None = None,
-    directory: Path | None = None,
     report_type: str = "repo_update",
 ) -> int:
-    """Save report."""
-    with database.atomic():
-        if config is None:
-            report = Report.create(
-                report_type=report_type,
-                repo=repo_id,
-                title=title,
-                commit_hash=commit_hash,
-                previous_commit_hash=previous_commit_hash,
-                commit_count=commit_count,
-                markpost_url=markpost_url,
-                content=content,
-            )
-            logger.info(f"Report saved: {report.id}")
-            return report.id
+    report = Report.create(
+        report_type=report_type,
+        repo=repo_id,
+        title=title,
+        commit_hash=commit_hash,
+        previous_commit_hash=previous_commit_hash or "",
+        commit_count=commit_count,
+        markpost_url=markpost_url or "",
+        content=content,
+    )
+    logger.info(f"Report saved: {report.id} (type={report_type})")
 
-        storage = get_storage(
-            config=config,
-            report_type=report_type,
-            repo_id=repo_id,
-            commit_hash=commit_hash,
-            previous_commit_hash=previous_commit_hash,
-            commit_count=commit_count,
-            markpost_url=markpost_url,
-        )
+    if config is not None and content and config.report.storage != StorageType.DB:
+        from progress.storages import get_storage
 
-        report_dir = directory or Path(config.data_dir) / "reports"
-        result = storage.save(title, content, report_dir)
+        storage = get_storage(config=config)
+        results = storage.save(title, [content])
+        if results and results[0].startswith("http"):
+            Report.update(markpost_url=results[0]).where(
+                Report.id == report.id
+            ).execute()
 
-        report_id = getattr(storage, "report_id", None)
-        if report_id is None:
-            report_id = int(result)
-
-        return report_id
+    return report.id

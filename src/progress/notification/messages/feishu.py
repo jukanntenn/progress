@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple
 
 from ...i18n import gettext as _
 from ..channels.feishu import FeishuChannel
@@ -18,54 +18,50 @@ from .base import Message
 logger = logging.getLogger(__name__)
 
 
+class FeishuContext(NamedTuple):
+    title: str
+    summary: str
+    total_commits: int
+    markpost_url: str | None = None
+    repo_statuses: Mapping[str, str] | None = None
+    notification_type: NotificationType = "repo_update"
+    changelog_entries: list[ChangelogEntry] | None = None
+    discovered_repos: list[DiscoveredRepo] | None = None
+    batch_index: int | None = None
+    total_batches: int | None = None
+
+
+class FeishuProposalContext(NamedTuple):
+    title: str
+    markpost_url: str | None = None
+    filenames: list[str] | None = None
+    more_count: int = 0
+
+
 class FeishuMessage(Message):
-    def __init__(
-        self,
-        channel: FeishuChannel,
-        title: str,
-        summary: str,
-        total_commits: int,
-        markpost_url: str | None = None,
-        repo_statuses: Mapping[str, str] | None = None,
-        notification_type: NotificationType = "repo_update",
-        changelog_entries: list[ChangelogEntry] | None = None,
-        discovered_repos: list[DiscoveredRepo] | None = None,
-        batch_index: int | None = None,
-        total_batches: int | None = None,
-    ) -> None:
+    def __init__(self, channel: FeishuChannel) -> None:
         super().__init__(channel)
-        self._title = title
-        self._summary = summary
-        self._total_commits = total_commits
-        self._markpost_url = markpost_url
-        self._repo_statuses = repo_statuses
-        self._notification_type = notification_type
-        self._changelog_entries = changelog_entries
-        self._discovered_repos = discovered_repos
-        self._batch_index = batch_index
-        self._total_batches = total_batches
+        logger.debug("FeishuMessage initialized")
 
-    def get_channel(self) -> FeishuChannel:
-        return self._channel
-
-    def get_payload(self) -> str:
+    def get_payload(self, context: FeishuContext) -> str:
         title_with_batch = add_batch_indicator(
-            self._title, self._batch_index, self._total_batches
+            context.title, context.batch_index, context.total_batches
         )
-        card: dict[str, Any] = {
-            "msg_type": "interactive",
-            "card": {
-                "header": self._build_header(title_with_batch),
-                "elements": self._build_elements(),
-            },
-        }
-        if (
-            self._notification_type in ("changelog", "discovered_repos")
-            and self._markpost_url
-        ):
-            card["card"]["card_link"] = {"url": self._markpost_url}
+        card = self._build_card(context, title_with_batch)
         logger.debug("Prepared Feishu payload for %s", title_with_batch)
         return json.dumps(card, ensure_ascii=False)
+
+    def _build_card(self, context: FeishuContext, title: str) -> dict[str, Any]:
+        card: dict[str, Any] = {
+            "header": self._build_header(title),
+            "elements": self._build_elements(context),
+        }
+        if (
+            context.notification_type in ("changelog", "discovered_repos")
+            and context.markpost_url
+        ):
+            card["card_link"] = {"url": context.markpost_url}
+        return card
 
     def _build_header(self, title: str) -> dict[str, Any]:
         return {
@@ -73,19 +69,19 @@ class FeishuMessage(Message):
             "template": "blue",
         }
 
-    def _build_elements(self) -> list[dict[str, Any]]:
-        if self._notification_type == "changelog":
-            return self._build_changelog_elements()
-        if self._notification_type == "discovered_repos":
-            return self._build_discovered_repos_elements()
-        return self._build_default_elements()
+    def _build_elements(self, context: FeishuContext) -> list[dict[str, Any]]:
+        if context.notification_type == "changelog":
+            return self._build_changelog_elements(context)
+        if context.notification_type == "discovered_repos":
+            return self._build_discovered_repos_elements(context)
+        return self._build_default_elements(context)
 
-    def _build_default_elements(self) -> list[dict[str, Any]]:
-        stats = compute_notification_stats(self._repo_statuses)
+    def _build_default_elements(self, context: FeishuContext) -> list[dict[str, Any]]:
+        stats = compute_notification_stats(context.repo_statuses)
         elements: list[dict[str, Any]] = [
-            self._build_overview_element(self._summary),
+            self._build_overview_element(context.summary),
             {"tag": "hr"},
-            self._build_stats_element(stats, total_commits=self._total_commits),
+            self._build_stats_element(stats, total_commits=context.total_commits),
         ]
 
         failed_element = self._build_repo_list_element(
@@ -102,15 +98,15 @@ class FeishuMessage(Message):
         if skipped_element:
             elements.append(skipped_element)
 
-        action_element = self._build_action_element(self._markpost_url)
+        action_element = self._build_action_element(context.markpost_url)
         if action_element:
             elements.append(action_element)
 
         return elements
 
-    def _build_changelog_elements(self) -> list[dict[str, Any]]:
+    def _build_changelog_elements(self, context: FeishuContext) -> list[dict[str, Any]]:
         elements: list[dict[str, Any]] = []
-        entries = self._changelog_entries or []
+        entries = context.changelog_entries or []
         for idx, entry in enumerate(entries):
             name_and_version = f"{entry.name} {entry.version}".strip()
             elements.append(
@@ -135,9 +131,11 @@ class FeishuMessage(Message):
         )
         return elements
 
-    def _build_discovered_repos_elements(self) -> list[dict[str, Any]]:
+    def _build_discovered_repos_elements(
+        self, context: FeishuContext
+    ) -> list[dict[str, Any]]:
         elements: list[dict[str, Any]] = []
-        repos = self._discovered_repos or []
+        repos = context.discovered_repos or []
         visible = repos[:5]
 
         for idx, repo in enumerate(visible):
@@ -239,40 +237,25 @@ class FeishuMessage(Message):
 
 
 class FeishuProposalMessage(Message):
-    def __init__(
-        self,
-        channel: FeishuChannel,
-        title: str,
-        markpost_url: str | None = None,
-        filenames: list[str] | None = None,
-        more_count: int = 0,
-    ) -> None:
+    def __init__(self, channel: FeishuChannel) -> None:
         super().__init__(channel)
-        self._title = title
-        self._markpost_url = markpost_url
-        self._filenames = filenames or []
-        self._more_count = more_count
 
-    def get_channel(self) -> FeishuChannel:
-        return self._channel
-
-    def get_payload(self) -> str:
+    def get_payload(self, context: FeishuProposalContext) -> str:
         elements: list[dict[str, Any]] = []
-
-        for idx, fname in enumerate(self._filenames):
+        filenames = context.filenames or []
+        for idx, fname in enumerate(filenames):
             elements.append(
                 {"tag": "div", "text": {"tag": "lark_md", "content": f"📄 {fname}"}}
             )
-            if idx < len(self._filenames) - 1 or self._more_count > 0:
+            if idx < len(filenames) - 1 or context.more_count > 0:
                 elements.append({"tag": "hr"})
-
-        if self._more_count > 0:
+        if context.more_count > 0:
             elements.append(
                 {
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": f"... and {self._more_count} more",
+                        "content": f"... and {context.more_count} more",
                     },
                 }
             )
@@ -280,12 +263,11 @@ class FeishuProposalMessage(Message):
         card: dict[str, Any] = {
             "header": {
                 "template": "blue",
-                "title": {"tag": "plain_text", "content": self._title},
+                "title": {"tag": "plain_text", "content": context.title},
             },
             "elements": elements,
         }
-        if self._markpost_url:
-            card["card_link"] = {"url": self._markpost_url}
-
-        logger.debug("Prepared Feishu proposal payload for %s", self._title)
-        return json.dumps({"msg_type": "interactive", "card": card}, ensure_ascii=False)
+        if context.markpost_url:
+            card["card_link"] = {"url": context.markpost_url}
+        logger.debug("Prepared Feishu proposal payload for %s", context.title)
+        return json.dumps(card, ensure_ascii=False)

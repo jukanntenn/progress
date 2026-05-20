@@ -5,10 +5,10 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from progress.db import close_db, create_tables, init_db
+from progress.config import ProposalTrackerConfig
 from progress.contrib.proposal.models import EIP, ProposalEvent, ProposalTracker
 from progress.contrib.proposal.proposal_tracking import ProposalTrackerManager
-from progress.config import ProposalTrackerConfig
+from progress.db import close_db, create_tables, init_db
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -24,7 +24,7 @@ def db(tmp_path: Path):
     close_db()
 
 
-def test_proposal_tracker_initial_and_incremental(db, tmp_path: Path):
+def test_proposal_tracker_initial_and_incremental(db, tmp_path: Path, monkeypatch):
     repo_dir = tmp_path / "proposal-repo"
     repo_dir.mkdir()
     _git(repo_dir, "init")
@@ -65,14 +65,24 @@ created: 2024-01-02
     cfg.github = Mock(git_timeout=30)
     cfg.get_timezone = Mock(return_value=ZoneInfo("UTC"))
     analyzer = Mock()
-    analyzer.analyze_proposal = Mock(return_value=("summary", "detail"))
+
+    called_with = []
+
+    def fake_analyze_proposal(analyzer, **kwargs):
+        called_with.append(kwargs)
+        return ("summary", "detail")
+
+    monkeypatch.setattr(
+        "progress.contrib.proposal.proposal_tracking.analyze_proposal",
+        fake_analyze_proposal,
+    )
 
     manager = ProposalTrackerManager(analyzer, cfg)
     manager.git.workspace_dir = tmp_path / "ws"
 
     reports = manager.check(tracker)
     assert reports
-    assert analyzer.analyze_proposal.called
+    assert len(called_with) > 0
     eip = EIP.select().where(EIP.eip_number == 1).first()
     assert eip is not None
     assert eip.file_path == "eip-1.md"

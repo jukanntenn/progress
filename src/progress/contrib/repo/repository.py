@@ -5,7 +5,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
+from progress.ai import Analyzer
 from progress.config import Config
 from progress.consts import WORKSPACE_DIR_DEFAULT
 from progress.db.models import Repository
@@ -13,6 +13,7 @@ from progress.github import GitClient, normalize_repo_url
 from progress.github_client import GitHubClient
 from progress.i18n import gettext as _
 
+from .analysis import analyze_diff, analyze_releases
 from .repo import Repo
 from .reporter import MarkdownReporter
 
@@ -90,27 +91,18 @@ class RepositoryManager:
 
     def __init__(
         self,
-        analyzer: ClaudeCodeAnalyzer,
+        analyzer: Analyzer,
         reporter: MarkdownReporter,
         config: Config,
     ):
-        """Initialize repository manager.
-
-        Args:
-            analyzer: Claude analyzer
-            reporter: Report generator
-            config: Configuration object
-        """
         self.analyzer = analyzer
         self.reporter = reporter
         self.config = config
+        self.language = config.analysis.language
+        self.max_diff_length = config.analysis.max_diff_length
         self.logger = logger
 
-        workspace_dir = (
-            config.workspace_dir
-            if hasattr(config, "workspace_dir")
-            else WORKSPACE_DIR_DEFAULT
-        )
+        workspace_dir = config.workspace_dir or WORKSPACE_DIR_DEFAULT
 
         self.git = GitClient(
             workspace_dir=workspace_dir, timeout=config.github.git_timeout
@@ -291,8 +283,12 @@ class RepositoryManager:
             }
 
             try:
-                summary, detail = self.analyzer.analyze_releases(
-                    repo_name, branch, single_release_data
+                summary, detail = analyze_releases(
+                    self.analyzer,
+                    repo_name,
+                    branch,
+                    single_release_data,
+                    self.language,
                 )
             except Exception as e:
                 self.logger.warning(
@@ -428,8 +424,14 @@ class RepositoryManager:
                     truncated,
                     original_length,
                     analyzed_length,
-                ) = self.analyzer.analyze_diff(
-                    str(repo.name), str(repo.branch), diff, commit_messages
+                ) = analyze_diff(
+                    self.analyzer,
+                    str(repo.name),
+                    str(repo.branch),
+                    diff,
+                    commit_messages,
+                    self.max_diff_length,
+                    self.language,
                 )
                 current_commit = repo_obj.get_current_commit()
                 repo_obj.update(current_commit)

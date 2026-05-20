@@ -1,6 +1,5 @@
-from pathlib import Path
 from typing import Protocol
 
 
 class Storage(Protocol):
-    def save(self, title: str, body: str | None, directory: Path) -> str: ...
+    def save(self, title: str, bodies: list[str]) -> list[str]: ...

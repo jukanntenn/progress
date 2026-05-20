@@ -1,233 +1,343 @@
-# Progress Tracker Configuration Example
+# =============================================================================
+# Progress Tracker Configuration
+# =============================================================================
+#
+# This file documents every available configuration option.
+# Optional settings are commented out and show their default values.
+# Required settings use an example value and are uncommented.
+#
+# Configuration priority: Environment Variables > config file > defaults
+#
+# Environment variable override rules:
+#   - Prefix:    PROGRESS_
+#   - Separator: __ (double underscore) for nested keys
+#   - Examples:  PROGRESS_TIMEZONE="Asia/Shanghai"
+#                PROGRESS_GITHUB__GH_TOKEN="ghp_xxx"
+#                PROGRESS_ANALYSIS__PROVIDER="codex"
+#                PROGRESS_WEB__PORT=8080
+#   - Boolean env vars: use "true" or "false"
+#   - List/array env vars are not well supported via env; use config file
+#
+# =============================================================================
 
-# ========== Top-level Configuration ==========
-# Timezone configuration (optional, default: UTC)
-# Supports all IANA timezone identifiers, for example:
-# - "UTC" - Coordinated Universal Time
-# - "Asia/Shanghai" - China Standard Time (CST)
-# - "America/New_York" - Eastern Time
-# - "Europe/London" - UK Time
-# - "Asia/Tokyo" - Japan Time
-timezone = "UTC"
 
-# Application language (optional, default: en)
-# Controls the language of user interface text including reports and notifications
-# Supported values: en (English), zh-hans (简体中文), or any language with gettext translation files
-# This is independent from analysis.language
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+
+# Application language for UI text, reports, and notifications.
+# Independent from analysis.language (which controls AI output language).
+# Supported values: "en", "zh-hans", or any language with gettext translations.
+# Env: PROGRESS_LANGUAGE
 language = "en"
 
-# ========== Markpost Configuration ==========
-[markpost]
-# Markpost publish URL (including base_url and post_key)
-# Example: https://markpost.example.com/p/your-post-key
-url = "https://markpost.example.com/p/your-post-key"
-# HTTP request timeout (seconds), default: 30
-timeout = 30
-# Maximum batch size for uploads (bytes), default: 1048576 (1MB)
-# Reports larger than this will be split into multiple batches
-max_batch_size = 1048576
+# IANA timezone identifier for timestamps in reports and notifications.
+# Common values: "UTC", "Asia/Shanghai", "America/New_York", "Europe/London".
+# Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# Env: PROGRESS_TIMEZONE
+# timezone = "UTC"
 
-# ========== Notification Configuration ==========
-[notification]
+# Base directory for storing runtime data (database, logs, cloned repos).
+# Relative paths are resolved from the working directory.
+# Env: PROGRESS_DATA_DIR
+# data_dir = "data"
 
-# Notification channels list
-# Each channel is configured as an array item with a "type" discriminator
+# Directory where git repositories are cloned into.
+# Defaults to data_dir/repos.
+# Env: PROGRESS_WORKSPACE_DIR
+# workspace_dir = "data/repos"
 
-[[notification.channels]]
-type = "console"
-enabled = true
 
-[[notification.channels]]
-type = "feishu"
-enabled = true
-# Feishu webhook configuration
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-# HTTP request timeout (seconds), default: 30
-timeout = 30
+# -----------------------------------------------------------------------------
+# GitHub [github]  (required)
+# -----------------------------------------------------------------------------
+# Credentials and settings for accessing GitHub repositories.
 
-[[notification.channels]]
-type = "email"
-enabled = false
-# Email notification configuration
-# SMTP server configuration
-host = "smtp.163.com"
-port = 465
-user = "user@163.com"
-password = "xxxx"
-# Sender address (optional, default: progress@example.com)
-from_addr = "user@163.com"
-# Recipient address list (can be multiple)
-recipient = ["user@foxmail.com"]
-# STARTTLS (port 587)
-starttls = false
-# SSL (port 465)
-ssl = true
-
-# ========== GitHub Configuration ==========
 [github]
-# GitHub CLI token (required)
+# GitHub personal access token (PAT). Required.
+# Needs `repo` scope for private repos; `public_repo` for public-only.
+# Create at: https://github.com/settings/tokens
+# Env: PROGRESS_GITHUB__GH_TOKEN
 gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
-# Global protocol configuration (optional, default: https)
-# Supported values: "https" or "ssh"
-protocol = "https"
-# Global proxy configuration (optional)
-# Supports HTTP/HTTPS/SOCKS5 proxies, for example:
-# proxy = "http://127.0.0.1:7890"
-# proxy = "socks5://127.0.0.1:1080"
-proxy = ""
-# Git command timeout (seconds), default: 300 (5 minutes)
-git_timeout = 300
-# GitHub CLI command timeout (seconds), default: 300 (5 minutes)
-gh_timeout = 300
 
-# ========== AI Analysis Configuration ==========
+# Git clone protocol.
+# "https" — uses HTTPS (default). Works behind most firewalls.
+# "ssh"   — uses SSH. Requires SSH key configured with GitHub.
+# Env: PROGRESS_GITHUB__PROTOCOL
+# protocol = "https"
+
+# HTTP/HTTPS/SOCKS5 proxy for git and GitHub CLI operations.
+# Examples: "http://127.0.0.1:7890", "socks5://127.0.0.1:1080"
+# Empty string means no proxy.
+# Env: PROGRESS_GITHUB__PROXY
+# proxy = ""
+
+# Timeout in seconds for git CLI commands (clone, fetch, etc.).
+# Env: PROGRESS_GITHUB__GIT_TIMEOUT
+# git_timeout = 300
+
+# Timeout in seconds for GitHub CLI (gh) commands.
+# Env: PROGRESS_GITHUB__GH_TIMEOUT
+# gh_timeout = 300
+
+
+# -----------------------------------------------------------------------------
+# AI Analysis [analysis]
+# -----------------------------------------------------------------------------
+# Controls which AI provider is used and how analysis is performed.
+
 [analysis]
-# Maximum diff length (characters), diffs exceeding this length will be truncated
-# Default: 100000
-max_diff_length = 100000
-# Concurrency (optional, default: 1 for serial)
-# Set to a value greater than 1 to enable concurrent analysis
-concurrency = 1
-# Claude Code analysis timeout (seconds), default: 600 (10 minutes)
-timeout = 600
-# AI analysis output language (optional, default: en)
-# Supports any language code (e.g., zh, en, ja, ko, fr, de, es, pt, ru, ar, etc.)
-# This is independent from the top-level language setting
-language = "zh"
+# AI analyzer provider. Determines which backend performs code analysis.
+# Supported values:
+#   "claude_code" — Uses the Claude Code CLI (`claude`). Requires `claude` installed
+#                   and authenticated. Best quality results.
+#   "codex"       — Uses the OpenAI Codex CLI (`codex exec --full-auto`). Requires
+#                   `codex` installed and configured with an API key.
+#   "truncate"    — No AI call. Simply truncates input to `truncate_chars` characters.
+#                   Intended for testing and CI environments without AI access.
+# Env: PROGRESS_ANALYSIS__PROVIDER
+# provider = "claude_code"
 
-# ========== Web Service Configuration ==========
-[web]
-# Enable or disable web service (optional, default: false)
-# When enabled, a web server will start alongside the scheduled tasks
-enabled = false
-# Web service host address (optional, default: 0.0.0.0)
-# Use 0.0.0.0 to listen on all interfaces
-host = "0.0.0.0"
-# Web service port (optional, default: 5000)
-port = 5000
-# Debug mode (optional, default: false)
-# WARNING: Debug mode should NEVER be enabled in production
-# For development, use 'progress serve' which auto-enables debug mode
-debug = false
-# Auto-reload (optional, default: true)
-# Controls whether the dev server auto-reloads on file changes
-# Only applicable when using 'progress serve' in development
-reload = true
+# Maximum length (in characters) of git diff content sent to the analyzer.
+# Diffs exceeding this are truncated before analysis to avoid timeouts and costs.
+# Env: PROGRESS_ANALYSIS__MAX_DIFF_LENGTH
+# max_diff_length = 100000
 
-# ========== Repository Configuration ==========
+# Number of concurrent analysis tasks.
+# Increase for large repo lists when the AI provider supports parallel requests.
+# Env: PROGRESS_ANALYSIS__CONCURRENCY
+# concurrency = 1
+
+# Timeout in seconds for a single AI analysis call.
+# Complex analyses (large diffs) may need higher values.
+# Env: PROGRESS_ANALYSIS__TIMEOUT
+# timeout = 600
+
+# Output language for AI analysis results (titles, summaries, diff descriptions).
+# This is independent from the top-level `language` setting.
+# Examples: "en", "zh", "ja", "ko", "fr", "de", "es", "pt", "ru", "ar".
+# Env: PROGRESS_ANALYSIS__LANGUAGE
+# language = "en"
+
+# Maximum characters retained when using the "truncate" provider.
+# Only takes effect when provider = "truncate".
+# Env: PROGRESS_ANALYSIS__TRUNCATE_CHARS
+# truncate_chars = 200
+
+# Number of recent commits to analyze on the very first run of a repository
+# (when no previous commit is recorded in the database).
+# Env: PROGRESS_ANALYSIS__FIRST_RUN_LOOKBACK_COMMITS
+# first_run_lookback_commits = 3
+
+
+# -----------------------------------------------------------------------------
+# Report Storage [report]
+# -----------------------------------------------------------------------------
+# Controls how generated reports are persisted.
+
+# [report]
+# Storage backend for reports.
+# "auto"    — Uses Markpost if configured, otherwise database.
+# "db"      — Always store in the local SQLite database only.
+# "file"    — Store as markdown files in the data directory.
+# "markpost"— Upload to a Markpost service (requires [markpost] config).
+# Env: PROGRESS_REPORT__STORAGE
+# storage = "auto"
+
+
+# -----------------------------------------------------------------------------
+# Markpost [markpost]
+# -----------------------------------------------------------------------------
+# Markpost is a markdown publishing service. When configured, reports are
+# uploaded and a public URL is returned for sharing.
+
+# [markpost]
+# Markpost publish endpoint URL (including post key).
+# When set, markpost.enabled is automatically true.
+# Example: "https://markpost.example.com/p/your-post-key"
+# Env: PROGRESS_MARKPOST__URL
+# url = "https://markpost.example.com/p/your-post-key"
+
+# HTTP request timeout in seconds for Markpost API calls.
+# Env: PROGRESS_MARKPOST__TIMEOUT
+# timeout = 30
+
+# Maximum batch upload size in bytes. Reports exceeding this are split.
+# Env: PROGRESS_MARKPOST__MAX_BATCH_SIZE
+# max_batch_size = 1048576
+
+
+# -----------------------------------------------------------------------------
+# Notification [notification]
+# -----------------------------------------------------------------------------
+# Configure one or more notification channels. Each channel is a
+# [[notification.channels]] entry with a `type` discriminator.
+
+# [[notification.channels]]
+# Console channel — prints notifications to stdout.
+# type = "console"
+# enabled = true
+
+# [[notification.channels]]
+# Feishu (Lark) bot channel — sends messages via Feishu webhook.
+# type = "feishu"
+# enabled = true
+# Webhook URL from Feishu bot configuration.
+# webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+# HTTP request timeout in seconds.
+# timeout = 30
+
+# [[notification.channels]]
+# Email channel — sends notifications via SMTP.
+# type = "email"
+# enabled = false
+# SMTP server hostname.
+# host = "smtp.163.com"
+# SMTP server port (587 for STARTTLS, 465 for SSL).
+# port = 465
+# SMTP authentication username.
+# user = "user@163.com"
+# SMTP authentication password or app-specific password.
+# password = "xxxx"
+# Sender email address.
+# from_addr = "user@163.com"
+# List of recipient email addresses.
+# recipient = ["user@foxmail.com"]
+# Use STARTTLS (typically with port 587).
+# starttls = false
+# Use SSL/TLS (typically with port 465).
+# ssl = true
+
+
+# -----------------------------------------------------------------------------
+# Web Server [web]
+# -----------------------------------------------------------------------------
+# Optional built-in web server for viewing reports via browser.
+
+# [web]
+# Enable the web server. When true, runs alongside scheduled tasks.
+# Can also be started with: progress serve
+# Env: PROGRESS_WEB__ENABLED
+# enabled = false
+
+# Listen address. "0.0.0.0" listens on all interfaces; "127.0.0.1" for localhost only.
+# Env: PROGRESS_WEB__HOST
+# host = "0.0.0.0"
+
+# Listen port.
+# Env: PROGRESS_WEB__PORT
+# port = 5000
+
+# Enable debug mode. WARNING: never use in production.
+# The `progress serve` command auto-enables debug mode.
+# Env: PROGRESS_WEB__DEBUG
+# debug = false
+
+# Auto-reload on file changes. Only applicable in development.
+# Env: PROGRESS_WEB__RELOAD
+# reload = true
+
+
+# -----------------------------------------------------------------------------
+# Repository Monitoring [[repos]]
+# -----------------------------------------------------------------------------
+# Each entry defines a GitHub repository to track for code changes.
+# At least one repository is required for report generation.
+
 [[repos]]
-# GitHub repository format: owner/repo
+# Repository identifier. Supported formats:
+#   - Short:     "owner/repo"
+#   - HTTPS URL: "https://github.com/owner/repo.git"
+#   - SSH URL:   "git@github.com:owner/repo.git"
 url = "vitejs/vite"
-# Branch to monitor (optional, default: main)
-branch = "main"
-# Enable or disable (optional, default: true)
-enabled = true
-# Repository-level protocol configuration (optional, overrides global config)
-# Default: https (if not specified)
-# protocol = "ssh"
 
+# Branch to track.
+# branch = "main"
+
+# Set to false to temporarily skip this repository.
+# enabled = true
+
+# Override the global github.protocol for this repository.
+# protocol = "https"
+
+# Example: second repository
 [[repos]]
 url = "facebook/react"
-# Branch not specified, defaults to main
 
+# Example: full URL format
 [[repos]]
-# Supports full URL format
 url = "https://github.com/vitejs/vite.git"
 
-[[repos]]
-# Supports SSH URL format
-url = "git@github.com:vitejs/vite.git"
-
+# Example: SSH with per-repo protocol override
 [[repos]]
 url = "vue/core"
-# Repository-level protocol configuration, overrides global config
-protocol = "ssh"
+# protocol = "ssh"
 
+# Example: disabled repository
 [[repos]]
 url = "mycompany/private-repo"
-branch = "develop"
-enabled = false                # Temporarily disabled
+# branch = "develop"
+# enabled = false
 
-# ========== Owner Monitoring Configuration ==========
+
+# -----------------------------------------------------------------------------
+# Owner Monitoring [[owners]]
+# -----------------------------------------------------------------------------
+# Monitor GitHub users and organizations for newly created repositories.
+# Discovered repos are analyzed and notifications are sent.
+
 [[owners]]
-# Owner type: "user" or "organization"
+# Owner type.
 type = "organization"
+# GitHub username or organization name.
 name = "bytedance"
-enabled = true
+# enabled = true
 
 [[owners]]
 type = "user"
 name = "torvalds"
-enabled = true
+# enabled = true
 
+# Example: disabled owner
 [[owners]]
 type = "organization"
 name = "microsoft"
-enabled = false
+# enabled = false
 
-# ========== Proposal Tracker Configuration ==========
-# Track proposal systems like EIPs, Rust RFCs, PEPs, and Django DEPs.
 
-[[proposal_trackers]]
-# Ethereum EIPs
-type = "eip"
-repo_url = "https://github.com/ethereum/EIPs.git"
-branch = "master"
-enabled = true
-proposal_dir = "EIPS"
-file_pattern = "eip-*.md"
+# -----------------------------------------------------------------------------
+# Proposal Tracking [[proposal_trackers]]
+# -----------------------------------------------------------------------------
+# Track proposal systems (EIPs, Rust RFCs, PEPs, Django DEPs) for status
+# changes and new proposals. High-priority events trigger notifications.
 
-[[proposal_trackers]]
-# Ethereum ERCs (same repo, different directory/pattern)
-type = "eip"
-repo_url = "https://github.com/ethereum/EIPs.git"
-branch = "master"
-enabled = false
-proposal_dir = "ERCS"
-file_pattern = "erc-*.md"
+# [[proposal_trackers]]
+# Proposal system type. Supported: "eip", "rust_rfc", "pep", "django_dep".
+# type = "eip"
+# GitHub repository URL containing the proposals.
+# repo_url = "https://github.com/ethereum/EIPs.git"
+# Branch to track.
+# branch = "master"
+# enabled = true
+# Subdirectory within the repo where proposals are stored.
+# proposal_dir = "EIPS"
+# Glob pattern to match proposal filenames.
+# file_pattern = "eip-*.md"
 
-[[proposal_trackers]]
-# Rust RFCs
-type = "rust_rfc"
-repo_url = "https://github.com/rust-lang/rfcs.git"
-branch = "master"
-enabled = true
-proposal_dir = "text"
-file_pattern = "*.md"
 
-[[proposal_trackers]]
-# Python PEPs
-type = "pep"
-repo_url = "https://github.com/python/peps.git"
-branch = "main"
-enabled = true
-proposal_dir = "peps"
-file_pattern = "pep-*.rst"
+# -----------------------------------------------------------------------------
+# Changelog Tracking [[changelog_trackers]]
+# -----------------------------------------------------------------------------
+# Track software release changelogs from arbitrary URLs. When new versions
+# are detected, a merged report is generated and a notification is sent.
 
-[[proposal_trackers]]
-# Django DEPs
-type = "django_dep"
-repo_url = "https://github.com/django/deps.git"
-branch = "main"
-enabled = true
-proposal_dir = "final"
-file_pattern = "*.rst"
-
-# ========== Changelog Tracker Configuration ==========
-# Track software release changelogs from arbitrary URLs.
-#
-# Supported parser types:
-# - markdown_heading: Markdown changelog with headings like "## 1.2.3"
-# - html_chinese_version: HTML changelog with patterns like "uTools v7.5.1"
-
-[[changelog_trackers]]
-name = "Vite"
-url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
-parser_type = "markdown_heading"
-enabled = true
-
-[[changelog_trackers]]
-name = "uTools"
-url = "https://www.u-tools.cn/docs/guide/changelog.html"
-parser_type = "html_chinese_version"
-enabled = false
+# [[changelog_trackers]]
+# Human-readable tracker name (used in reports and notifications).
+# name = "Vite"
+# URL to the changelog page or file.
+# url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
+# Parser for extracting versions from the changelog.
+# "markdown_heading"   — Markdown headings like "## 1.2.3"
+# "html_chinese_version" — HTML with patterns like "uTools v7.5.1"
+# parser_type = "markdown_heading"
+# enabled = true

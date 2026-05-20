@@ -56,6 +56,7 @@ progress/
 │       ├── log.py         # Logging
 │       ├── markpost.py    # Markpost functionality
 │       ├── models.py      # Peewee ORM models
+│       ├── ai/             # AI analysis (analyzers/factory)
 │       ├── notification/  # Notifications (channels/messages/factory)
 │       ├── notifier.py    # Notifications (legacy)
 │       ├── proposal_parsers.py # Proposal parsing modules

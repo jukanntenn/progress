@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 from progress.errors import AnalysisException
 
 if TYPE_CHECKING:
-    from progress.config import AnalysisConfig
+    pass
 
 from ..types import ParserType, R
 from .base import Analyzer, noop
@@ -23,9 +23,8 @@ class CommandResult:
     returncode: int
 
 
-class ClaudeCodeAnalyzer(Analyzer):
-    def __init__(self, config: AnalysisConfig) -> None:
-        super().__init__(config)
+class CodexAnalyzer(Analyzer):
+    _STDERR_PREVIEW_LIMIT = 500
 
     @override
     def analyze(
@@ -35,18 +34,27 @@ class ClaudeCodeAnalyzer(Analyzer):
         parser: ParserType[R] = noop,
     ) -> R:
         result = _run_command(
-            ["claude", "-p", prompt],
+            [
+                "codex",
+                "exec",
+                "--full-auto",
+                "--skip-git-repo-check",
+                "--color",
+                "never",
+                prompt,
+            ],
             input_text=content if content else None,
             timeout=self._config.timeout,
         )
         if result.returncode != 0:
+            stderr_preview = result.stderr.strip()[: self._STDERR_PREVIEW_LIMIT]
             logger.error(
-                "Claude Code failed with exit code %d: %s",
+                "Codex failed with exit code %d: %s",
                 result.returncode,
-                result.stderr.strip(),
+                stderr_preview,
             )
             raise AnalysisException(
-                f"Claude Code failed with exit code {result.returncode}: {result.stderr.strip()}"
+                f"Codex failed with exit code {result.returncode}: {stderr_preview}"
             )
 
         return self.apply_parser(parser, result.stdout)

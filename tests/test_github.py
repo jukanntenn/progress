@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from progress.github import sanitize_repo_name, GitClient, resolve_repo_url
 from progress.contrib.repo.repository import RepositoryManager
-
+from progress.github import GitClient, resolve_repo_url, sanitize_repo_name
 
 # ========== Test Cases ==========
 
@@ -302,7 +301,10 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         last_commit_hash=None,
     )
     cfg = SimpleNamespace(
-        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        workspace_dir="/tmp/ws",
+        analysis=SimpleNamespace(
+            first_run_lookback_commits=3, language="en", max_diff_length=100000
+        ),
         github=SimpleNamespace(
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),
@@ -375,7 +377,10 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         last_commit_hash=None,
     )
     cfg = SimpleNamespace(
-        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        workspace_dir="/tmp/ws",
+        analysis=SimpleNamespace(
+            first_run_lookback_commits=3, language="en", max_diff_length=100000
+        ),
         github=SimpleNamespace(
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),
@@ -445,7 +450,10 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         last_commit_hash=None,
     )
     cfg = SimpleNamespace(
-        analysis=SimpleNamespace(first_run_lookback_commits=3),
+        workspace_dir="/tmp/ws",
+        analysis=SimpleNamespace(
+            first_run_lookback_commits=3, language="en", max_diff_length=100000
+        ),
         github=SimpleNamespace(
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),

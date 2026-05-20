@@ -5,11 +5,17 @@ from progress.notification.config import (
     EmailChannelConfig,
     FeishuChannelConfig,
 )
-from progress.notification.factory import create_channel, create_message, create_proposal_message
-from progress.notification.messages import ConsoleMessage, EmailMessage, FeishuMessage
+from progress.notification.factory import (
+    create_channel,
+    create_message,
+    create_proposal_message,
+)
 from progress.notification.messages import (
+    ConsoleMessage,
     ConsoleProposalMessage,
+    EmailMessage,
     EmailProposalMessage,
+    FeishuMessage,
     FeishuProposalMessage,
 )
 
@@ -47,7 +53,7 @@ def test_create_channel_returns_email_channel() -> None:
 def test_create_message_returns_console_message() -> None:
     config = ConsoleChannelConfig(enabled=True)
     channel = create_channel(config)
-    message = create_message(config, channel, title="T", summary="S", total_commits=1)
+    message = create_message(config, channel)
     assert isinstance(message, ConsoleMessage)
 
 
@@ -57,7 +63,7 @@ def test_create_message_returns_feishu_message() -> None:
         timeout=30,
     )
     channel = create_channel(config)
-    message = create_message(config, channel, title="T", summary="S", total_commits=1)
+    message = create_message(config, channel)
     assert isinstance(message, FeishuMessage)
 
 
@@ -71,14 +77,14 @@ def test_create_message_returns_email_message() -> None:
         recipient=["to@example.com"],
     )
     channel = create_channel(config)
-    message = create_message(config, channel, title="T", summary="S", total_commits=1)
+    message = create_message(config, channel)
     assert isinstance(message, EmailMessage)
 
 
 def test_create_proposal_message_returns_console_proposal_message() -> None:
     config = ConsoleChannelConfig(enabled=True)
     channel = create_channel(config)
-    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    message = create_proposal_message(config, channel)
     assert isinstance(message, ConsoleProposalMessage)
 
 
@@ -88,7 +94,7 @@ def test_create_proposal_message_returns_feishu_proposal_message() -> None:
         timeout=30,
     )
     channel = create_channel(config)
-    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    message = create_proposal_message(config, channel)
     assert isinstance(message, FeishuProposalMessage)
 
 
@@ -102,5 +108,5 @@ def test_create_proposal_message_returns_email_proposal_message() -> None:
         recipient=["to@example.com"],
     )
     channel = create_channel(config)
-    message = create_proposal_message(config, channel, title="T", filenames=["a.md"])
+    message = create_proposal_message(config, channel)
     assert isinstance(message, EmailProposalMessage)

@@ -1,29 +1,22 @@
-import logging
-from pathlib import Path
+from __future__ import annotations
 
-from .base import Storage
+import logging
+from typing import TYPE_CHECKING
+
 from .db import DBStorage
+
+if TYPE_CHECKING:
+    from .base import Storage
 
 logger = logging.getLogger(__name__)
 
 
 class CombinedStorage:
-    def __init__(self, db: DBStorage, primary: Storage) -> None:
-        self._db = db
+    def __init__(self, primary: Storage) -> None:
         self._primary = primary
+        self._db = DBStorage()
 
-    @property
-    def report_id(self) -> int | None:
-        return self._db.report_id
-
-    def save(self, title: str, body: str | None, directory: Path) -> str:
-        from progress.db.models import Report
-
-        self._db.save(title, body, directory)
-        result = self._primary.save(title, body, directory)
-
-        report_id = self._db.report_id
-        if report_id is not None and result.startswith("http"):
-            Report.update(markpost_url=result).where(Report.id == report_id).execute()
-
-        return result
+    def save(self, title: str, bodies: list[str]) -> list[str]:
+        logger.debug("Saving to combined storage (primary + database)")
+        self._db.save(title, bodies)
+        return self._primary.save(title, bodies)

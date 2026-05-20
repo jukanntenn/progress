@@ -69,9 +69,11 @@ class GitHubConfig(BaseModel):
 
 
 class AnalysisConfig(BaseModel):
-    """Claude Code analysis configuration."""
+    """AI analysis configuration."""
 
+    provider: str = "claude_code"
     max_diff_length: int = Field(default=100000, gt=0)
+    truncate_chars: int = Field(default=200, ge=1)
     concurrency: int = Field(default=1, ge=1)
     timeout: int = Field(default=600, ge=1)
     language: str = Field(default="en")

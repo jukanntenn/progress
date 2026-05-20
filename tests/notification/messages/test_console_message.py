@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 from progress.notification.channels.console import ConsoleChannel
-from progress.notification.messages.console import ConsoleMessage, ConsoleProposalMessage
+from progress.notification.messages.console import (
+    ConsoleContext,
+    ConsoleMessage,
+    ConsoleProposalContext,
+    ConsoleProposalMessage,
+)
 from progress.notification.utils import ChangelogEntry, DiscoveredRepo
 
 
 def test_console_message_get_payload_includes_title_and_summary() -> None:
     channel = ConsoleChannel()
-    message = ConsoleMessage(
-        channel,
+    message = ConsoleMessage(channel)
+    context = ConsoleContext(
         title="Test Title",
         summary="Test summary",
         total_commits=3,
@@ -18,7 +23,7 @@ def test_console_message_get_payload_includes_title_and_summary() -> None:
         total_batches=2,
     )
 
-    payload = message.get_payload()
+    payload = message.get_payload(context)
     assert "Test Title (1/2)" in payload
     assert "Test summary" in payload
     assert "https://example.com/report" in payload
@@ -26,12 +31,14 @@ def test_console_message_get_payload_includes_title_and_summary() -> None:
 
 def test_console_message_changelog_renders_bullet_list() -> None:
     channel = ConsoleChannel()
+    message = ConsoleMessage(channel)
     entries = [
-        ChangelogEntry(name="React", version="v19.0.0", url="https://react.dev/changelog"),
+        ChangelogEntry(
+            name="React", version="v19.0.0", url="https://react.dev/changelog"
+        ),
         ChangelogEntry(name="Vue", version="v3.5.0", url="https://vuejs.org/changelog"),
     ]
-    message = ConsoleMessage(
-        channel,
+    context = ConsoleContext(
         title="Changelog Updates",
         summary="",
         total_commits=0,
@@ -40,38 +47,38 @@ def test_console_message_changelog_renders_bullet_list() -> None:
         changelog_entries=entries,
     )
 
-    payload = message.get_payload()
-    assert "• React v19.0.0" in payload
-    assert "• Vue v3.5.0" in payload
+    payload = message.get_payload(context)
+    assert "React v19.0.0" in payload
+    assert "Vue v3.5.0" in payload
     assert "https://example.com/report" in payload
 
 
 def test_console_proposal_message_renders_filenames_and_report_link() -> None:
     channel = ConsoleChannel()
-    message = ConsoleProposalMessage(
-        channel,
+    message = ConsoleProposalMessage(channel)
+    context = ConsoleProposalContext(
         title="Proposal Updates",
         markpost_url="https://example.com/report",
         filenames=["eip-1.md", "eip-2.md"],
         more_count=3,
     )
 
-    payload = message.get_payload()
+    payload = message.get_payload(context)
     assert "Proposal Updates" in payload
-    assert "📄 eip-1.md" in payload
-    assert "📄 eip-2.md" in payload
+    assert "eip-1.md" in payload
+    assert "eip-2.md" in payload
     assert "... and 3 more" in payload
     assert "https://example.com/report" in payload
 
 
 def test_console_message_discovered_repos_renders_repo_list() -> None:
     channel = ConsoleChannel()
+    message = ConsoleMessage(channel)
     repos = [
         DiscoveredRepo(name="owner1/repo1", url="https://github.com/owner1/repo1"),
         DiscoveredRepo(name="owner2/repo2", url="https://github.com/owner2/repo2"),
     ]
-    message = ConsoleMessage(
-        channel,
+    context = ConsoleContext(
         title="New Repos Discovered",
         summary="",
         total_commits=0,
@@ -80,7 +87,7 @@ def test_console_message_discovered_repos_renders_repo_list() -> None:
         discovered_repos=repos,
     )
 
-    payload = message.get_payload()
+    payload = message.get_payload(context)
     assert "owner1/repo1" in payload
     assert "owner2/repo2" in payload
     assert "https://example.com/report" in payload

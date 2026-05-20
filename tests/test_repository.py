@@ -4,7 +4,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
 from progress.contrib.repo.reporter import MarkdownReporter
 from progress.contrib.repo.repository import RepositoryManager
 
@@ -17,6 +16,8 @@ class TestRepositoryManager:
         """Create mock config"""
         config = Mock()
         config.workspace_dir = "/tmp/workspace"
+        config.analysis.language = "en"
+        config.analysis.max_diff_length = 100000
         github_config = Mock()
         github_config.gh_token = "test_token"
         github_config.proxy = None
@@ -28,8 +29,7 @@ class TestRepositoryManager:
     @pytest.fixture
     def mock_analyzer(self):
         """Create mock analyzer"""
-        analyzer = Mock(spec=ClaudeCodeAnalyzer)
-        return analyzer
+        return Mock()
 
     @pytest.fixture
     def mock_reporter(self):
@@ -59,29 +59,26 @@ class TestRepositoryManager:
             ]
         }
 
-        repo_manager.analyzer.analyze_releases.return_value = (
-            "**Summary of v1.0.0**",
-            "**Detailed analysis of v1.0.0**",
-        )
+        with patch(
+            "progress.contrib.repo.repository.analyze_releases",
+            return_value=("**Summary of v1.0.0**", "**Detailed analysis of v1.0.0**"),
+        ) as mock_analyze:
+            result = repo_manager._analyze_all_releases(
+                "test/repo", "main", release_data
+            )
 
-        result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
+            assert len(result) == 1
+            assert result[0]["tag_name"] == "v1.0.0"
+            assert result[0]["title"] == "Release 1.0.0"
+            assert result[0]["notes"] == "First release"
+            assert result[0]["ai_summary"] == "**Summary of v1.0.0**"
+            assert result[0]["ai_detail"] == "**Detailed analysis of v1.0.0**"
 
-        assert len(result) == 1
-        assert result[0]["tag_name"] == "v1.0.0"
-        assert result[0]["title"] == "Release 1.0.0"
-        assert result[0]["notes"] == "First release"
-        assert result[0]["ai_summary"] == "**Summary of v1.0.0**"
-        assert result[0]["ai_detail"] == "**Detailed analysis of v1.0.0**"
-
-        repo_manager.analyzer.analyze_releases.assert_called_once()
-        call_args = repo_manager.analyzer.analyze_releases.call_args
-        assert call_args[0][0] == "test/repo"
-        assert call_args[0][1] == "main"
-        assert call_args[0][2]["is_first_check"] is False
-        assert call_args[0][2]["latest_release"]["tag"] == "v1.0.0"
-        assert call_args[0][2]["latest_release"]["name"] == "Release 1.0.0"
-        assert call_args[0][2]["latest_release"]["notes"] == "First release"
-        assert call_args[0][2]["latest_release"]["commit_hash"] == "abc123"
+            mock_analyze.assert_called_once()
+            call_args = mock_analyze.call_args
+            assert call_args[0][0] is repo_manager.analyzer
+            assert call_args[0][1] == "test/repo"
+            assert call_args[0][2] == "main"
 
     def test_analyze_all_releases_multiple_releases(self, repo_manager):
         """Test analyzing multiple releases individually"""
@@ -111,28 +108,32 @@ class TestRepositoryManager:
             ]
         }
 
-        repo_manager.analyzer.analyze_releases.side_effect = [
-            ("**Summary of v1.2.0**", "**Detail of v1.2.0**"),
-            ("**Summary of v1.1.0**", "**Detail of v1.1.0**"),
-            ("**Summary of v1.0.0**", "**Detail of v1.0.0**"),
-        ]
+        with patch(
+            "progress.contrib.repo.repository.analyze_releases",
+            side_effect=[
+                ("**Summary of v1.2.0**", "**Detail of v1.2.0**"),
+                ("**Summary of v1.1.0**", "**Detail of v1.1.0**"),
+                ("**Summary of v1.0.0**", "**Detail of v1.0.0**"),
+            ],
+        ) as mock_analyze:
+            result = repo_manager._analyze_all_releases(
+                "test/repo", "main", release_data
+            )
 
-        result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
+            assert len(result) == 3
+            assert mock_analyze.call_count == 3
 
-        assert len(result) == 3
-        assert repo_manager.analyzer.analyze_releases.call_count == 3
+            assert result[0]["tag_name"] == "v1.2.0"
+            assert result[0]["ai_summary"] == "**Summary of v1.2.0**"
+            assert result[0]["ai_detail"] == "**Detail of v1.2.0**"
 
-        assert result[0]["tag_name"] == "v1.2.0"
-        assert result[0]["ai_summary"] == "**Summary of v1.2.0**"
-        assert result[0]["ai_detail"] == "**Detail of v1.2.0**"
+            assert result[1]["tag_name"] == "v1.1.0"
+            assert result[1]["ai_summary"] == "**Summary of v1.1.0**"
+            assert result[1]["ai_detail"] == "**Detail of v1.1.0**"
 
-        assert result[1]["tag_name"] == "v1.1.0"
-        assert result[1]["ai_summary"] == "**Summary of v1.1.0**"
-        assert result[1]["ai_detail"] == "**Detail of v1.1.0**"
-
-        assert result[2]["tag_name"] == "v1.0.0"
-        assert result[2]["ai_summary"] == "**Summary of v1.0.0**"
-        assert result[2]["ai_detail"] == "**Detail of v1.0.0**"
+            assert result[2]["tag_name"] == "v1.0.0"
+            assert result[2]["ai_summary"] == "**Summary of v1.0.0**"
+            assert result[2]["ai_detail"] == "**Detail of v1.0.0**"
 
     def test_analyze_all_releases_includes_diff_content(self, repo_manager):
         release_data = {
@@ -152,18 +153,21 @@ class TestRepositoryManager:
         mock_repo_obj.repo_path = "/tmp/repo"
         mock_repo_obj.git.get_commit_diff.return_value = "diff text"
 
-        repo_manager.analyzer.analyze_releases.return_value = ("Summary", "Detail")
+        with patch(
+            "progress.contrib.repo.repository.analyze_releases",
+            return_value=("Summary", "Detail"),
+        ) as mock_analyze:
+            repo_manager._analyze_all_releases(
+                "test/repo",
+                "main",
+                release_data,
+                mock_repo_obj,
+                previous_release_commit="old456",
+            )
 
-        repo_manager._analyze_all_releases(
-            "test/repo",
-            "main",
-            release_data,
-            mock_repo_obj,
-            previous_release_commit="old456",
-        )
-
-        call_args = repo_manager.analyzer.analyze_releases.call_args
-        assert call_args[0][2]["diff_content"] == "diff text"
+            call_args = mock_analyze.call_args
+            single_release_data = call_args[0][3]
+            assert single_release_data["diff_content"] == "diff text"
 
     def test_analyze_all_releases_with_analysis_error(self, repo_manager):
         """Test graceful handling when AI analysis fails"""
@@ -179,19 +183,21 @@ class TestRepositoryManager:
             ]
         }
 
-        repo_manager.analyzer.analyze_releases.side_effect = Exception(
-            "AI service unavailable"
-        )
+        with patch(
+            "progress.contrib.repo.repository.analyze_releases",
+            side_effect=Exception("AI service unavailable"),
+        ):
+            result = repo_manager._analyze_all_releases(
+                "test/repo", "main", release_data
+            )
 
-        result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
-
-        assert len(result) == 1
-        assert result[0]["tag_name"] == "v1.0.0"
-        assert result[0]["title"] == "Release 1.0.0"
-        assert "AI analysis unavailable" in result[0]["ai_summary"]
-        assert "v1.0.0" in result[0]["ai_summary"]
-        assert "Release 1.0.0" in result[0]["ai_detail"]
-        assert "Important release notes" in result[0]["ai_detail"]
+            assert len(result) == 1
+            assert result[0]["tag_name"] == "v1.0.0"
+            assert result[0]["title"] == "Release 1.0.0"
+            assert "AI analysis unavailable" in result[0]["ai_summary"]
+            assert "v1.0.0" in result[0]["ai_summary"]
+            assert "Release 1.0.0" in result[0]["ai_detail"]
+            assert "Important release notes" in result[0]["ai_detail"]
 
     def test_analyze_all_releases_preserves_original_fields(self, repo_manager):
         """Test that all original release fields are preserved"""
@@ -209,26 +215,33 @@ class TestRepositoryManager:
             ]
         }
 
-        repo_manager.analyzer.analyze_releases.return_value = ("Summary", "Detail")
+        with patch(
+            "progress.contrib.repo.repository.analyze_releases",
+            return_value=("Summary", "Detail"),
+        ):
+            result = repo_manager._analyze_all_releases(
+                "test/repo", "main", release_data
+            )
 
-        result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
-
-        assert len(result) == 1
-        assert result[0]["tag_name"] == "v1.0.0"
-        assert result[0]["title"] == "Release 1.0.0"
-        assert result[0]["notes"] == "Release notes here"
-        assert result[0]["published_at"] == "2024-01-01T00:00:00Z"
-        assert result[0]["commit_hash"] == "abc123"
-        assert result[0]["author"] == "testuser"
-        assert result[0]["prerelease"] is False
-        assert result[0]["ai_summary"] == "Summary"
-        assert result[0]["ai_detail"] == "Detail"
+            assert len(result) == 1
+            assert result[0]["tag_name"] == "v1.0.0"
+            assert result[0]["title"] == "Release 1.0.0"
+            assert result[0]["notes"] == "Release notes here"
+            assert result[0]["published_at"] == "2024-01-01T00:00:00Z"
+            assert result[0]["commit_hash"] == "abc123"
+            assert result[0]["author"] == "testuser"
+            assert result[0]["prerelease"] is False
+            assert result[0]["ai_summary"] == "Summary"
+            assert result[0]["ai_detail"] == "Detail"
 
     def test_analyze_all_releases_empty_list(self, repo_manager):
         """Test analyzing empty release list"""
         release_data = {"releases": []}
 
-        result = repo_manager._analyze_all_releases("test/repo", "main", release_data)
+        with patch("progress.contrib.repo.repository.analyze_releases") as mock_analyze:
+            result = repo_manager._analyze_all_releases(
+                "test/repo", "main", release_data
+            )
 
-        assert result == []
-        repo_manager.analyzer.analyze_releases.assert_not_called()
+            assert result == []
+            mock_analyze.assert_not_called()

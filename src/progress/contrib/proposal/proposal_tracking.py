@@ -7,13 +7,14 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from ...ai.analyzers.claude_code import ClaudeCodeAnalyzer
+from ...ai import Analyzer
 from ...config import Config, ProposalTrackerConfig
-from .models import EIP, PEP, DjangoDEP, ProposalEvent, ProposalTracker, RustRFC
 from ...enums import ProposalEventType
 from ...errors import AnalysisException, GitException, ProposalParseError
 from ...github import GitClient, sanitize_repo_name
 from ...utils import get_now, run_command
+from .analysis import analyze_proposal
+from .models import EIP, PEP, DjangoDEP, ProposalEvent, ProposalTracker, RustRFC
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,10 @@ class InitialCheckResult:
 
 
 class ProposalTrackerManager:
-    def __init__(self, analyzer: ClaudeCodeAnalyzer, cfg: Config):
+    def __init__(self, analyzer: Analyzer, cfg: Config):
         self.analyzer = analyzer
         self.cfg = cfg
+        self.language = cfg.analysis.language
         self.git = GitClient(timeout=cfg.github.git_timeout)
 
     def sync(self, trackers: list[ProposalTrackerConfig]) -> dict:
@@ -614,15 +616,17 @@ class ProposalTrackerManager:
         ]
 
     @staticmethod
-    def _build_file_url(tracker: ProposalTracker, commit_hash: str, rel_path: str) -> str:
+    def _build_file_url(
+        tracker: ProposalTracker, commit_hash: str, rel_path: str
+    ) -> str:
         repo_url = str(getattr(tracker, "repo_url", "") or "")
         base_url = ""
         if repo_url.startswith("https://github.com/"):
             base_url = repo_url.removesuffix(".git")
         elif repo_url.startswith("git@github.com:"):
-            base_url = "https://github.com/" + repo_url[len("git@github.com:") :].removesuffix(
-                ".git"
-            )
+            base_url = "https://github.com/" + repo_url[
+                len("git@github.com:") :
+            ].removesuffix(".git")
         elif repo_url.startswith("ssh://git@github.com/"):
             base_url = "https://github.com/" + repo_url[
                 len("ssh://git@github.com/") :
@@ -865,7 +869,8 @@ class ProposalTrackerManager:
         diff_text: str | None,
     ) -> tuple[str, str]:
         try:
-            return self.analyzer.analyze_proposal(
+            return analyze_proposal(
+                self.analyzer,
                 proposal_type=proposal_type,
                 event_type=event_type,
                 proposal_number=number,
@@ -874,6 +879,7 @@ class ProposalTrackerManager:
                 new_status=new_status,
                 proposal_text=proposal_text,
                 diff_text=diff_text,
+                language=self.language,
             )
         except AnalysisException:
             return ("", "")

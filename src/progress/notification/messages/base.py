@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from typing import Any
 
 from ..base import Channel
 
@@ -13,14 +14,14 @@ class Message(ABC):
         self._channel = channel
 
     @abstractmethod
-    def get_channel(self) -> Channel: ...
+    def get_payload(self, context: Any) -> str: ...
 
-    @abstractmethod
-    def get_payload(self) -> str: ...
+    def get_channel(self) -> Channel:
+        return self._channel
 
-    def send(self, fail_silently: bool = True) -> bool:
+    def send(self, context: Any, fail_silently: bool = True) -> bool:
         try:
-            self.get_channel().send(self.get_payload())
+            self.get_channel().send(self.get_payload(context))
             return True
         except Exception as e:
             logger.warning("Channel failed: %s", e)

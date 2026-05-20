@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from progress.config import Config
 from progress.contrib.repo.repo import Repo
 from progress.db.models import Repository
 from progress.errors import GitException
@@ -17,13 +16,15 @@ from progress.github_client import GitHubClient
 @pytest.fixture
 def mock_config():
     """Create a mock config object."""
-    config = Mock(spec=Config)
+    config = Mock()
     config.github = Mock()
     config.github.gh_timeout = 300
     config.github.git_timeout = 300
     config.workspace_dir = "/tmp/test"
     config.github.gh_token = None
     config.github.proxy = None
+    config.analysis.language = "en"
+    config.analysis.max_diff_length = 100000
     return config
 
 
@@ -275,7 +276,6 @@ class TestReleaseAnalysisFallback:
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test that when AI analysis fails, a fallback summary is generated."""
-        from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
         from progress.contrib.repo.reporter import MarkdownReporter
         from progress.contrib.repo.repository import RepositoryManager
         from progress.errors import AnalysisException
@@ -298,16 +298,11 @@ class TestReleaseAnalysisFallback:
             ]
         }
 
-        # Create analyzer mock that raises AnalysisException
-        analyzer = Mock(spec=ClaudeCodeAnalyzer)
-        analyzer.analyze_releases.side_effect = AnalysisException("Claude Code failed")
-
+        analyzer = Mock()
         reporter = Mock(spec=MarkdownReporter)
         manager = RepositoryManager(analyzer, reporter, mock_config)
 
-        # Mock Repo class creation to avoid actual git operations
         with patch("progress.contrib.repo.repository.Repo", return_value=repo):
-            # Mock repo.check_releases to return test data
             with patch.object(repo, "check_releases", return_value=release_data):
                 with patch.object(repo, "update_releases"):
                     with patch.object(repo, "clone_or_update"):
@@ -315,9 +310,12 @@ class TestReleaseAnalysisFallback:
                             with patch.object(
                                 repo, "get_current_commit", return_value="current123"
                             ):
-                                result = manager.check(mock_repository)
+                                with patch(
+                                    "progress.contrib.repo.repository.analyze_releases",
+                                    side_effect=AnalysisException("Claude Code failed"),
+                                ):
+                                    result = manager.check(mock_repository)
 
-        # Verify that despite analysis failure, we get fallback content
         assert result is not None
         assert result.releases is not None
         assert len(result.releases) == 1
@@ -333,7 +331,6 @@ class TestReleaseAnalysisFallback:
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test fallback when release has no notes."""
-        from progress.ai.analyzers.claude_code import ClaudeCodeAnalyzer
         from progress.contrib.repo.reporter import MarkdownReporter
         from progress.contrib.repo.repository import RepositoryManager
         from progress.errors import AnalysisException
@@ -356,9 +353,7 @@ class TestReleaseAnalysisFallback:
             ]
         }
 
-        analyzer = Mock(spec=ClaudeCodeAnalyzer)
-        analyzer.analyze_releases.side_effect = AnalysisException("AI unavailable")
-
+        analyzer = Mock()
         reporter = Mock(spec=MarkdownReporter)
         manager = RepositoryManager(analyzer, reporter, mock_config)
 
@@ -370,7 +365,11 @@ class TestReleaseAnalysisFallback:
                             with patch.object(
                                 repo, "get_current_commit", return_value="current123"
                             ):
-                                result = manager.check(mock_repository)
+                                with patch(
+                                    "progress.contrib.repo.repository.analyze_releases",
+                                    side_effect=AnalysisException("AI unavailable"),
+                                ):
+                                    result = manager.check(mock_repository)
 
         assert result is not None
         assert result.releases is not None
