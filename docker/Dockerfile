@@ -1,10 +1,10 @@
-FROM node:20-slim AS frontend
+FROM node:22-slim AS frontend
 
 WORKDIR /app/src/progress/web
 
-RUN corepack enable && corepack prepare pnpm@9.15.6 --activate
+RUN corepack enable
 
-COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml* ./
+COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml* src/progress/web/pnpm-workspace.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
 
 COPY src/progress/web/ ./

@@ -79,12 +79,28 @@ docker buildx version >/dev/null 2>&1 || {
 
 # Create and use buildx builder
 BUILDER_NAME="multiarch-builder"
+BUILDX_CONFIG_FILE=$(mktemp)
+trap "rm -f $BUILDX_CONFIG_FILE" EXIT
+
+# Extract registry host from REGISTRY for insecure registry config
+REGISTRY_HOST="${REGISTRY%%:*}"
+REGISTRY_PORT="${REGISTRY#*:}"
+if [ "$REGISTRY_PORT" != "$REGISTRY_HOST" ] && [ "$PUSH" = "true" ]; then
+    cat > "$BUILDX_CONFIG_FILE" <<EOF
+[registry."${REGISTRY_HOST}:${REGISTRY_PORT}"]
+  http = true
+  insecure = true
+EOF
+    echo "Configuring insecure registry: ${REGISTRY_HOST}:${REGISTRY_PORT}"
+fi
+
 if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
     echo "Creating buildx builder: $BUILDER_NAME"
-    docker buildx create --name "$BUILDER_NAME" --driver docker-container --use
+    docker buildx create --name "$BUILDER_NAME" --driver docker-container --config "$BUILDX_CONFIG_FILE" --use
 else
-    echo "Using existing buildx builder: $BUILDER_NAME"
-    docker buildx use "$BUILDER_NAME"
+    echo "Recreating buildx builder: $BUILDER_NAME (to apply registry config)"
+    docker buildx rm "$BUILDER_NAME" 2>/dev/null || true
+    docker buildx create --name "$BUILDER_NAME" --driver docker-container --config "$BUILDX_CONFIG_FILE" --use
 fi
 
 # Bootstrap builder

@@ -44,3 +44,5 @@ README.md
 config.toml.example
 
 .DS_Store
+
+**/node_modules
