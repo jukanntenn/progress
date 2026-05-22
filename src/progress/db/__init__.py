@@ -8,7 +8,7 @@ from peewee import CharField, DateTimeField
 from playhouse.migrate import SqliteMigrator, migrate
 from playhouse.pool import PooledSqliteDatabase
 
-from progress.config import Config, StorageType
+from progress.config import Config
 from progress.consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from progress.db.models import (
     Report,
@@ -256,15 +256,4 @@ def save_report(
         content=content,
     )
     logger.info(f"Report saved: {report.id} (type={report_type})")
-
-    if config is not None and content and config.report.storage != StorageType.DB:
-        from progress.storages import get_storage
-
-        storage = get_storage(config=config)
-        results = storage.save(title, [content])
-        if results and results[0].startswith("http"):
-            Report.update(markpost_url=results[0]).where(
-                Report.id == report.id
-            ).execute()
-
     return report.id
