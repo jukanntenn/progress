@@ -30,7 +30,7 @@ progress/
 ├── docker/                # Docker configuration files
 │   ├── Dockerfile        # Docker container definition
 │   ├── docker-compose.yml # Docker Compose configuration
-│   ├── build.sh          # Docker build script
+│   ├── build.py          # Docker build script (Python)
 │   └── entrypoint.sh     # Docker entrypoint script
 ├── devops/                # DevOps related files
 ├── guides/                # Guide documentation

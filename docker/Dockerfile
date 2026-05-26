@@ -1,81 +1,65 @@
-FROM node:22-slim AS frontend
+FROM node:22-alpine AS frontend
 
 WORKDIR /app/src/progress/web
 
 RUN corepack enable
 
-COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml* src/progress/web/pnpm-workspace.yaml* ./
-RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
+COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml src/progress/web/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY src/progress/web/ ./
 RUN pnpm build
 
-FROM python:3.13-slim AS builder
+FROM python:3.13-alpine AS builder
 
-ARG BUILDPLATFORM
-ARG TARGETPLATFORM
-ARG TARGETARCH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    curl \
-    gettext \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    export PATH="/root/.local/bin:$PATH" && \
-    uv --version
+RUN apk add --no-cache gcc musl-dev gettext
+RUN pip install uv
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv export --no-dev --no-emit-project -o /tmp/requirements.txt && \
+    uv pip install --system -r /tmp/requirements.txt
+
 COPY src/ ./src/
 
-ENV PATH="/root/.local/bin:$PATH"
-RUN uv pip install --system -e .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-deps .
 
-# Compile i18n translation files
 RUN if [ -d "/app/src/progress/locales" ]; then \
         find /app/src/progress/locales -name "*.po" | while read po_file; do \
             mo_file="${po_file%.po}.mo"; \
             mkdir -p "$(dirname "$mo_file")"; \
-            msgfmt -o "$mo_file" "$po_file" || echo "Failed to compile $po_file"; \
+            msgfmt -o "$mo_file" "$po_file"; \
         done; \
-        echo "i18n files compiled"; \
-    else \
-        echo "No locales directory found, skipping i18n compilation"; \
     fi
 
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 ARG TARGETARCH
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
     git \
     openssh-client \
     curl \
     ca-certificates \
+    nodejs \
     npm \
-    && rm -rf /var/lib/apt/lists/*
+    github-cli
 
 ENV SUPERCRONIC_VERSION=v0.2.33
 
-RUN SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH} \
-    && curl -fsSL "$SUPERCRONIC_URL" -o /usr/local/bin/supercronic \
-    && chmod +x /usr/local/bin/supercronic \
-    && supercronic -version || echo "Supercronic installed for ${TARGETARCH}"
+RUN curl -fsSL \
+    "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH}" \
+    -o /usr/local/bin/supercronic \
+    && chmod +x /usr/local/bin/supercronic
 
 RUN npm install -g @anthropic-ai/claude-code
 
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list \
-    && apt-get update \
-    && apt-get install -y gh \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /root/.local/bin /root/.local/bin
 COPY --from=builder /app/src/progress/locales /app/src/progress/locales
 COPY --from=frontend /app/src/progress/web/dist /app/src/progress/web/dist
 
