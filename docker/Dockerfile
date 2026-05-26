@@ -45,6 +45,7 @@ RUN apk add --no-cache \
     openssh-client \
     curl \
     ca-certificates \
+    tzdata \
     nodejs \
     npm \
     github-cli
