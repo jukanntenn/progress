@@ -1,17 +1,27 @@
 services:
-  progress:
+  backend:
     image: 192.168.5.50:5000/progress:latest
-    container_name: progress
+    container_name: progress-backend
     volumes:
       - ./config.toml:/app/config.toml
       - ./claude_settings.json:/root/.claude/settings.json
       - ./data:/app/data
 
-    # Uncomment the following line to enable web service access
-    # ports:
-    #   - "5000:5000"
+    environment:
+      - PROGRESS_SCHEDULE_CRON=0 8 * * *
+
+    restart: always
+
+  frontend:
+    image: 192.168.5.50:5000/progress-frontend:latest
+    container_name: progress-frontend
+    ports:
+      - "3000:3000"
 
     environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * * # Daily at 8 AM
+      - BACKEND_URL=http://backend:5000
+
+    depends_on:
+      - backend
 
     restart: always

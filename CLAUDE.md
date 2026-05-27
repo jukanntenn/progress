@@ -19,6 +19,8 @@ progress/
 ├── .dockerignore          # Docker ignore file
 ├── .github/               # GitHub workflow files
 ├── .claude/               # Claude Code configuration
+├── .vscode/               # VS Code configuration
+│   └── tasks.json        # VS Code tasks
 ├── config/                # Configuration files directory
 │   ├── docker.toml       # Docker configuration
 │   ├── full.toml         # Full configuration
@@ -28,11 +30,14 @@ progress/
 │   ├── progress.log      # Application log
 │   └── repos/            # Repositories data
 ├── docker/                # Docker configuration files
-│   ├── Dockerfile        # Docker container definition
+│   ├── Dockerfile        # Backend Docker container definition
+│   ├── Dockerfile.frontend # Frontend Docker container definition
 │   ├── docker-compose.yml # Docker Compose configuration
 │   ├── build.py          # Docker build script (Python)
 │   └── entrypoint.sh     # Docker entrypoint script
 ├── devops/                # DevOps related files
+│   ├── dev.py            # Development environment manager
+│   └── ansible/          # Ansible deployment files
 ├── guides/                # Guide documentation
 │   ├── config.md         # Configuration guide
 │   ├── dev.md            # Development guide
@@ -42,6 +47,24 @@ progress/
 ├── scripts/               # Utility scripts
 │   ├── compilemessages.sh # Compile localization messages
 │   └── makemessages.sh   # Generate localization messages
+├── web/                   # Frontend (Next.js + React)
+│   ├── package.json      # Frontend dependencies
+│   ├── pnpm-lock.yaml    # pnpm lock file
+│   ├── pnpm-workspace.yaml # pnpm workspace config
+│   ├── next.config.ts    # Next.js configuration
+│   ├── tsconfig.json     # TypeScript configuration
+│   ├── vitest.config.ts  # Vitest test configuration
+│   ├── eslint.config.mjs # ESLint configuration
+│   ├── postcss.config.mjs # PostCSS configuration
+│   ├── public/           # Static assets
+│   └── src/              # Frontend source code
+│       ├── app/          # Next.js App Router
+│       ├── components/   # React components
+│       ├── hooks/        # Custom React hooks
+│       ├── i18n/         # Internationalization
+│       ├── lib/          # Utility libraries
+│       ├── proxy.ts      # API proxy configuration
+│       └── test/         # Test setup
 ├── src/                   # Source code directory
 │   └── progress/          # Main package directory
 │       ├── __init__.py    # Package initialization
@@ -65,8 +88,7 @@ progress/
 │       ├── repository.py  # Extended repository operations
 │       ├── reporter.py    # Markdown report generator
 │       ├── utils.py       # Utility functions
-│       ├── api/           # Web API + static serving (FastAPI)
-│       └── web/           # Frontend (React + Vite)
+│       ├── api/           # Web API (FastAPI)
 │       ├── templates/     # Jinja2 template files
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
@@ -101,11 +123,15 @@ progress/
 ## Commands
 
 - Install dependencies: `uv sync`
-- Install frontend dependencies: `cd src/progress/web && pnpm install`
+- Install frontend dependencies: `cd web && pnpm install`
 - Run application: `uv run progress -c config.toml`
 - Run unit tests: `uv run pytest -v`
+- Run frontend tests: `cd web && pnpm test`
 - Start dev server (backend): `uv run progress -c config.toml serve --reload`
-- Start dev server (frontend): `cd src/progress/web && pnpm dev`
+- Start dev server (frontend): `cd web && pnpm dev`
+- Start all services: `python devops/dev.py start`
+- Stop all services: `python devops/dev.py stop`
+- Build Docker images: `python docker/build.py`
 
 ## Proposal Tracking
 
@@ -119,7 +145,11 @@ progress/
 - Package and Project Manager: uv 0.9+
 - CLI Framework: Click 8.3+
 - Web Framework: FastAPI 0.115+
-- Frontend: React 18 + TypeScript + Vite 5 + Tailwind CSS
+- Frontend: React 19 + TypeScript + Next.js 16 + Tailwind CSS v4
+- Frontend UI: @base-ui/react + class-variance-authority
+- Frontend Data Fetching: @tanstack/react-query v5
+- Frontend i18n: next-intl v4
+- Frontend Themes: next-themes
 - Frontend Package Manager: pnpm
 - RSS Generation: feedgen
 - Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)

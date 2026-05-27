@@ -1,15 +1,3 @@
-FROM node:22-alpine AS frontend
-
-WORKDIR /app/src/progress/web
-
-RUN corepack enable
-
-COPY src/progress/web/package.json src/progress/web/pnpm-lock.yaml src/progress/web/pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
-
-COPY src/progress/web/ ./
-RUN pnpm build
-
 FROM python:3.13-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev gettext
@@ -62,7 +50,6 @@ RUN npm install -g @anthropic-ai/claude-code
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src/progress/locales /app/src/progress/locales
-COPY --from=frontend /app/src/progress/web/dist /app/src/progress/web/dist
 
 WORKDIR /app
 

@@ -1,7 +1,7 @@
 services:
-  progress:
+  backend:
     image: 192.168.5.50:5000/progress:latest
-    container_name: progress
+    container_name: progress-backend
     volumes:
       - ./config.toml:/app/config.toml:rw
       - ./data:/app/data
@@ -9,5 +9,14 @@ services:
     environment:
       - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
     restart: always
+
+  frontend:
+    image: 192.168.5.50:5000/progress-frontend:latest
+    container_name: progress-frontend
     ports:
-      - "5053:5000"
+      - "5053:3000"
+    environment:
+      - BACKEND_URL=http://backend:5000
+    depends_on:
+      - backend
+    restart: always

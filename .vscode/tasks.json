@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Backend",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "progress", "serve", "--reload"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": false,
+        "group": "dev-servers"
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "icon": { "id": "server", "color": "terminal.ansiGreen" }
+    },
+    {
+      "label": "Start Frontend",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["dev"],
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": false,
+        "group": "dev-servers"
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "icon": { "id": "zap", "color": "terminal.ansiYellow" }
+    },
+    {
+      "label": "Start All",
+      "dependsOn": ["Start Backend", "Start Frontend"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "icon": { "id": "rocket", "color": "terminal.ansiBlue" }
+    }
+  ]
+}
