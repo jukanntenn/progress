@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Progress development environment manager.
 
-Manages backend (uvicorn) and frontend (Next.js) for local development.
+Manages backend (FastAPI) and frontend (Next.js) for local development.
 
 Usage:
     python devops/dev.py start    # Start all services (default)
@@ -19,8 +19,10 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-PID_FILE = SCRIPT_DIR / "frontend.pid"
-LOG_FILE = SCRIPT_DIR / "frontend.log"
+BACKEND_PID_FILE = SCRIPT_DIR / "backend.pid"
+FRONTEND_PID_FILE = SCRIPT_DIR / "frontend.pid"
+BACKEND_LOG_FILE = SCRIPT_DIR / "backend.log"
+FRONTEND_LOG_FILE = SCRIPT_DIR / "frontend.log"
 
 BACKEND_PORT = 5000
 FRONTEND_PORT = 3000
@@ -74,23 +76,46 @@ def wait_for(url, name, timeout=120):
 
 
 def start():
-    logger.info("Starting backend (uvicorn)...")
-
     frontend_dir = PROJECT_ROOT / "web"
+
+    logger.info("Starting backend (fastapi dev)...")
+    env = os.environ.copy()
+    env["CONFIG_FILE"] = str(PROJECT_ROOT / "config.toml")
+    env["PYTHONPATH"] = str(PROJECT_ROOT / "src")
+    with open(BACKEND_LOG_FILE, "w") as log:
+        backend_proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "fastapi",
+                "dev",
+                "--port",
+                str(BACKEND_PORT),
+            ],
+            cwd=str(PROJECT_ROOT),
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
+            env=env,
+        )
+    BACKEND_PID_FILE.write_text(str(backend_proc.pid))
+
+    wait_for(f"http://localhost:{BACKEND_PORT}/api/v1/reports", "Backend", timeout=30)
+
     if not (frontend_dir / "node_modules").exists():
         logger.info("Installing frontend dependencies...")
         run("pnpm", "install", cwd=str(frontend_dir))
 
     logger.info("Starting frontend (pnpm dev)...")
-    with open(LOG_FILE, "w") as log:
-        proc = subprocess.Popen(
+    with open(FRONTEND_LOG_FILE, "w") as log:
+        frontend_proc = subprocess.Popen(
             ["pnpm", "dev"],
             cwd=str(frontend_dir),
             stdout=log,
             stderr=log,
             start_new_session=True,
         )
-    PID_FILE.write_text(str(proc.pid))
+    FRONTEND_PID_FILE.write_text(str(frontend_proc.pid))
 
     wait_for(f"http://localhost:{FRONTEND_PORT}", "Frontend", timeout=60)
 
@@ -101,25 +126,30 @@ def start():
 
 
 def stop():
-    if PID_FILE.exists():
-        pid = int(PID_FILE.read_text().strip())
-        try:
-            os.killpg(pid, signal.SIGTERM)
-            time.sleep(1)
-            os.killpg(pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
-        PID_FILE.unlink()
+    for pid_file, name in [
+        (BACKEND_PID_FILE, "backend"),
+        (FRONTEND_PID_FILE, "frontend"),
+    ]:
+        if pid_file.exists():
+            pid = int(pid_file.read_text().strip())
+            try:
+                os.killpg(pid, signal.SIGTERM)
+                time.sleep(1)
+                os.killpg(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            pid_file.unlink()
 
-    logger.info("Stopping frontend...")
-    try:
-        result = run("lsof", "-ti", f":{FRONTEND_PORT}")
-        if result.stdout.strip():
-            for pid_str in result.stdout.strip().splitlines():
-                subprocess.run(["kill", "-9", pid_str], capture_output=True)
-    except Exception:
-        pass
-    logger.info("Frontend stopped")
+    for port in [FRONTEND_PORT, BACKEND_PORT]:
+        try:
+            result = run("lsof", "-ti", f":{port}")
+            if result.stdout.strip():
+                for pid_str in result.stdout.strip().splitlines():
+                    subprocess.run(["kill", "-9", pid_str], capture_output=True)
+        except Exception:
+            pass
+
+    logger.info("All services stopped")
 
 
 def main():

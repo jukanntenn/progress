@@ -1,7 +1,6 @@
 """CLI main entry point."""
 
 import logging
-import os
 from datetime import datetime
 from pathlib import Path, PurePath
 
@@ -982,56 +981,12 @@ def list_proposal_events(ctx, proposal_type: str, number: int):
         click.echo("detected_at\tevent_type\told_status\tnew_status\tcommit")
         for e in query:
             click.echo(
-                f"{e.detected_at.isoformat()}\t{e.event_type}\t{e.old_status or ''}\t{e.new_status or ''}\t{e.commit_hash}"
+                f"{e.detected_at.isoformat()}\t{e.event_type}"
+                f"\t{e.old_status or ''}\t{e.new_status or ''}"
+                f"\t{e.commit_hash}"
             )
     finally:
         close_db()
-
-
-@cli.command(name="serve")
-@click.option("--host", "-h", default=None, help="Override host from config")
-@click.option("--port", "-p", default=None, type=int, help="Override port from config")
-@click.option("--reload/--no-reload", default=True, help="Enable/disable auto-reload")
-@click.pass_context
-def serve(ctx, host, port, reload):
-    """Start development server with hot reload."""
-    import uvicorn
-
-    config_path = ctx.obj["config_path"]
-
-    try:
-        logger.info(f"Loading configuration file: {config_path}")
-        cfg = Config.load_from_file(config_path)
-
-        initialize(ui_language=cfg.language)
-
-        host = host or cfg.web.host
-        port = port or cfg.web.port
-
-        if reload:
-            logger.warning(
-                "Hot reload is enabled. This should NOT be used in production."
-            )
-
-        os.environ["CONFIG_FILE"] = config_path
-
-        logger.info(f"Starting server on {host}:{port}")
-        logger.info(f"Hot reload: {'enabled' if reload else 'disabled'}")
-
-        uvicorn.run(
-            "progress.api:create_app",
-            host=host,
-            port=port,
-            reload=reload,
-            factory=True,
-        )
-
-    except ProgressException as e:
-        logger.error(f"Application error: {e}", exc_info=True)
-        raise click.ClickException(str(e))
-    except Exception as e:
-        logger.error(f"Program execution failed: {e}", exc_info=True)
-        raise click.ClickException(str(e))
 
 
 def main():

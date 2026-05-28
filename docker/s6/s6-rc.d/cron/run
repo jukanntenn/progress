@@ -1,0 +1,21 @@
+#!/bin/sh
+if [ -z "$PROGRESS_SCHEDULE_CRON" ]; then
+    exec sleep infinity
+fi
+
+export CONFIG_FILE="${CONFIG_FILE:-/app/config.toml}"
+export PYTHONPATH=/app/src
+export PYTHONUNBUFFERED=1
+
+/usr/local/bin/progress --config "$CONFIG_FILE"
+
+mkdir -p /etc/supercronic
+cat > /etc/supercronic/crontab << EOF
+PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin
+PYTHONUNBUFFERED=1
+PYTHONPATH=/app/src
+$PROGRESS_SCHEDULE_CRON cd /app && /usr/local/bin/progress --config /app/config.toml 2>&1
+EOF
+
+supercronic -test /etc/supercronic/crontab
+exec supercronic -passthrough-logs /etc/supercronic/crontab

@@ -30,11 +30,13 @@ progress/
 │   ├── progress.log      # Application log
 │   └── repos/            # Repositories data
 ├── docker/                # Docker configuration files
-│   ├── Dockerfile        # Backend Docker container definition
-│   ├── Dockerfile.frontend # Frontend Docker container definition
+│   ├── Dockerfile        # Unified Docker container definition
 │   ├── docker-compose.yml # Docker Compose configuration
+│   ├── Caddyfile         # Caddy reverse proxy configuration
 │   ├── build.py          # Docker build script (Python)
-│   └── entrypoint.sh     # Docker entrypoint script
+│   └── s6/               # s6-overlay service definitions
+│       ├── cont-init.d/  # Container initialization scripts
+│       └── s6-rc.d/      # Service run scripts (caddy, fastapi, nextjs, cron)
 ├── devops/                # DevOps related files
 │   ├── dev.py            # Development environment manager
 │   └── ansible/          # Ansible deployment files
@@ -63,7 +65,6 @@ progress/
 │       ├── hooks/        # Custom React hooks
 │       ├── i18n/         # Internationalization
 │       ├── lib/          # Utility libraries
-│       ├── proxy.ts      # API proxy configuration
 │       └── test/         # Test setup
 ├── src/                   # Source code directory
 │   └── progress/          # Main package directory
@@ -127,7 +128,7 @@ progress/
 - Run application: `uv run progress -c config.toml`
 - Run unit tests: `uv run pytest -v`
 - Run frontend tests: `cd web && pnpm test`
-- Start dev server (backend): `uv run progress -c config.toml serve --reload`
+- Start dev server (backend): `PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev`
 - Start dev server (frontend): `cd web && pnpm dev`
 - Start all services: `python devops/dev.py start`
 - Stop all services: `python devops/dev.py stop`

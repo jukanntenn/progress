@@ -31,7 +31,7 @@ progress/
 │   ├── Dockerfile        # Docker container definition
 │   ├── docker-compose.yml # Docker Compose configuration
 │   ├── build.sh          # Docker build script
-│   └── entrypoint.sh     # Docker entrypoint script
+│   └── s6/               # s6-overlay service definitions
 ├── devops/                # DevOps related files
 ├── guides/                # Guide documentation
 │   ├── config.md         # Configuration guide
@@ -104,7 +104,7 @@ progress/
 - Install frontend dependencies: `cd src/progress/web && pnpm install`
 - Run application: `uv run progress -c config.toml`
 - Run unit tests: `uv run pytest -v`
-- Start dev server (backend): `uv run progress -c config.toml serve --reload`
+- Start dev server (backend): `PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev`
 - Start dev server (frontend): `cd src/progress/web && pnpm dev`
 
 ## Proposal Tracking

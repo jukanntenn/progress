@@ -80,16 +80,6 @@ class AnalysisConfig(BaseModel):
     first_run_lookback_commits: int = Field(default=3, ge=1)
 
 
-class WebConfig(BaseModel):
-    """Web service configuration."""
-
-    enabled: bool = False
-    host: str = Field(default="0.0.0.0")
-    port: int = Field(default=5000, ge=1, le=65535)
-    debug: bool = Field(default=False)
-    reload: bool = Field(default=True)
-
-
 class RepositoryConfig(BaseModel):
     """Repository configuration."""
 
@@ -178,7 +168,6 @@ class Config(BaseSettings):
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
     github: GitHubConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
-    web: WebConfig = Field(default_factory=WebConfig)
     repos: List[RepositoryConfig] = Field(default_factory=list)
     owners: List[OwnerConfig] = Field(default_factory=list)
     proposal_trackers: List[ProposalTrackerConfig] = Field(default_factory=list)
@@ -187,6 +176,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="PROGRESS_",
         env_nested_delimiter="__",
+        extra="ignore",
     )
 
     @field_validator("timezone", mode="before")

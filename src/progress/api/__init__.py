@@ -1,9 +1,6 @@
 import os
-from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from .routes import config, reports, rss
 
@@ -31,20 +28,6 @@ def create_app(config_obj=None) -> FastAPI:
     api_router.include_router(config.router)
     api_router.include_router(rss.router)
     app.include_router(api_router)
-
-    web_dist = Path(__file__).resolve().parent.parent / "web" / "dist"
-    if web_dist.exists():
-        assets_dir = web_dist / "assets"
-        if assets_dir.exists():
-            app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-
-        @app.get("/{path:path}")
-        def spa_fallback(path: str):
-            if "." in path.split("/")[-1]:
-                file_path = web_dist / path
-                if file_path.exists():
-                    return FileResponse(file_path)
-            return FileResponse(web_dist / "index.html")
 
     @app.on_event("shutdown")
     def shutdown_db():

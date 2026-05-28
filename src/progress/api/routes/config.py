@@ -298,50 +298,6 @@ def build_config_editor_schema() -> EditorSchema:
         ],
     )
 
-    web = SectionSchema(
-        id="web",
-        title="Web",
-        description="Web service settings",
-        fields=[
-            FieldSchema(
-                type="boolean",
-                path="web.enabled",
-                label="Enabled",
-                default=False,
-                help_text="Enable or disable the web service.",
-            ),
-            FieldSchema(
-                type="text",
-                path="web.host",
-                label="Host",
-                default="0.0.0.0",
-                help_text="Bind address (use 0.0.0.0 to listen on all interfaces).",
-            ),
-            FieldSchema(
-                type="number",
-                path="web.port",
-                label="Port",
-                default=5000,
-                validation={"min": 1, "max": 65535},
-                help_text="Listening port.",
-            ),
-            FieldSchema(
-                type="boolean",
-                path="web.debug",
-                label="Debug",
-                default=False,
-                help_text="Do not enable in production.",
-            ),
-            FieldSchema(
-                type="boolean",
-                path="web.reload",
-                label="Reload",
-                default=True,
-                help_text="Auto-reload on file changes (development only).",
-            ),
-        ],
-    )
-
     github = SectionSchema(
         id="github",
         title="GitHub",
@@ -603,8 +559,12 @@ def build_config_editor_schema() -> EditorSchema:
                         required=True,
                         help_text="Supported formats: owner/repo, https://..., git@....",
                     ),
-                    FieldSchema(type="text", path="branch", label="Branch", default="main"),
-                    FieldSchema(type="boolean", path="enabled", label="Enabled", default=True),
+                    FieldSchema(
+                        type="text", path="branch", label="Branch", default="main"
+                    ),
+                    FieldSchema(
+                        type="boolean", path="enabled", label="Enabled", default=True
+                    ),
                     FieldSchema(
                         type="select",
                         path="protocol",
@@ -638,7 +598,9 @@ def build_config_editor_schema() -> EditorSchema:
                         options=["user", "organization"],
                     ),
                     FieldSchema(type="text", path="name", label="Name", required=True),
-                    FieldSchema(type="boolean", path="enabled", label="Enabled", default=True),
+                    FieldSchema(
+                        type="boolean", path="enabled", label="Enabled", default=True
+                    ),
                 ],
             )
         ],
@@ -669,10 +631,24 @@ def build_config_editor_schema() -> EditorSchema:
                         required=True,
                         help_text="Expected format: https://github.com/<owner>/<repo>(.git)",
                     ),
-                    FieldSchema(type="text", path="branch", label="Branch", default="main"),
-                    FieldSchema(type="boolean", path="enabled", label="Enabled", default=True),
-                    FieldSchema(type="text", path="proposal_dir", label="Proposal Dir", default=""),
-                    FieldSchema(type="text", path="file_pattern", label="File Pattern", default=""),
+                    FieldSchema(
+                        type="text", path="branch", label="Branch", default="main"
+                    ),
+                    FieldSchema(
+                        type="boolean", path="enabled", label="Enabled", default=True
+                    ),
+                    FieldSchema(
+                        type="text",
+                        path="proposal_dir",
+                        label="Proposal Dir",
+                        default="",
+                    ),
+                    FieldSchema(
+                        type="text",
+                        path="file_pattern",
+                        label="File Pattern",
+                        default="",
+                    ),
                 ],
             )
         ],
@@ -698,7 +674,9 @@ def build_config_editor_schema() -> EditorSchema:
                         required=True,
                         options=["markdown_heading", "html_chinese_version"],
                     ),
-                    FieldSchema(type="boolean", path="enabled", label="Enabled", default=True),
+                    FieldSchema(
+                        type="boolean", path="enabled", label="Enabled", default=True
+                    ),
                 ],
             )
         ],
@@ -707,7 +685,6 @@ def build_config_editor_schema() -> EditorSchema:
     return EditorSchema(
         sections=[
             general,
-            web,
             github,
             analysis,
             report,

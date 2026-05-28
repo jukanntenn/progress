@@ -210,35 +210,6 @@ gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
 
 
 # -----------------------------------------------------------------------------
-# Web Server [web]
-# -----------------------------------------------------------------------------
-# Optional built-in web server for viewing reports via browser.
-
-# [web]
-# Enable the web server. When true, runs alongside scheduled tasks.
-# Can also be started with: progress serve
-# Env: PROGRESS_WEB__ENABLED
-# enabled = false
-
-# Listen address. "0.0.0.0" listens on all interfaces; "127.0.0.1" for localhost only.
-# Env: PROGRESS_WEB__HOST
-# host = "0.0.0.0"
-
-# Listen port.
-# Env: PROGRESS_WEB__PORT
-# port = 5000
-
-# Enable debug mode. WARNING: never use in production.
-# The `progress serve` command auto-enables debug mode.
-# Env: PROGRESS_WEB__DEBUG
-# debug = false
-
-# Auto-reload on file changes. Only applicable in development.
-# Env: PROGRESS_WEB__RELOAD
-# reload = true
-
-
-# -----------------------------------------------------------------------------
 # Repository Monitoring [[repos]]
 # -----------------------------------------------------------------------------
 # Each entry defines a GitHub repository to track for code changes.

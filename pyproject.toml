@@ -5,8 +5,7 @@ description = "Progress is a GitHub project tracking tool that traces multi-repo
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.1",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
+    "fastapi[standard]>=0.115.0",
     "feedgen>=0.9.0",
     "jinja2>=3.1.0",
     "markdown-it-py>=3.0.0",
@@ -32,6 +31,9 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 progress = "progress.cli:cli"
+
+[tool.fastapi]
+entrypoint = "progress.main:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

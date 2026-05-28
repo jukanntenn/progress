@@ -1,7 +1,9 @@
 services:
-  backend:
+  app:
     image: 192.168.5.50:5000/progress:latest
-    container_name: progress-backend
+    container_name: progress
+    ports:
+      - "5000:5000"
     volumes:
       - ./config.toml:/app/config.toml
       - ./claude_settings.json:/root/.claude/settings.json
@@ -9,19 +11,5 @@ services:
 
     environment:
       - PROGRESS_SCHEDULE_CRON=0 8 * * *
-
-    restart: always
-
-  frontend:
-    image: 192.168.5.50:5000/progress-frontend:latest
-    container_name: progress-frontend
-    ports:
-      - "3000:3000"
-
-    environment:
-      - BACKEND_URL=http://backend:5000
-
-    depends_on:
-      - backend
 
     restart: always

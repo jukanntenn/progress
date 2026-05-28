@@ -4,11 +4,10 @@
 
 | Image | Stage | Version | Size (compressed) |
 |-------|-------|---------|-------------------|
-| `node:22-alpine` | Frontend builder | Pinned to Alpine | ~60MB |
-| `python:3.13-alpine` | Backend builder | Pinned to Alpine | ~50MB |
-| `python:3.13-alpine` | Runtime | Pinned to Alpine | ~50MB |
+| `python:3.13-alpine` | Python deps + runtime | Pinned to Alpine | ~50MB |
+| `node:22-alpine` | Node deps + build | Pinned to Alpine | ~60MB |
 
-All base images use Alpine Linux for minimal size. Unpinned `latest` tags are not used.
+All base images use Alpine Linux for minimal size.
 
 ## Build Tool
 
@@ -20,25 +19,24 @@ Key features used:
 - Multi-stage Dockerfile builds
 - Build cache mounts (`--mount=type=cache`)
 
-See [buildx reference](../../wiki/buildx-reference.md) for detailed buildx knowledge.
-
 ## Directory Structure
 
 ```
 progress/
 ├── docker/                          # Production image building
 │   ├── build.py                     # Build script (environment check + buildx invocation)
-│   ├── Dockerfile                   # Multi-stage production image (frontend + backend + runtime)
+│   ├── Dockerfile                   # Unified multi-stage image (backend + frontend + proxy)
 │   ├── docker-compose.yml           # Runtime compose configuration
-│   └── entrypoint.sh               # Container entrypoint (timezone, web service, supercronic)
-├── wiki/
-│   └── buildx-reference.md          # Buildx knowledge base
+│   ├── Caddyfile                    # Caddy reverse proxy routing rules
+│   └── s6/                          # s6-overlay process manager configuration
+│       ├── cont-init.d/             # Container initialization scripts
+│       └── s6-rc.d/                 # Service definitions (fastapi, nextjs, caddy, cron)
 ├── .dockerignore                    # Excludes tests, specs, guides, wiki from build context
 ├── pyproject.toml                   # Project dependencies
 ├── uv.lock                          # Locked dependency versions
 └── src/                             # Source code
     └── progress/
-        ├── web/                     # Frontend (React + Vite)
+        ├── api/                     # FastAPI backend
         ├── locales/                 # i18n translation files (.po → .mo compilation)
         └── ...                      # Backend Python modules
 ```
@@ -49,17 +47,20 @@ progress/
 
 Dependencies are installed before source code is copied. This ensures that code changes don't invalidate the expensive dependency installation layer.
 
-**Frontend stage:**
-1. `COPY package.json pnpm-lock.yaml pnpm-workspace.yaml` → `RUN pnpm install --frozen-lockfile` — cached unless dependencies change
-2. `COPY src/progress/web/` — invalidated by frontend source changes
-3. `RUN pnpm build` — only re-runs after frontend changes
-
-**Backend builder stage:**
+**Python deps stage:**
 1. `COPY pyproject.toml uv.lock` → `RUN uv export ... | uv pip install --system -r ...` — cached unless dependencies change
 2. `COPY src/` — invalidated by Python source changes
 3. `RUN uv pip install --system --no-deps .` — only re-runs after source changes
 
-### Two-Step Dependency Installation
+**Node deps stage:**
+1. `COPY package.json pnpm-lock.yaml pnpm-workspace.yaml` → `RUN pnpm install --frozen-lockfile` — cached unless dependencies change
+
+**Node build stage:**
+1. `COPY --from=node-deps /app/node_modules` — cached from deps stage
+2. `COPY web/` — invalidated by frontend source changes
+3. `RUN next build` — only re-runs after frontend changes
+
+### Two-Step Dependency Installation (Python)
 
 The builder stage separates dependency installation from project installation:
 
@@ -80,6 +81,10 @@ Alpine Linux base images minimize image size (~5MB base vs ~80MB for Debian slim
 ### Corepack (Frontend)
 
 pnpm is activated via `corepack enable` instead of `npm install -g pnpm`. The exact pnpm version is pinned in `package.json`'s `packageManager` field, ensuring reproducible builds.
+
+### Next.js Standalone Output
+
+`next.config.ts` sets `output: "standalone"`, which produces a minimal server bundle without the full `node_modules`. The standalone output is copied to the runtime image.
 
 ### Build Context Filtering
 
@@ -107,8 +112,6 @@ The script performs two functions in order:
 The script does **not** modify the environment. If requirements are not met, it exits with an error and instructions for manual resolution.
 
 ### Environment Checks
-
-The following checks run before any build starts:
 
 | Check | Command | Failure |
 |-------|---------|---------|

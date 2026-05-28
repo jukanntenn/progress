@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Build multi-architecture Docker images for Progress using Docker buildx.
 
-Builds two images:
-  - progress: Python backend (CLI, scheduler, API)
-  - progress-frontend: Next.js frontend (standalone)
+Builds a single unified image containing:
+  - FastAPI backend (API, CLI, scheduler)
+  - Next.js frontend (standalone)
+  - Caddy reverse proxy
+  - s6-overlay process manager
 
 Supports load (local, single platform) and push (multi-platform to registry) modes.
 
@@ -40,16 +42,8 @@ QEMU_ARCH_MAP = {
     "linux/amd64": "x86_64",
 }
 
-IMAGES = {
-    "backend": {
-        "name": "progress",
-        "dockerfile": "docker/Dockerfile",
-    },
-    "frontend": {
-        "name": "progress-frontend",
-        "dockerfile": "docker/Dockerfile.frontend",
-    },
-}
+IMAGE_NAME = "progress"
+DOCKERFILE = "docker/Dockerfile"
 
 logger = logging.getLogger("build")
 
@@ -70,7 +64,7 @@ def setup_logging(verbose=False):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Build multi-architecture Docker images for Progress",
+        description="Build multi-architecture Docker image for Progress",
     )
     parser.add_argument(
         "--push",
@@ -104,12 +98,6 @@ def parse_args():
         "--verbose",
         action="store_true",
         help="Show full build output (no progress bar)",
-    )
-    parser.add_argument(
-        "--image",
-        choices=["backend", "frontend", "all"],
-        default="all",
-        help="Which image to build (default: all)",
     )
     return parser.parse_args()
 
@@ -257,55 +245,6 @@ def check_environment(target_platforms):
     return check_builder_platforms(target_platforms)
 
 
-def build_single_image(image_key, args, platforms_to_build, builder_name, project_root):
-    image_info = IMAGES[image_key]
-    image_name = image_info["name"]
-    dockerfile_path = os.path.join(project_root, image_info["dockerfile"])
-
-    all_tags = args.tags or ["latest"]
-    full_image_names = []
-    cmd = ["docker", "buildx", "build"]
-    for tag in all_tags:
-        if args.push:
-            full_tag = f"{args.registry}/{image_name}:{tag}"
-        else:
-            full_tag = f"{image_name}:{tag}"
-        full_image_names.append(full_tag)
-        cmd.extend(["--tag", full_tag])
-
-    cmd.extend(["--platform", ",".join(platforms_to_build)])
-
-    if args.push:
-        cmd.append("--push")
-        cache_ref = f"{args.registry}/{image_name}:cache"
-        if not args.no_cache:
-            cmd.extend(["--cache-from", f"type=registry,ref={cache_ref}"])
-            cmd.extend(["--cache-to", f"type=registry,ref={cache_ref},mode=max"])
-    else:
-        cmd.append("--load")
-
-    if args.no_cache:
-        cmd.append("--no-cache")
-
-    if args.verbose:
-        cmd.extend(["--progress", "plain"])
-
-    cmd.extend(["-f", dockerfile_path, project_root])
-
-    logger.info("Building %s:", image_key)
-    logger.info("  Image:      %s", ", ".join(full_image_names))
-    logger.info("  Platform:   %s", ", ".join(platforms_to_build))
-    logger.info("  Dockerfile: %s", dockerfile_path)
-
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        logger.error("Build failed for %s (exit code %d)!", image_key, e.returncode)
-        sys.exit(1)
-
-    logger.info("Build completed: %s", ", ".join(full_image_names))
-
-
 def build_image(args):
     target_platforms = resolve_platforms(args.platform)
 
@@ -321,26 +260,54 @@ def build_image(args):
     builder_name = check_environment(platforms_to_build)
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    dockerfile_path = os.path.join(project_root, DOCKERFILE)
+
+    all_tags = args.tags or ["latest"]
+    full_image_names = []
+    cmd = ["docker", "buildx", "build"]
+    for tag in all_tags:
+        if args.push:
+            full_tag = f"{args.registry}/{IMAGE_NAME}:{tag}"
+        else:
+            full_tag = f"{IMAGE_NAME}:{tag}"
+        full_image_names.append(full_tag)
+        cmd.extend(["--tag", full_tag])
+
+    cmd.extend(["--platform", ",".join(platforms_to_build)])
+
+    if args.push:
+        cmd.append("--push")
+        cache_ref = f"{args.registry}/{IMAGE_NAME}:cache"
+        if not args.no_cache:
+            cmd.extend(["--cache-from", f"type=registry,ref={cache_ref}"])
+            cmd.extend(["--cache-to", f"type=registry,ref={cache_ref},mode=max"])
+    else:
+        cmd.append("--load")
+
+    if args.no_cache:
+        cmd.append("--no-cache")
+
+    if args.verbose:
+        cmd.extend(["--progress", "plain"])
+
+    cmd.extend(["-f", dockerfile_path, project_root])
 
     mode = "push" if args.push else "load"
     logger.info("Build configuration:")
     logger.info("  Mode:       %s", mode)
-    logger.info("  Platforms:  %s", ", ".join(platforms_to_build))
+    logger.info("  Image:      %s", ", ".join(full_image_names))
+    logger.info("  Platform:   %s", ", ".join(platforms_to_build))
     logger.info("  Builder:    %s", builder_name)
     logger.info("  Context:    %s", project_root)
+    logger.info("  Dockerfile: %s", dockerfile_path)
 
-    images_to_build = []
-    if args.image == "all":
-        images_to_build = ["backend", "frontend"]
-    else:
-        images_to_build = [args.image]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error("Build failed (exit code %d)!", e.returncode)
+        sys.exit(1)
 
-    for image_key in images_to_build:
-        build_single_image(
-            image_key, args, platforms_to_build, builder_name, project_root
-        )
-
-    logger.info("All builds completed.")
+    logger.info("Build completed: %s", ", ".join(full_image_names))
 
 
 def main():

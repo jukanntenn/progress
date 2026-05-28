@@ -5,9 +5,13 @@
       "label": "Start Backend",
       "type": "shell",
       "command": "uv",
-      "args": ["run", "progress", "serve", "--reload"],
+      "args": ["run", "fastapi", "dev"],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/src",
+          "CONFIG_FILE": "${workspaceFolder}/config.toml"
+        }
       },
       "presentation": {
         "reveal": "always",

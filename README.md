@@ -248,23 +248,6 @@ timeout = 600
 # This is independent from the top-level language setting
 language = "zh"
 
-[web]
-# Enable or disable web service (optional, default: false)
-# When enabled, a web server will start alongside the scheduled tasks
-enabled = false
-# Web service host address (optional, default: 0.0.0.0)
-# Use 0.0.0.0 to listen on all interfaces
-host = "0.0.0.0"
-# Web service port (optional, default: 5000)
-port = 5000
-# Debug mode (optional, default: false)
-# WARNING: Debug mode should NEVER be enabled in production
-# For development, use 'progress serve' which auto-enables debug mode
-debug = false
-# Auto-reload (optional, default: true)
-# Controls whether the dev server auto-reloads on file changes
-reload = true
-
 # Repository configuration (at least one required)
 [[repos]]
 # GitHub repository format: owner/repo (recommended format, concise and clear)
@@ -336,11 +319,6 @@ enabled = true
 - `analysis.concurrency` - Concurrent analysis count, default 1
 - `analysis.timeout` - Analysis timeout, default 600 seconds
 - `analysis.language` - AI analysis output language, default en
-- `web.enabled` - Enable or disable web service, default false
-- `web.host` - Web service host address, default 0.0.0.0
-- `web.port` - Web service port, default 5000
-- `web.debug` - Debug mode (development only), default false
-- `web.reload` - Auto-reload on file changes (development only), default true
 - `repos[].branch` - Repository branch, default main
 - `repos[].enabled` - Whether enabled, default true
 - `repos[].protocol` - Repository-level protocol configuration, default https
@@ -497,30 +475,17 @@ docker-compose up -d
 
 ## Web Service
 
-Progress includes a built-in web service that allows you to browse aggregated reports and subscribe via RSS.
-
-### Enabling Web Service
-
-To enable the web service, add the `[web]` section to your `config.toml`:
-
-```toml
-[web]
-enabled = true
-host = "0.0.0.0"
-port = 5000
-```
+Progress includes a web service that allows you to browse aggregated reports and subscribe via RSS.
 
 ### Accessing the Web Interface
 
-Once enabled, the web service will automatically start when the container launches. You can access:
+The web service runs automatically in the Docker container. You can access:
 
 - **Report List**: `http://your-host:5000/` - Browse all aggregated reports with pagination (50 reports per page)
 - **Report Detail**: `http://your-host:5000/report/<id>` - View full content of a specific report
-- **RSS Feed**: `http://your-host:5000/rss` - Subscribe to RSS feed for the latest reports
+- **RSS Feed**: `http://your-host:5000/api/v1/rss` - Subscribe to RSS feed for the latest reports
 
 ### Docker Compose Configuration
-
-When using Docker, you'll need to expose the web service port:
 
 ```yaml
 services:
@@ -532,7 +497,7 @@ services:
       - ./claude_settings.json:/root/.claude/settings.json:ro
       - ./data:/app/data
     ports:
-      - "5000:5000"  # Expose web service port
+      - "5000:5000"
     environment:
       - PROGRESS_SCHEDULE_CRON=0 8 * * *
     restart: always
@@ -542,7 +507,7 @@ services:
 
 You can subscribe to the RSS feed using any RSS reader:
 
-1. Copy the RSS URL: `http://your-host:5000/rss`
+1. Copy the RSS URL: `http://your-host:5000/api/v1/rss`
 2. Add it to your favorite RSS reader (e.g., Feedly, Inoreader, NetNewsWire)
 3. Receive updates when new aggregated reports are generated
 
@@ -550,36 +515,20 @@ The RSS feed includes the 50 most recent reports.
 
 ## Development Server
 
-Progress includes a built-in development server with hot reload support for convenient web interface development.
-
-### Starting the Development Server
-
-To start the development server:
+For local development, run the backend and frontend separately:
 
 ```bash
-# Start dev server with hot reload (default: 0.0.0.0:5000)
-uv run progress serve
+# Terminal 1: Backend (FastAPI with hot reload)
+PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev
 
-# Custom host/port
-uv run progress serve --host 127.0.0.1 --port 8000
-
-# Disable debug mode
-uv run progress serve --no-debug
-
-# With custom config file
-uv run progress -c custom.toml serve
+# Terminal 2: Frontend (Next.js with Turbopack)
+cd web && pnpm dev
 ```
 
-### Development Server Features
+Or use the development environment manager:
 
-- **Hot Reload**: Automatically restarts the server when you modify Python files
-- **Debug Mode**: Enabled by default with interactive debugger and detailed error pages
-- **Config Override**: Override host, port, and debug settings via command-line options
+```bash
+python devops/dev.py start   # Start all services
+python devops/dev.py stop    # Stop all services
+```
 
-### Production Deployment
-
-For production deployments, continue using Docker with gunicorn as documented in the [Web Service](#web-service) section. The development server (`progress serve`) is intended for local development only.
-
-### Security Note
-
-The development server enables debug mode by default, which should NEVER be used in production. The production Docker deployment uses gunicorn and is not affected by these development settings.

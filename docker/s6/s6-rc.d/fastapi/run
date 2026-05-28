@@ -1,0 +1,6 @@
+#!/bin/sh
+export CONFIG_FILE="${CONFIG_FILE:-/app/config.toml}"
+export PYTHONPATH=/app/src
+export PYTHONUNBUFFERED=1
+cd /app
+exec fastapi run --host 127.0.0.1 --port 8000

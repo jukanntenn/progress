@@ -6,31 +6,14 @@ Run backend and frontend in separate terminals:
 
 ```bash
 # Terminal 1: Backend (FastAPI)
-uv run progress serve --reload
+PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev
 
 # Terminal 2: Frontend (Next.js)
 cd web
 pnpm dev
 ```
 
-### Command Options
-
-- `--host/-h`: Override host from config (default: from config file)
-- `--port/-p`: Override port from config (default: from config file)
-- `--reload/--no-reload`: Enable/disable hot reload (default: enabled)
-
-### Examples
-
-```bash
-# Custom host and port
-uv run progress serve --host 127.0.0.1 --port 8000
-
-# Disable hot reload
-uv run progress serve --no-reload
-
-# With custom config
-uv run progress -c custom.toml serve
-```
+The frontend proxies `/api/*` requests to the backend via Next.js rewrites configured in `next.config.ts`.
 
 ## Development Environment Manager
 
@@ -54,24 +37,22 @@ Use `Ctrl+Shift+P` > "Tasks: Run Task" to start services:
 
 ## Production Deployment
 
-Use Docker Compose for production. The development servers are for local development only.
-
-**Security Warning**: Hot reload is enabled by default in `progress serve`. Never use it in production.
+Production uses a single Docker container with Caddy, FastAPI, and Next.js managed by s6-overlay.
 
 ### Docker Build
 
 ```bash
-# Build both images
+# Build image
 python docker/build.py
-
-# Build only backend
-python docker/build.py --image backend
-
-# Build only frontend
-python docker/build.py --image frontend
 
 # Build and push to registry
 python docker/build.py --push
+
+# Build for specific platform
+python docker/build.py --platform amd64
+
+# No cache
+python docker/build.py --no-cache
 ```
 
 ### Docker Compose
