@@ -241,4 +241,5 @@ src/progress/web/node_modules/
 web/node_modules/
 web/.next/
 
+.local/
 .fa/
