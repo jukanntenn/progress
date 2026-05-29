@@ -1,0 +1,11 @@
+model_provider = "axonhub-responses"
+model = "axon"
+model_reasoning_effort = "low"
+preferred_auth_method = "apikey"
+
+[model_providers.axonhub-responses]
+name = "AxonHub using Chat Completions"
+base_url = "http://192.168.5.50:8099/v1"
+auth_key = "OPENAI_API_KEY"
+wire_api = "responses"
+query_params = {}

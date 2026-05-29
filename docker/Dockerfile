@@ -59,6 +59,8 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     nodejs \
+    npm \
+    bash \
     github-cli
 
 RUN curl -fsSL \
@@ -78,6 +80,14 @@ RUN curl -fsSL \
     | tar xz -C /usr/local/bin caddy && \
     chmod +x /usr/local/bin/caddy
 
+RUN curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.153
+RUN npm install -g @openai/codex@0.129.0
+
+COPY docker/Caddyfile /etc/caddy/Caddyfile
+COPY docker/s6/cont-init.d /etc/cont-init.d
+COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d
+RUN chmod +x /etc/cont-init.d/*.sh
+
 COPY --from=python-deps /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=python-deps /usr/local/bin /usr/local/bin
 COPY --from=python-deps /app/src/progress/locales /app/src/progress/locales
@@ -90,10 +100,6 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src/ ./src/
-
-COPY docker/Caddyfile /etc/caddy/Caddyfile
-COPY docker/s6/cont-init.d /etc/cont-init.d
-COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d
 
 RUN mkdir -p /app/data
 

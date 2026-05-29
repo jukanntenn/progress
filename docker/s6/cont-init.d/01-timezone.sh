@@ -1,7 +1,8 @@
 #!/bin/sh
 tz="UTC"
-if [ -f "$CONFIG_FILE" ]; then
-    tz=$(grep '^[[:space:]]*timezone[[:space:]]*=' "$CONFIG_FILE" | cut -d'=' -f2 | tr -d '"\047' | cut -d'#' -f1 | xargs)
+config_file="${CONFIG_FILE:-/app/config.toml}"
+if [ -f "$config_file" ]; then
+    tz=$(grep '^[[:space:]]*timezone[[:space:]]*=' "$config_file" | cut -d'=' -f2 | tr -d '"\047' | cut -d'#' -f1 | xargs)
     tz=${tz:-UTC}
 fi
 if [ ! -f "/usr/share/zoneinfo/$tz" ]; then

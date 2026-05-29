@@ -8,6 +8,8 @@ services:
       - ./config.toml:/app/config.toml:rw
       - ./data:/app/data
       - ./claude_settings.json:/root/.claude/settings.json:ro
+      - ./codex_config.toml:/root/.codex/config.toml:ro
+      - ./codex_auth.json:/root/.codex/auth.json:ro
     environment:
       - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
     restart: always

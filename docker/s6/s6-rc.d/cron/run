@@ -6,6 +6,7 @@ fi
 export CONFIG_FILE="${CONFIG_FILE:-/app/config.toml}"
 export PYTHONPATH=/app/src
 export PYTHONUNBUFFERED=1
+export PATH="/root/.local/bin:$PATH"
 
 /usr/local/bin/progress --config "$CONFIG_FILE"
 
