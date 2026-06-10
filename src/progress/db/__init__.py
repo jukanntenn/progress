@@ -212,13 +212,20 @@ def create_tables():
             Report,
             GitHubOwner,
             DiscoveredRepository,
-            ProposalTrackerState,
             ChangelogTracker,
+        ],
+        safe=True,
+    )
+
+    migrate_database()
+
+    database.create_tables(
+        [
+            ProposalTrackerState,
             Proposal,
         ],
         safe=True,
     )
-    migrate_database()
 
     logger.info("Database tables created")
 
