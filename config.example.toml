@@ -276,24 +276,26 @@ name = "microsoft"
 # enabled = false
 
 
-# -----------------------------------------------------------------------------
-# Proposal Tracking [[proposal_trackers]]
-# -----------------------------------------------------------------------------
-# Track proposal systems (EIPs, Rust RFCs, PEPs, Django DEPs) for status
-# changes and new proposals. High-priority events trigger notifications.
 
-# [[proposal_trackers]]
-# Proposal system type. Supported: "eip", "rust_rfc", "pep", "django_dep".
-# type = "eip"
-# GitHub repository URL containing the proposals.
-# repo_url = "https://github.com/ethereum/EIPs.git"
-# Branch to track.
-# branch = "master"
-# enabled = true
-# Subdirectory within the repo where proposals are stored.
-# proposal_dir = "EIPS"
-# Glob pattern to match proposal filenames.
-# file_pattern = "eip-*.md"
+# -----------------------------------------------------------------------------
+# Proposal Tracking [proposal_trackers]
+# -----------------------------------------------------------------------------
+# Track proposal systems for status changes and new proposals.
+# All repository details (URL, branch, directory, file patterns) are configured
+# internally — you only specify which kinds to enable.
+#
+# Supported kinds:
+#   "eip" — Ethereum Improvement Proposals (ethereum/EIPs)
+#   "erc" — Ethereum Request for Comments (ethereum/ercs)
+#   "pep" — Python Enhancement Proposals (python/peps)
+#   "rfc" — Rust Request for Comments (rust-lang/rfcs)
+#   "dep" — Django Enhancement Proposals (django/deps)
+#
+# Notifiable events (new proposals, accepted, rejected, withdrawn) trigger
+# notifications via configured notification channels.
+#
+# Example — enable all trackers:
+# proposal_trackers = ["eip", "erc", "pep", "rfc", "dep"]
 
 
 # -----------------------------------------------------------------------------

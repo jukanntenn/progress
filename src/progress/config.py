@@ -115,26 +115,7 @@ class OwnerConfig(BaseModel):
         return v.strip()
 
 
-class ProposalTrackerConfig(BaseModel):
-    type: Literal["eip", "rust_rfc", "pep", "django_dep"]
-    repo_url: str
-    branch: str = "main"
-    enabled: bool = True
-    proposal_dir: str = ""
-    file_pattern: str = ""
-
-    @field_validator("repo_url")
-    @classmethod
-    def validate_repo_url(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("repo_url cannot be empty")
-
-        v = v.strip()
-        if not re.match(r"^https://github\.com/[^/]+/[^/]+(\.git)?$", v):
-            raise ValueError(
-                f"Invalid GitHub repo_url format: {v}. Expected https://github.com/<owner>/<repo>(.git)"
-            )
-        return v
+ProposalTrackerKind = Literal["eip", "erc", "pep", "rfc", "dep"]
 
 
 class ChangelogTrackerConfig(BaseModel):
@@ -170,7 +151,7 @@ class Config(BaseSettings):
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     repos: List[RepositoryConfig] = Field(default_factory=list)
     owners: List[OwnerConfig] = Field(default_factory=list)
-    proposal_trackers: List[ProposalTrackerConfig] = Field(default_factory=list)
+    proposal_trackers: List[ProposalTrackerKind] = Field(default_factory=list)
     changelog_trackers: List[ChangelogTrackerConfig] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(

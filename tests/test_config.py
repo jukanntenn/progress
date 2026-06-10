@@ -228,8 +228,12 @@ protocol = "ftp"
         Config.load_from_file(temp_config_file)
 
 
-def test_proposal_tracker_repo_url_validation(temp_config_file):
+
+
+def test_proposal_trackers_list_config(temp_config_file):
     content = """
+proposal_trackers = ["eip", "pep"]
+
 [markpost]
 url = "https://markpost.example.com/p/test"
 
@@ -240,24 +244,18 @@ webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/test"
 
 [github]
 gh_token = "ghp_test"
-
-[[proposal_trackers]]
-type = "eip"
-repo_url = "https://github.com/ethereum/EIPs.git"
-branch = "master"
-enabled = true
-proposal_dir = "EIPS"
-file_pattern = "eip-*.md"
 """
     Path(temp_config_file).write_text(content)
     cfg = Config.load_from_file(temp_config_file)
-    assert cfg.proposal_trackers and cfg.proposal_trackers[0].type == "eip"
+    assert cfg.proposal_trackers == ["eip", "pep"]
 
-    bad = content.replace("https://github.com/ethereum/EIPs.git", "file:///tmp/repo")
+    bad = content.replace(
+        'proposal_trackers = ["eip", "pep"]',
+        'proposal_trackers = ["invalid"]',
+    )
     Path(temp_config_file).write_text(bad)
     with pytest.raises(ConfigException):
         Config.load_from_file(temp_config_file)
-
 
 def test_invalid_repo_url_format(temp_config_file):
     """Test: Invalid repository URL format"""

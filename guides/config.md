@@ -32,28 +32,25 @@ enabled = true
 
 ## Proposal Tracking
 
-You can track proposal repositories (EIPs, Rust RFCs, PEPs, Django DEPs) using the `[[proposal_trackers]]` section.
+You can track proposal repositories (EIPs, ERCs, PEPs, Rust RFCs, Django DEPs) using the `proposal_trackers` field. This is a list of proposal kinds to enable — all repository details are configured internally.
 
-### Fields
+### Supported Kinds
 
-- `type` (required): one of `"eip"`, `"rust_rfc"`, `"pep"`, `"django_dep"`
-- `repo_url` (required): GitHub repository URL in the form `https://github.com/<owner>/<repo>(.git)`
-- `branch` (optional): branch to track (default: `main`)
-- `enabled` (optional): `true` or `false` (default: `true`)
-- `proposal_dir` (optional): subdirectory to scan within the repo (default: empty)
-- `file_pattern` (optional): filename glob pattern (default: empty)
+| Kind | Repository | Description |
+|---|---|---|
+| `eip` | ethereum/EIPs | Ethereum Improvement Proposals |
+| `erc` | ethereum/ercs | Ethereum Request for Comments |
+| `pep` | python/peps | Python Enhancement Proposals |
+| `rfc` | rust-lang/rfcs | Rust Request for Comments |
+| `dep` | django/deps | Django Enhancement Proposals |
 
 ### Example
 
 ```toml
-[[proposal_trackers]]
-type = "eip"
-repo_url = "https://github.com/ethereum/EIPs.git"
-branch = "master"
-enabled = true
-proposal_dir = "EIPS"
-file_pattern = "eip-*.md"
+proposal_trackers = ["eip", "erc", "pep", "rfc", "dep"]
 ```
+
+To disable a tracker, simply remove it from the list.
 
 ## Changelog Tracking
 

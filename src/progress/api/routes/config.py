@@ -609,47 +609,14 @@ def build_config_editor_schema() -> EditorSchema:
     proposals = SectionSchema(
         id="proposal_trackers",
         title="Proposal Trackers",
-        description="Track EIPs, Rust RFCs, PEPs, and Django DEPs",
+        description="Track EIPs, ERCs, PEPs, Rust RFCs, and Django DEPs",
         fields=[
             FieldSchema(
-                type="object_list",
+                type="string_list",
                 path="proposal_trackers",
-                label="Trackers",
-                item_label="Tracker",
-                item_fields=[
-                    FieldSchema(
-                        type="select",
-                        path="type",
-                        label="Type",
-                        required=True,
-                        options=["eip", "rust_rfc", "pep", "django_dep"],
-                    ),
-                    FieldSchema(
-                        type="text",
-                        path="repo_url",
-                        label="Repo URL",
-                        required=True,
-                        help_text="Expected format: https://github.com/<owner>/<repo>(.git)",
-                    ),
-                    FieldSchema(
-                        type="text", path="branch", label="Branch", default="main"
-                    ),
-                    FieldSchema(
-                        type="boolean", path="enabled", label="Enabled", default=True
-                    ),
-                    FieldSchema(
-                        type="text",
-                        path="proposal_dir",
-                        label="Proposal Dir",
-                        default="",
-                    ),
-                    FieldSchema(
-                        type="text",
-                        path="file_pattern",
-                        label="File Pattern",
-                        default="",
-                    ),
-                ],
+                label="Enabled Kinds",
+                default=[],
+                help_text="Proposal kinds to track: eip, erc, pep, rfc, dep.",
             )
         ],
     )
