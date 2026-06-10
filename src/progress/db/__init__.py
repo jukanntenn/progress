@@ -154,26 +154,27 @@ def migrate_database():
         )
         logger.info("Migration completed: release tracking columns added")
 
-    proposal_tables = ["eips", "peps", "django_deps", "rust_rfcs"]
-    for table in proposal_tables:
-        if not _table_exists(table):
-            continue
-        cols = _existing_columns(table)
-        migrations = []
-        if "created_at" not in cols:
-            migrations.append(
-                migrator.add_column(table, "created_at", DateTimeField(null=True))
-            )
-        if "updated_at" not in cols:
-            migrations.append(
-                migrator.add_column(table, "updated_at", DateTimeField(null=True))
-            )
-        if migrations:
+    old_proposal_tables = [
+        "proposal_events",
+        "eips",
+        "rust_rfcs",
+        "peps",
+        "django_deps",
+    ]
+    for table in old_proposal_tables:
+        if _table_exists(table):
+            logger.info(f"Migrating: Dropping old proposal table '{table}'")
+            database.execute_sql(f"DROP TABLE IF EXISTS {table}")
+            logger.info(f"Migration completed: '{table}' dropped")
+
+    if _table_exists("proposal_trackers"):
+        cols = _existing_columns("proposal_trackers")
+        if "tracker_type" in cols:
             logger.info(
-                f"Migrating: Adding created_at/updated_at columns to {table} table"
+                "Migrating: Dropping old proposal_trackers table for new schema"
             )
-            migrate(*migrations)
-            logger.info(f"Migration completed: {table} timestamps added")
+            database.execute_sql("DROP TABLE IF EXISTS proposal_trackers")
+            logger.info("Migration completed: old proposal_trackers dropped")
 
     if _table_exists("discovered_repositories"):
         cols = _existing_columns("discovered_repositories")
@@ -202,14 +203,7 @@ def close_db():
 def create_tables():
     """Create database tables and migrate schema."""
     from progress.contrib.changelog.models import ChangelogTracker
-    from progress.contrib.proposal.models import (
-        EIP,
-        PEP,
-        DjangoDEP,
-        ProposalEvent,
-        ProposalTracker,
-        RustRFC,
-    )
+    from progress.contrib.proposal.models import Proposal, ProposalTrackerState
     from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
 
     database.create_tables(
@@ -218,13 +212,9 @@ def create_tables():
             Report,
             GitHubOwner,
             DiscoveredRepository,
-            ProposalTracker,
+            ProposalTrackerState,
             ChangelogTracker,
-            EIP,
-            RustRFC,
-            PEP,
-            DjangoDEP,
-            ProposalEvent,
+            Proposal,
         ],
         safe=True,
     )

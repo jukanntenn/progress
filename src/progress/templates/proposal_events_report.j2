@@ -1,9 +1,9 @@
-{% for tracker_type, items in grouped_events.items() %}
-{% set tracker_url = tracker_urls.get(tracker_type) %}
+{% for kind, items in grouped_events.items() %}
+{% set tracker_url = tracker_urls.get(kind) %}
 {% if tracker_url %}
-## [{{ tracker_type }}]({{ tracker_url }})
+## [{{ kind | upper }}]({{ tracker_url }})
 {% else %}
-## {{ tracker_type }}
+## {{ kind | upper }}
 {% endif %}
 
 {% for e in items %}
@@ -13,6 +13,11 @@
 {% else %}
 📄 {{ file_name }}
 {% endif %}
+
+- **Number:** {{ e.number }}
+{% if e.title %}- **Title:** {{ e.title }}{% endif %}
+{% if e.old_status %}- **Status:** {{ e.old_status.value }} → {{ e.new_status.value }}{% else %}
+- **Status:** {{ e.new_status.value }} (new){% endif %}
 
 #### Summary
 
