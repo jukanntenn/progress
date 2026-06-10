@@ -48,7 +48,7 @@ class KindConfig(NamedTuple):
 KIND_CONFIGS: dict[ProposalKind, KindConfig] = {
     ProposalKind.EIP: KindConfig(
         repo_url="https://github.com/ethereum/EIPs",
-        branch="main",
+        branch="master",
         proposal_dir="EIPS",
         file_pattern=["eip-*.md"],
     ),
