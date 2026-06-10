@@ -81,8 +81,12 @@ RUN curl -fsSL \
     chmod +x /usr/local/bin/caddy
 
 ARG HTTP_PROXY=""
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTP_PROXY}
 RUN npm install -g @anthropic-ai/claude-code@2.1.153
 RUN npm install -g @openai/codex@0.129.0
+ENV HTTP_PROXY=
+ENV HTTPS_PROXY=
 
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 COPY docker/s6/cont-init.d /etc/cont-init.d
