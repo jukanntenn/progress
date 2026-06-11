@@ -99,11 +99,6 @@ def parse_args():
         action="store_true",
         help="Show full build output (no progress bar)",
     )
-    parser.add_argument(
-        "--proxy",
-        default="",
-        help="HTTP proxy for downloading dependencies during build (e.g., http://host:port)",
-    )
     return parser.parse_args()
 
 
@@ -294,9 +289,6 @@ def build_image(args):
 
     if args.verbose:
         cmd.extend(["--progress", "plain"])
-
-    if args.proxy:
-        cmd.extend(["--build-arg", f"HTTP_PROXY={args.proxy}"])
 
     cmd.extend(["-f", dockerfile_path, project_root])
 
