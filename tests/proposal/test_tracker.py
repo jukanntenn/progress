@@ -285,3 +285,48 @@ class TestErrorHandling:
         reports = tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].analysis_summary is None
+
+
+class TestLanguagePropagation:
+    def test_configured_language_reaches_analysis_prompt(self, db, tmp_path: Path):
+        repo_dir = _make_repo(
+            tmp_path,
+            {
+                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test EIP\nstatus: Draft\n---\n\nBody\n"
+            },
+        )
+        commit = _git(repo_dir, "rev-parse", "HEAD")
+
+        analyzer = _mock_analyzer()
+        analyzer.analyze = Mock(return_value=("summary", "detail"))
+        tracker = ProposalTracker(
+            analyzer=analyzer,
+            git_client=_mock_git(tmp_path, commit),
+            clock=lambda: datetime.now(ZoneInfo("UTC")),
+            language="zh",
+        )
+        tracker._clone_or_update = lambda config: repo_dir
+
+        tracker.check(ProposalKind.EIP)
+
+        prompt = analyzer.analyze.call_args.kwargs["prompt"]
+        assert 'language is "zh"' in prompt
+
+    def test_default_language_is_english(self, db, tmp_path: Path):
+        repo_dir = _make_repo(
+            tmp_path,
+            {
+                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test EIP\nstatus: Draft\n---\n\nBody\n"
+            },
+        )
+        commit = _git(repo_dir, "rev-parse", "HEAD")
+
+        analyzer = _mock_analyzer()
+        analyzer.analyze = Mock(return_value=("summary", "detail"))
+        tracker = _make_tracker(analyzer, _mock_git(tmp_path, commit))
+        tracker._clone_or_update = lambda config: repo_dir
+
+        tracker.check(ProposalKind.EIP)
+
+        prompt = analyzer.analyze.call_args.kwargs["prompt"]
+        assert 'language is "en"' in prompt

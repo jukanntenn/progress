@@ -50,10 +50,12 @@ class ProposalTracker:
         analyzer: Analyzer,
         git_client: GitClient,
         clock: Callable[[], datetime],
+        language: str = "en",
     ):
         self.analyzer = analyzer
         self.git = git_client
         self.clock = clock
+        self.language = language
 
     def check(self, kind: ProposalKind) -> list[ProposalReport]:
         config = KIND_CONFIGS[kind]
@@ -420,6 +422,7 @@ class ProposalTracker:
             None,
             parsed.raw_status,
             content=parsed.full_text,
+            language=self.language,
         )
 
         file_url = self._build_file_url(config, current_commit, latest_rel_path)
@@ -491,6 +494,7 @@ class ProposalTracker:
                 parsed.raw_status,
                 parsed.raw_status,
                 content=diff_text,
+                language=self.language,
             )
         else:
             summary, detail = run_analysis(
@@ -502,6 +506,7 @@ class ProposalTracker:
                 existing.raw_status if existing else None,
                 parsed.raw_status,
                 content=parsed.full_text,
+                language=self.language,
             )
 
         self._upsert_proposal(state, parsed, new_status)

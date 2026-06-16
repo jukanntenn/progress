@@ -54,6 +54,7 @@ def initialize_components(cfg):
         analyzer=analyzer,
         git_client=git_client,
         clock=lambda: get_now(cfg.get_timezone()),
+        language=cfg.analysis.language,
     )
 
     return markpost_client, repo_manager, proposal_tracker, reporter
