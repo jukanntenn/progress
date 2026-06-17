@@ -68,7 +68,7 @@ RUN curl -fsSL \
     -o /usr/local/bin/supercronic \
     && chmod +x /usr/local/bin/supercronic
 
-ADD "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" /tmp/s6-overlay-noarch.tar.xz
+RUN curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -o /tmp/s6-overlay-noarch.tar.xz
 RUN S6_ARCH=$(case "${TARGETARCH}" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; esac) && \
     curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" -o /tmp/s6-overlay-arch.tar.xz && \
     tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
@@ -80,9 +80,7 @@ RUN curl -fsSL \
     | tar xz -C /usr/local/bin caddy && \
     chmod +x /usr/local/bin/caddy
 
-RUN curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.153 && \
-    claude --version || \
-    (echo "ERROR: claude CLI installation failed. Check network access to claude.ai" && exit 1)
+RUN bash -c 'set -o pipefail && curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.153'
 RUN npm install -g @openai/codex@0.129.0
 
 COPY docker/Caddyfile /etc/caddy/Caddyfile
