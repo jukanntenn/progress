@@ -12,7 +12,6 @@ from .config import Config
 from .consts import DATABASE_PATH
 from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
 from .contrib.proposal import ProposalKind, ProposalReport, ProposalTracker
-from .contrib.repo.models import DiscoveredRepository
 from .contrib.repo.owner import OwnerManager
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
@@ -431,12 +430,8 @@ def _send_entity_notification(
     )
 
     for r in sorted_repos:
-        record_id = r.get("id")
-        if record_id:
-            record = DiscoveredRepository.get_by_id(record_id)
-            if record:
-                r["readme_summary"] = record.readme_summary
-                r["readme_detail"] = record.readme_detail
+        r.setdefault("readme_summary", None)
+        r.setdefault("readme_detail", None)
 
     for r in sorted_repos:
         created_at = r.get("created_at")
@@ -506,14 +501,6 @@ def _send_entity_notification(
         notification_type="discovered_repos",
         discovered_repos=discovered_repos,
     )
-
-    for r in new_repos:
-        record_id = r.get("id")
-        if record_id:
-            record = DiscoveredRepository.get_by_id(record_id)
-            if record:
-                record.notified = True
-                record.save()
 
 
 def _send_proposal_notification(
@@ -804,14 +791,6 @@ def _run_check_command(config: str, trackers_only: bool = False):
                     )
                     repo_info["readme_summary"] = summary
                     repo_info["readme_detail"] = detail
-
-                    record_id = repo_info.get("id")
-                    if record_id:
-                        record = DiscoveredRepository.get_by_id(record_id)
-                        if record:
-                            record.readme_summary = summary
-                            record.readme_detail = detail
-                            record.save()
                 except Exception as e:
                     logger.warning(
                         f"Failed to analyze README for {repo_info.get('name_with_owner')}: {e}"

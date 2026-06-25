@@ -178,19 +178,9 @@ def migrate_database():
             logger.info("Migration completed: old proposal_trackers dropped")
 
     if _table_exists("discovered_repositories"):
-        cols = _existing_columns("discovered_repositories")
-        if "updated_at" not in cols:
-            logger.info(
-                "Migrating: Adding 'updated_at' column to discovered_repositories table"
-            )
-            migrate(
-                migrator.add_column(
-                    "discovered_repositories",
-                    "updated_at",
-                    DateTimeField(null=True),
-                )
-            )
-            logger.info("Migration completed: 'updated_at' column added")
+        logger.info("Migrating: Dropping deprecated 'discovered_repositories' table")
+        database.execute_sql("DROP TABLE IF EXISTS discovered_repositories")
+        logger.info("Migration completed: 'discovered_repositories' dropped")
 
 
 def close_db():
@@ -205,7 +195,7 @@ def create_tables():
     """Create database tables and migrate schema."""
     from progress.contrib.changelog.models import ChangelogTracker
     from progress.contrib.proposal.models import Proposal, ProposalTrackerState
-    from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
+    from progress.contrib.repo.models import GitHubOwner
 
     database.create_tables(
         [
@@ -213,7 +203,6 @@ def create_tables():
             Report,
             Batch,
             GitHubOwner,
-            DiscoveredRepository,
             ChangelogTracker,
         ],
         safe=True,

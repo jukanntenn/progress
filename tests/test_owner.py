@@ -3,9 +3,9 @@ from datetime import datetime
 import pytest
 
 from progress.config import OwnerConfig
-from progress.db import close_db, create_tables, init_db
-from progress.contrib.repo.models import DiscoveredRepository, GitHubOwner
+from progress.contrib.repo.models import GitHubOwner
 from progress.contrib.repo.owner import OwnerManager
+from progress.db import close_db, create_tables, init_db
 
 
 @pytest.fixture()
@@ -82,7 +82,6 @@ def test_owner_manager_check_owner_first_check_returns_most_recent(
     new_repos = manager._check_owner(owner)
     assert len(new_repos) == 1
     assert new_repos[0]["repo_name"] == "new"
-    assert DiscoveredRepository.select().count() == 1
 
     owner_refreshed = GitHubOwner.get_by_id(owner.id)
     assert owner_refreshed.last_tracked_repo is not None

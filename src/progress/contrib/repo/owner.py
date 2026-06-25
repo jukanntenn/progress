@@ -3,7 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from ...github_client import GitHubClient
-from .models import DiscoveredRepository, GitHubOwner
+from .models import GitHubOwner
 
 logger = logging.getLogger(__name__)
 
@@ -141,26 +141,7 @@ class OwnerManager:
             readme_content = readme_content[:MAX_README_LENGTH]
             readme_was_truncated = True
 
-        defaults = {
-            "repo_url": repo_url,
-            "description": description,
-            "has_readme": has_readme,
-            "readme_was_truncated": readme_was_truncated,
-            "notified": False,
-        }
-        record, created = DiscoveredRepository.get_or_create(
-            owner=owner,
-            repo_name=repo_name,
-            defaults=defaults,
-        )
-
-        if not created:
-            for key, value in defaults.items():
-                setattr(record, key, value)
-            record.save()
-
         return {
-            "id": record.id,
             "owner_type": owner.owner_type,
             "owner_name": owner.name,
             "repo_name": repo_name,

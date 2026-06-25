@@ -7,7 +7,6 @@ This document describes the current database schema for Progress. The schema is 
 ```mermaid
 erDiagram
     repositories ||--o{ reports : "has"
-    github_owners ||--o{ discovered_repositories : "has"
     proposal_trackers ||--o{ proposals : "tracks"
     reports ||--o{ batch : "has"
 
@@ -29,13 +28,6 @@ erDiagram
         int id PK
         string owner_type
         string name
-    }
-
-    discovered_repositories {
-        int id PK
-        int owner_id FK
-        string repo_name
-        string repo_url
     }
 
     proposal_trackers {
@@ -133,25 +125,6 @@ Defined in `src/progress/contrib/repo/models.py`. Stores GitHub organization/use
 | `last_tracked_repo` | `last_tracked_repo` | datetime | yes | — | — | Timestamp of most recent discovered repo |
 | `created_at` | `created_at` | datetime | no | `now()` | — | Record creation time |
 | `updated_at` | `updated_at` | datetime | no | `now()` | — | Record last update time (auto-updated on save) |
-
-### `discovered_repositories`
-
-Defined in `src/progress/contrib/repo/models.py`. Stores repositories discovered from tracked GitHub owners.
-
-| Python Field | DB Column | Type | Nullable | Default | Constraints | Description |
-|--------------|-----------|------|----------|---------|-------------|-------------|
-| `id` | `id` | integer auto-increment | no | — | PK | Primary key |
-| `owner` | `owner_id` | integer FK | no | — | FK → `github_owners`, ON DELETE CASCADE | Owning GitHub owner |
-| `repo_name` | `repo_name` | varchar | no | — | unique together with `owner` | Repository name |
-| `repo_url` | `repo_url` | varchar | no | — | — | Repository URL |
-| `description` | `description` | text | yes | — | — | Repository description |
-| `discovered_at` | `discovered_at` | datetime | no | `now()` | — | When the repo was first discovered |
-| `updated_at` | `updated_at` | datetime | no | `now()` | — | Record last update time (auto-updated on save) |
-| `has_readme` | `has_readme` | boolean | no | `False` | — | Whether README was fetched |
-| `readme_summary` | `readme_summary` | text | yes | — | — | AI-generated README summary |
-| `readme_detail` | `readme_detail` | text | yes | — | — | AI-generated README detail |
-| `readme_was_truncated` | `readme_was_truncated` | boolean | no | `False` | — | Whether README was truncated before analysis |
-| `notified` | `notified` | boolean | no | `False` | — | Whether a notification was sent |
 
 ### `proposal_trackers`
 
