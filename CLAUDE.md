@@ -136,7 +136,7 @@ progress/
 
 ## Proposal Tracking
 
-- Configure proposal trackers in `config.toml` using `[[proposal_trackers]]` entries.
+- Configure proposal trackers in `config.toml` via `proposal_trackers`, a list of kind strings (e.g., `proposal_trackers = ["eip", "erc", "pep", "rfc", "dep"]`). Supported kinds: `"eip"`, `"erc"`, `"pep"`, `"rfc"`, `"dep"`. Per-kind repository details (URL, branch, directory, file patterns) are defined in code (`KIND_CONFIGS` in `src/progress/contrib/proposal/types.py`), not in the config file.
 - Run proposal-only checks with `uv run progress check --trackers-only`.
 - Run proposal checks explicitly with `uv run progress track-proposals`.
 
