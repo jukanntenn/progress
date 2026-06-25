@@ -87,6 +87,27 @@ class Report(BaseModel):
         return super().save(*args, **kwargs)
 
 
+class Batch(BaseModel):
+    """Batch model — one published MarkPost article of a multi-part aggregated report."""
+
+    report = ForeignKeyField(Report, backref="batches", on_delete="CASCADE")
+    title = CharField()
+    markpost_url = CharField(default="")
+    seq = IntegerField()
+    created_at = DateTimeField(default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+
+    class Meta:
+        table_name = "batch"
+        indexes = ((("report_id", "seq"), True),)
+
+    def save(self, *args, **kwargs):
+        """Override save method to auto-update updated_at"""
+        if self._pk is not None:
+            self.updated_at = datetime.now(UTC)
+        return super().save(*args, **kwargs)
+
+
 def create_tables():
     """Create database tables and migrate schema."""
     from . import database, migrate_database

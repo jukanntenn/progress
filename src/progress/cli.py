@@ -17,7 +17,7 @@ from .contrib.repo.owner import OwnerManager
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
 from .db import close_db, create_tables, init_db, save_report
-from .db.models import Report, Repository
+from .db.models import Batch, Report, Repository
 from .errors import ProgressException
 from .github import GitClient
 from .i18n import gettext as _
@@ -249,6 +249,7 @@ def process_reports(
         batches = [create_report_batches(check_result.reports, 2**63 - 1)[0]]
 
     uploaded_urls = []
+    uploaded_batches: list[tuple[str, str]] = []
     upload_errors = []
     first_batch_url = None
 
@@ -308,6 +309,14 @@ def process_reports(
                         f"Batch {batch.batch_index + 1} uploaded: {markpost_url}"
                     )
                     uploaded_urls.append(markpost_url)
+                    uploaded_batches.append(
+                        (
+                            add_batch_suffix(
+                                unified_title, batch.batch_index, batch.total_batches
+                            ),
+                            markpost_url,
+                        )
+                    )
                     if batch.batch_index == 0:
                         first_batch_url = markpost_url
 
@@ -370,14 +379,25 @@ def process_reports(
                 f"{unified_summary.strip()}\n\n{full_aggregated_report}"
             )
 
-        aggregated_markpost_url = first_batch_url if len(batches) == 1 else ""
-        save_report(
+        aggregated_markpost_url = first_batch_url or ""
+        aggregated_report_id = save_report(
             config=config,
             commit_count=check_result.total_commits,
             markpost_url=aggregated_markpost_url,
             content=aggregated_report_with_summary,
             title=unified_title,
         )
+        for seq, (batch_title, batch_url) in enumerate(uploaded_batches, start=1):
+            Batch.create(
+                report=aggregated_report_id,
+                title=batch_title,
+                markpost_url=batch_url,
+                seq=seq,
+            )
+        if uploaded_batches:
+            logger.info(
+                f"Persisted {len(uploaded_batches)} batch(es) for report {aggregated_report_id}"
+            )
         logger.info("Aggregated report saved to database")
     except Exception as db_error:
         logger.error(f"Failed to save aggregated report: {db_error}")
