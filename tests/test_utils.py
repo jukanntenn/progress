@@ -1,11 +1,11 @@
 """Tests for utils module"""
 
 import time
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
-from progress.utils import sanitize, retry
+from progress.utils import retry, sanitize
 
 
 class TestSanitize:
@@ -106,6 +106,36 @@ class TestRetry:
         for i in range(len(call_times) - 1):
             delay = call_times[i + 1] - call_times[i]
             assert 0.04 < delay < 0.07
+
+    def test_retry_max_delay_caps_exponential_backoff(self):
+        """Test max_delay caps the exponentially growing delay"""
+        delays: list[int] = []
+
+        with patch("progress.utils.time.sleep", lambda d: delays.append(d)):
+
+            @retry(times=5, initial_delay=20, backoff="exponential", max_delay=60)
+            def func():
+                raise ValueError("fail")
+
+            with pytest.raises(ValueError):
+                func()
+
+        assert delays == [20, 40, 60, 60]
+
+    def test_retry_max_delay_none_leaves_uncapped(self):
+        """Test default max_delay=None does not cap the growing delay"""
+        delays: list[int] = []
+
+        with patch("progress.utils.time.sleep", lambda d: delays.append(d)):
+
+            @retry(times=3, initial_delay=1, backoff="exponential")
+            def func():
+                raise ValueError("fail")
+
+            with pytest.raises(ValueError):
+                func()
+
+        assert delays == [1, 2]
 
     def test_retry_on_retry_callback(self):
         """Test on_retry callback is called"""

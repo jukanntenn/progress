@@ -32,6 +32,7 @@ def retry(
     backoff: BackoffStrategy = "exponential",
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
     on_retry: Optional[Callable[[tuple, dict, Exception, int], None]] = None,
+    max_delay: Optional[int] = None,
 ):
     def decorator(func):
         @wraps(func)
@@ -61,6 +62,8 @@ def retry(
 
                     if backoff == "exponential":
                         delay *= 2
+                        if max_delay is not None:
+                            delay = min(delay, max_delay)
 
         return wrapper
 
