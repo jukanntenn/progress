@@ -134,3 +134,48 @@ def test_get_timezones(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert "UTC" in data["timezones"]
+
+
+def test_repos_replace_and_list(client: TestClient):
+    assert client.get("/api/v1/config/repos").json() == []
+
+    response = client.put(
+        "/api/v1/config/repos",
+        json=[{"url": "vitejs/vite", "branch": "main"}, {"url": "vue/core"}],
+    )
+    assert response.status_code == 200
+    urls = [r["url"] for r in response.json()]
+    assert "https://github.com/vitejs/vite.git" in urls
+    assert "https://github.com/vue/core.git" in urls
+
+    listed = client.get("/api/v1/config/repos").json()
+    assert len(listed) == 2
+
+
+def test_repos_replace_prunes_missing(client: TestClient):
+    client.put(
+        "/api/v1/config/repos", json=[{"url": "vitejs/vite"}, {"url": "vue/core"}]
+    )
+    response = client.put("/api/v1/config/repos", json=[{"url": "vue/core"}])
+    urls = [r["url"] for r in response.json()]
+    assert urls == ["https://github.com/vue/core.git"]
+
+
+def test_repos_invalid_url_rejected(client: TestClient):
+    response = client.put("/api/v1/config/repos", json=[{"url": "not-a-url"}])
+    assert response.status_code == 422
+
+
+def test_owners_replace_preserves_enabled_flag(client: TestClient):
+    assert client.get("/api/v1/config/owners").json() == []
+
+    response = client.put(
+        "/api/v1/config/owners",
+        json=[
+            {"type": "user", "name": "torvalds"},
+            {"type": "organization", "name": "bytedance", "enabled": False},
+        ],
+    )
+    assert response.status_code == 200
+    by_name = {o["name"]: o["enabled"] for o in response.json()}
+    assert by_name == {"torvalds": True, "bytedance": False}

@@ -33,9 +33,10 @@ logger = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
 
 APP_CONFIG_ID = 1
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 SECRET_MASK = "********"
 INFRA_FIELDS = ("data_dir", "workspace_dir")
+EXCLUDED_FROM_BLOB = ("data_dir", "workspace_dir", "repos", "owners")
 
 
 class ConfigVersionConflict(ConfigException):
@@ -43,14 +44,18 @@ class ConfigVersionConflict(ConfigException):
 
 
 def get_config_json_schema() -> dict:
-    """JSON Schema for the editable app config (infra fields excluded)."""
+    """JSON Schema for the editable app config.
+
+    Infra fields (data_dir/workspace_dir) and table-backed lists (repos/owners)
+    are excluded: they are not stored in or edited through the blob.
+    """
     schema = deepcopy(Config.model_json_schema())
     props = schema.setdefault("properties", {})
-    for field in INFRA_FIELDS:
+    for field in EXCLUDED_FROM_BLOB:
         props.pop(field, None)
     required = schema.get("required")
     if isinstance(required, list):
-        schema["required"] = [r for r in required if r not in INFRA_FIELDS]
+        schema["required"] = [r for r in required if r not in EXCLUDED_FROM_BLOB]
     schema["schemaVersion"] = CURRENT_SCHEMA_VERSION
     return schema
 
@@ -98,8 +103,30 @@ def load_app_config() -> tuple[dict, int] | None:
     return data, row.version
 
 
-def _strip_infra(data: dict) -> dict:
-    return {k: v for k, v in data.items() if k not in INFRA_FIELDS}
+def _strip_excluded(data: dict) -> dict:
+    """Drop keys that do not belong in the blob (infra + table-backed lists)."""
+    return {k: v for k, v in data.items() if k not in EXCLUDED_FROM_BLOB}
+
+
+def migrate_blob_schema() -> None:
+    """One-time migration of an existing blob to the current schema version.
+
+    P1 blobs stored ``repos``/``owners`` inline; P2 moves them to their tables,
+    so any inline copies are stripped here. Idempotent.
+    """
+    row = _load_row()
+    if row is None or row.schema_version >= CURRENT_SCHEMA_VERSION:
+        return
+    data = json.loads(row.data) if row.data else {}
+    data = _strip_excluded(data)
+    row.data = json.dumps(data)
+    row.schema_version = CURRENT_SCHEMA_VERSION
+    row.updated_at = datetime.now(UTC)
+    row.save()
+    logger.info(
+        "Migrated app config blob to schema version %d (stripped inline repos/owners)",
+        CURRENT_SCHEMA_VERSION,
+    )
 
 
 def import_app_config(data: dict) -> int:
@@ -108,7 +135,7 @@ def import_app_config(data: dict) -> int:
     Validates, then upserts the blob, bumping the version so concurrent UI
     editors are forced to refresh. Returns the new version.
     """
-    payload = _strip_infra(data)
+    payload = _strip_excluded(data)
     validate_config_dict(payload)
     row = _load_row()
     if row is None:
@@ -138,7 +165,7 @@ def seed_app_config_if_needed(seed_data: dict) -> bool:
     """
     if _load_row() is not None:
         return False
-    seed = _strip_infra(seed_data)
+    seed = _strip_excluded(seed_data)
     AppConfig.create(
         id=APP_CONFIG_ID,
         data=json.dumps(seed),
@@ -151,11 +178,32 @@ def seed_app_config_if_needed(seed_data: dict) -> bool:
 
 def build_runtime_config(blob_data: dict, infra: dict) -> Config:
     """Assemble a runtime Config from the blob plus infra fields."""
-    merged = _strip_infra(blob_data)
+    merged = _strip_excluded(blob_data)
     for field in INFRA_FIELDS:
         if field in infra:
             merged[field] = infra[field]
     return _config_from_dict(merged)
+
+
+def seed_lists_if_needed(file_cfg: Config) -> None:
+    """One-shot import of file repos/owners into their tables (fresh deploy).
+
+    ``repos`` and ``owners`` live in the ``repositories``/``github_owners``
+    tables, not the blob. On a fresh deploy (empty tables) they are seeded from
+    the file config; once populated the tables are managed via the web UI and
+    this is a no-op.
+    """
+    from .contrib.repo.models import GitHubOwner
+    from .contrib.repo.owner import replace_owners
+    from .contrib.repo.repository import replace_repositories
+    from .db.models import Repository
+
+    if file_cfg.repos and Repository.select().count() == 0:
+        result = replace_repositories(file_cfg.repos, file_cfg.github.protocol)
+        logger.info("Seeded repositories from file: %s", result)
+    if file_cfg.owners and GitHubOwner.select().count() == 0:
+        result = replace_owners(file_cfg.owners)
+        logger.info("Seeded owners from file: %s", result)
 
 
 # --- schema-driven secret handling ----------------------------------------
@@ -289,7 +337,7 @@ def save_app_config(data: dict, expected_version: int) -> tuple[dict, int]:
     if row is None:
         raise ConfigException("Application config has not been seeded")
     stored = json.loads(row.data) if row.data else {}
-    merged = _merge_secret_placeholders(_strip_infra(data), stored)
+    merged = _merge_secret_placeholders(_strip_excluded(data), stored)
     validate_config_dict(merged)
 
     updated = (
@@ -333,7 +381,9 @@ __all__ = [
     "is_seeded",
     "load_app_config",
     "mask_secrets",
+    "migrate_blob_schema",
     "save_app_config",
+    "seed_lists_if_needed",
     "seed_app_config_if_needed",
     "validate_config_dict",
 ]

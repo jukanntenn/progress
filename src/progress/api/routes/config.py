@@ -6,9 +6,10 @@ optimistic locking (``version``) and secrets are masked in every GET response.
 """
 
 import pytz
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ...config import OwnerConfig, RepositoryConfig
 from ...config_store import (
     ConfigVersionConflict,
     get_config_json_schema,
@@ -17,6 +18,10 @@ from ...config_store import (
     save_app_config,
     validate_config_dict,
 )
+from ...contrib.repo.models import GitHubOwner
+from ...contrib.repo.owner import replace_owners
+from ...contrib.repo.repository import replace_repositories
+from ...db.models import Repository
 from ...errors import ConfigException
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -85,3 +90,51 @@ def get_schema():
 @router.get("/timezones", response_model=TimezonesResponse)
 def get_timezones():
     return TimezonesResponse(timezones=sorted(pytz.all_timezones))
+
+
+# --- table-backed lists (repos / owners) ----------------------------------
+# These live in the repositories/github_owners tables, not the config blob, so
+# they have their own read/replace endpoints separate from the blob above.
+
+
+class RepoView(BaseModel):
+    id: int
+    name: str
+    url: str
+    branch: str
+    enabled: bool
+
+
+class OwnerView(BaseModel):
+    id: int
+    owner_type: str
+    name: str
+    enabled: bool
+
+
+@router.get("/repos", response_model=list[RepoView])
+def list_repos():
+    return [
+        RepoView(id=r.id, name=r.name, url=r.url, branch=r.branch, enabled=r.enabled)
+        for r in Repository.select().order_by(Repository.id)
+    ]
+
+
+@router.put("/repos", response_model=list[RepoView])
+def replace_repos_route(request: Request, repos: list[RepositoryConfig]):
+    replace_repositories(repos, request.app.state.config.github.protocol)
+    return list_repos()
+
+
+@router.get("/owners", response_model=list[OwnerView])
+def list_owners():
+    return [
+        OwnerView(id=o.id, owner_type=o.owner_type, name=o.name, enabled=o.enabled)
+        for o in GitHubOwner.select().order_by(GitHubOwner.id)
+    ]
+
+
+@router.put("/owners", response_model=list[OwnerView])
+def replace_owners_route(owners: list[OwnerConfig]):
+    replace_owners(owners)
+    return list_owners()

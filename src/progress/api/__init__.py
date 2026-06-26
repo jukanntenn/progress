@@ -10,7 +10,9 @@ def create_app(config_obj=None) -> FastAPI:
     from ..config_store import (
         build_runtime_config,
         load_app_config,
+        migrate_blob_schema,
         seed_app_config_if_needed,
+        seed_lists_if_needed,
     )
     from ..db import close_db, create_tables, init_db, resolve_db_path
 
@@ -27,6 +29,8 @@ def create_app(config_obj=None) -> FastAPI:
     create_tables()
 
     seed_app_config_if_needed(config_obj.model_dump(mode="json"))
+    migrate_blob_schema()
+    seed_lists_if_needed(config_obj)
     loaded = load_app_config()
     if loaded is not None:
         blob_data, _ = loaded

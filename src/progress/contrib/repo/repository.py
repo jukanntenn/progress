@@ -9,6 +9,7 @@ from progress.ai import Analyzer
 from progress.config import Config
 from progress.consts import WORKSPACE_DIR_DEFAULT
 from progress.db.models import Repository
+from progress.enums import Protocol
 from progress.github import GitClient, normalize_repo_url
 from progress.github_client import GitHubClient
 from progress.i18n import gettext as _
@@ -39,6 +40,58 @@ class SyncResult:
         return (
             f"Created: {self.created}, Updated: {self.updated}, Deleted: {self.deleted}"
         )
+
+
+def replace_repositories(
+    repos_config: list, default_protocol: "Protocol | str"
+) -> SyncResult:
+    """Persist the desired repos to the table, upserting and pruning the rest.
+
+    Unlike :meth:`RepositoryManager.sync`, this performs no GitHub verification
+    — it simply makes the ``repositories`` table match the desired set. Used by
+    the config UI and ``config import``; the tracking check verifies repos
+    lazily and skips ones that no longer exist.
+    """
+    from ...consts import parse_repo_name
+
+    database = _get_database()
+    configured_urls = set()
+    created_count = 0
+    updated_count = 0
+
+    with database.atomic():
+        for repo_config in repos_config:
+            normalized_url = normalize_repo_url(
+                repo_config.url, repo_config.protocol, default_protocol
+            )
+            name = parse_repo_name(repo_config.url)
+            configured_urls.add(normalized_url)
+
+            repo, created = Repository.get_or_create(
+                url=normalized_url,
+                defaults={
+                    "name": name,
+                    "branch": repo_config.branch,
+                    "enabled": repo_config.enabled,
+                },
+            )
+            if not created:
+                repo.name = name
+                repo.branch = repo_config.branch
+                repo.enabled = repo_config.enabled
+                repo.url = normalized_url
+                repo.save()
+                updated_count += 1
+            else:
+                created_count += 1
+
+        deleted_count = (
+            Repository.delete().where(Repository.url.not_in(configured_urls)).execute()
+        )
+
+    return SyncResult(
+        created=created_count, updated=updated_count, deleted=deleted_count
+    )
 
 
 @dataclass

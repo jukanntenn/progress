@@ -1,5 +1,7 @@
 """Tests for the database-backed application config store."""
 
+import json
+
 import pytest
 
 from progress.config_store import (
@@ -128,11 +130,93 @@ def test_schema_excludes_infra_and_has_channels_oneof():
     schema = get_config_json_schema()
     assert "data_dir" not in schema["properties"]
     assert "workspace_dir" not in schema["properties"]
+    assert "repos" not in schema["properties"]
+    assert "owners" not in schema["properties"]
     assert "github" in schema["properties"]
     items = schema["$defs"]["NotificationConfig"]["properties"]["channels"]["items"]
     assert "oneOf" in items
     assert items["discriminator"]["propertyName"] == "type"
-    assert schema["schemaVersion"] == 1
+    assert schema["schemaVersion"] == 2
+
+
+def test_migrate_blob_schema_strips_inline_repos_and_owners(db):
+    from progress.config_store import (
+        APP_CONFIG_ID,
+        CURRENT_SCHEMA_VERSION,
+        migrate_blob_schema,
+    )
+    from progress.db.models import AppConfig
+
+    AppConfig.create(
+        id=APP_CONFIG_ID,
+        data=json.dumps(
+            {
+                "language": "en",
+                "repos": [{"url": "vitejs/vite"}],
+                "owners": [{"type": "user", "name": "torvalds"}],
+            }
+        ),
+        version=1,
+        schema_version=1,
+    )
+
+    migrate_blob_schema()
+
+    data, _ = load_app_config()
+    assert "repos" not in data
+    assert "owners" not in data
+    assert data["language"] == "en"
+    row = AppConfig.get(AppConfig.id == APP_CONFIG_ID)
+    assert row.schema_version == CURRENT_SCHEMA_VERSION
+
+
+def test_migrate_blob_schema_is_idempotent(db):
+    from progress.config_store import migrate_blob_schema
+
+    test_migrate_blob_schema_strips_inline_repos_and_owners(db)
+    migrate_blob_schema()
+    data, _ = load_app_config()
+    assert "repos" not in data
+
+
+def test_seed_lists_if_needed_seeds_empty_tables(db):
+    from progress.config_store import _config_from_dict, seed_lists_if_needed
+    from progress.contrib.repo.models import GitHubOwner
+    from progress.db.models import Repository
+
+    file_cfg = _config_from_dict(
+        {
+            "github": {"gh_token": "t"},
+            "repos": [{"url": "vitejs/vite"}, {"url": "vue/core"}],
+            "owners": [{"type": "user", "name": "torvalds"}],
+        }
+    )
+    seed_lists_if_needed(file_cfg)
+    assert Repository.select().count() == 2
+    assert GitHubOwner.select().count() == 1
+
+
+def test_seed_lists_if_needed_noop_when_populated(db):
+    from progress.config_store import _config_from_dict, seed_lists_if_needed
+    from progress.contrib.repo.models import GitHubOwner
+    from progress.db.models import Repository
+
+    Repository.create(
+        name="django/django", url="https://github.com/django/django.git", branch="main"
+    )
+    GitHubOwner.create(owner_type="user", name="existing")
+
+    file_cfg = _config_from_dict(
+        {
+            "github": {"gh_token": "t"},
+            "repos": [{"url": "vitejs/vite"}],
+            "owners": [{"type": "user", "name": "torvalds"}],
+        }
+    )
+    seed_lists_if_needed(file_cfg)
+    urls = {r.url for r in Repository.select()}
+    assert urls == {"https://github.com/django/django.git"}
+    assert {o.name for o in GitHubOwner.select()} == {"existing"}
 
 
 def test_import_overwrites_and_bumps_version(db):

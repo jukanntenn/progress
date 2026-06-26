@@ -79,10 +79,14 @@ def _resolve_runtime_config(file_cfg: Config) -> Config:
     from .config_store import (
         build_runtime_config,
         load_app_config,
+        migrate_blob_schema,
         seed_app_config_if_needed,
+        seed_lists_if_needed,
     )
 
     seed_app_config_if_needed(file_cfg.model_dump(mode="json"))
+    migrate_blob_schema()
+    seed_lists_if_needed(file_cfg)
     loaded = load_app_config()
     if loaded is None:
         return file_cfg
@@ -742,9 +746,6 @@ def _run_check_command(config: str, trackers_only: bool = False):
             logger.warning(f"Changelog tracking startup check failed: {e}")
 
         if not trackers_only:
-            sync_result = repo_manager.sync(cfg.repos)
-            logger.info(f"Sync completed: {sync_result}")
-
             repos = repo_manager.list_enabled()
             logger.info(f"Starting to check {len(repos)} repositories")
 
@@ -794,8 +795,6 @@ def _run_check_command(config: str, trackers_only: bool = False):
             logger.info("No proposal trackers configured")
 
         owner_manager = OwnerManager(cfg.github.gh_token, cfg.github.proxy)
-        owner_sync_result = owner_manager.sync_owners(cfg.owners)
-        logger.info(f"Owner sync completed: {owner_sync_result}")
 
         new_repos = owner_manager.check_all()
         if new_repos:
@@ -916,13 +915,21 @@ def config_import(ctx, force: bool):
         create_tables()
 
         from .config_store import import_app_config, is_seeded
+        from .contrib.repo.owner import replace_owners
+        from .contrib.repo.repository import replace_repositories
 
         if is_seeded() and not force:
             raise click.ClickException(
                 "DB config already seeded. Re-run with --force to overwrite."
             )
         version = import_app_config(file_cfg.model_dump(mode="json"))
-        click.echo(f"Imported configuration into DB (version {version}).")
+        repo_result = replace_repositories(file_cfg.repos, file_cfg.github.protocol)
+        owner_result = replace_owners(file_cfg.owners)
+        click.echo(
+            f"Imported configuration into DB (version {version}). "
+            f"Repos: {repo_result}. Owners: created={owner_result['created']}, "
+            f"updated={owner_result['updated']}, deleted={owner_result['deleted']}."
+        )
     except click.ClickException:
         raise
     except Exception as e:

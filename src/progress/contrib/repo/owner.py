@@ -22,6 +22,38 @@ def _parse_github_datetime(value: str | datetime | None) -> datetime | None:
         return None
 
 
+def replace_owners(owners_config) -> dict:
+    """Persist the desired owners to the table, upserting and pruning the rest.
+
+    Unlike :meth:`OwnerManager.sync_owners`, the ``enabled`` flag is preserved:
+    a disabled owner is kept (and skipped at check time) rather than deleted.
+    Used by the config UI and ``config import``.
+    """
+    desired = {(cfg.type, cfg.name): cfg for cfg in owners_config or []}
+    created = 0
+    updated = 0
+    deleted = 0
+
+    existing = {(o.owner_type, o.name): o for o in GitHubOwner.select()}
+    for (owner_type, name), cfg in desired.items():
+        enabled = getattr(cfg, "enabled", True)
+        existing_owner = existing.get((owner_type, name))
+        if existing_owner is None:
+            GitHubOwner.create(owner_type=owner_type, name=name, enabled=enabled)
+            created += 1
+        elif existing_owner.enabled != enabled:
+            existing_owner.enabled = enabled
+            existing_owner.save()
+            updated += 1
+
+    for key, existing_owner in existing.items():
+        if key not in desired:
+            existing_owner.delete_instance()
+            deleted += 1
+
+    return {"created": created, "updated": updated, "deleted": deleted}
+
+
 class OwnerManager:
     def __init__(self, gh_token: str | None, proxy: str | None = None):
         self.gh_token = gh_token
