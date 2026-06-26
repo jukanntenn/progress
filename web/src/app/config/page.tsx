@@ -6,19 +6,66 @@ import { Button } from "@/components/ui/button";
 import { Header, PageContainer } from "@/components/layout";
 import { SectionNav } from "@/components/config/SectionNav";
 import { ConfigSections } from "@/components/config/ConfigSections";
+import { TableListSection } from "@/components/config/TableListSection";
 import { showToast } from "@/components/providers";
-import { saveConfig, validateConfig } from "@/lib/api";
+import {
+  saveConfig,
+  validateConfig,
+  replaceRepos,
+  replaceOwners,
+  configKeys,
+  type FieldSchema,
+  type RepoInput,
+  type OwnerInput,
+} from "@/lib/api";
 import { jsonSchemaToSections } from "@/lib/config/schemaAdapter";
-import { useConfig, useConfigSchema, useScrollSpy } from "@/hooks";
+import { useConfig, useConfigSchema, useRepos, useOwners, useScrollSpy } from "@/hooks";
 import { useQueryClient } from "@tanstack/react-query";
-import { configKeys } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { RotateCcw, Save, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const REPOS_FIELD: FieldSchema = {
+  type: "object_list",
+  path: "repos",
+  label: "Repositories",
+  item_label: "Repository",
+  item_fields: [
+    {
+      type: "text",
+      path: "url",
+      label: "URL",
+      required: true,
+      help_text: "owner/repo, https://..., or git@...",
+    },
+    { type: "text", path: "branch", label: "Branch", default: "main" },
+    { type: "boolean", path: "enabled", label: "Enabled", default: true },
+  ],
+};
+
+const OWNERS_FIELD: FieldSchema = {
+  type: "object_list",
+  path: "owners",
+  label: "Owners",
+  item_label: "Owner",
+  item_fields: [
+    {
+      type: "select",
+      path: "owner_type",
+      label: "Type",
+      required: true,
+      options: ["user", "organization"],
+    },
+    { type: "text", path: "name", label: "Name", required: true },
+    { type: "boolean", path: "enabled", label: "Enabled", default: true },
+  ],
+};
+
 export default function ConfigPage() {
   const { data, error, isLoading } = useConfig();
   const { data: schema, error: schemaError, isLoading: schemaLoading } = useConfigSchema();
+  const { data: reposData } = useRepos();
+  const { data: ownersData } = useOwners();
   const queryClient = useQueryClient();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -27,11 +74,21 @@ export default function ConfigPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
 
-  const sections = useMemo(
-    () => (schema ? jsonSchemaToSections(schema) : []),
-    [schema],
+  const [reposDraft, setReposDraft] = useState<Record<string, unknown>[]>([]);
+  const [ownersDraft, setOwnersDraft] = useState<Record<string, unknown>[]>([]);
+  const [savingRepos, setSavingRepos] = useState(false);
+  const [savingOwners, setSavingOwners] = useState(false);
+
+  const sections = useMemo(() => (schema ? jsonSchemaToSections(schema) : []), [schema]);
+  const navSections = useMemo(
+    () => [
+      ...sections.map((s) => ({ id: s.id, title: s.title })),
+      { id: "repositories", title: "Repositories" },
+      { id: "owners", title: "Owners" },
+    ],
+    [sections],
   );
-  const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
+  const sectionIds = useMemo(() => navSections.map((s) => s.id), [navSections]);
   const activeSection = useScrollSpy(sectionIds);
 
   useEffect(() => {
@@ -41,8 +98,17 @@ export default function ConfigPage() {
     }
   }, [data]);
 
-  const isModified =
-    JSON.stringify(configDraft) !== JSON.stringify(data?.data ?? {});
+  useEffect(() => {
+    if (reposData) setReposDraft(reposData as unknown as Record<string, unknown>[]);
+  }, [reposData]);
+
+  useEffect(() => {
+    if (ownersData) setOwnersDraft(ownersData as unknown as Record<string, unknown>[]);
+  }, [ownersData]);
+
+  const isModified = JSON.stringify(configDraft) !== JSON.stringify(data?.data ?? {});
+  const reposModified = JSON.stringify(reposDraft) !== JSON.stringify(reposData ?? []);
+  const ownersModified = JSON.stringify(ownersDraft) !== JSON.stringify(ownersData ?? []);
 
   const handleReset = () => {
     if (window.confirm("Reset to saved configuration? Unsaved changes will be lost.")) {
@@ -95,6 +161,32 @@ export default function ConfigPage() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveRepos = async () => {
+    setSavingRepos(true);
+    try {
+      const result = await replaceRepos(reposDraft as unknown as RepoInput[]);
+      queryClient.setQueryData(configKeys.repos(), result);
+      showToast("Repositories saved", "success");
+    } catch (e) {
+      showToast("Save failed: " + (e as Error).message, "error");
+    } finally {
+      setSavingRepos(false);
+    }
+  };
+
+  const handleSaveOwners = async () => {
+    setSavingOwners(true);
+    try {
+      const result = await replaceOwners(ownersDraft as unknown as OwnerInput[]);
+      queryClient.setQueryData(configKeys.owners(), result);
+      showToast("Owners saved", "success");
+    } catch (e) {
+      showToast("Save failed: " + (e as Error).message, "error");
+    } finally {
+      setSavingOwners(false);
     }
   };
 
@@ -182,7 +274,7 @@ export default function ConfigPage() {
             <div className="sticky top-24">
               <div className="mb-3 text-sm font-semibold text-foreground">Sections</div>
               <SectionNav
-                sections={sections}
+                sections={navSections}
                 activeSection={activeSection}
                 onSectionClick={handleSectionClick}
               />
@@ -211,6 +303,30 @@ export default function ConfigPage() {
                 onConfigChange={setConfigDraft}
               />
             )}
+
+            <TableListSection
+              id="repositories"
+              title="Repositories"
+              description="Repositories to track. Stored in the database."
+              field={REPOS_FIELD}
+              items={reposDraft}
+              onItemsChange={setReposDraft}
+              modified={reposModified}
+              onSave={handleSaveRepos}
+              saving={savingRepos}
+            />
+
+            <TableListSection
+              id="owners"
+              title="Owners"
+              description="GitHub users/organizations to monitor for new repositories."
+              field={OWNERS_FIELD}
+              items={ownersDraft}
+              onItemsChange={setOwnersDraft}
+              modified={ownersModified}
+              onSave={handleSaveOwners}
+              saving={savingOwners}
+            />
           </main>
         </div>
 
@@ -218,12 +334,12 @@ export default function ConfigPage() {
           <span
             className={cn(
               "inline-flex items-center gap-1.5",
-              isModified
+              isModified || reposModified || ownersModified
                 ? "text-warning-600 dark:text-warning-500"
                 : "text-success-600 dark:text-success-500",
             )}
           >
-            {isModified ? (
+            {isModified || reposModified || ownersModified ? (
               <>
                 <span className="h-2 w-2 animate-pulse rounded-full bg-warning-500" />
                 Unsaved changes

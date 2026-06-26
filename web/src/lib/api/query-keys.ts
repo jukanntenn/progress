@@ -9,4 +9,6 @@ export const configKeys = {
   data: () => [...configKeys.all, "data"] as const,
   schema: () => [...configKeys.all, "schema"] as const,
   timezones: () => [...configKeys.all, "timezones"] as const,
+  repos: () => [...configKeys.all, "repos"] as const,
+  owners: () => [...configKeys.all, "owners"] as const,
 };

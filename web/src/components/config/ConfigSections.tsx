@@ -209,7 +209,7 @@ function StringListField({
   );
 }
 
-function ObjectListField({
+export function ObjectListField({
   field,
   value,
   onChange,

@@ -68,3 +68,58 @@ export async function validateConfig(
   });
   return json<ConfigValidateResult>(res);
 }
+
+export interface RepoItem {
+  id: number;
+  name: string;
+  url: string;
+  branch: string;
+  enabled: boolean;
+}
+
+export interface RepoInput {
+  url: string;
+  branch?: string;
+  enabled?: boolean;
+}
+
+export interface OwnerItem {
+  id: number;
+  owner_type: string;
+  name: string;
+  enabled: boolean;
+}
+
+export interface OwnerInput {
+  owner_type: string;
+  name: string;
+  enabled?: boolean;
+}
+
+export async function fetchRepos(): Promise<RepoItem[]> {
+  const res = await fetch("/api/v1/config/repos");
+  return json<RepoItem[]>(res);
+}
+
+export async function replaceRepos(repos: RepoInput[]): Promise<RepoItem[]> {
+  const res = await fetch("/api/v1/config/repos", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(repos),
+  });
+  return json<RepoItem[]>(res);
+}
+
+export async function fetchOwners(): Promise<OwnerItem[]> {
+  const res = await fetch("/api/v1/config/owners");
+  return json<OwnerItem[]>(res);
+}
+
+export async function replaceOwners(owners: OwnerInput[]): Promise<OwnerItem[]> {
+  const res = await fetch("/api/v1/config/owners", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(owners),
+  });
+  return json<OwnerItem[]>(res);
+}
