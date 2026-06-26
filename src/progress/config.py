@@ -76,6 +76,8 @@ class AnalysisConfig(BaseModel):
     truncate_chars: int = Field(default=200, ge=1)
     concurrency: int = Field(default=1, ge=1)
     timeout: int = Field(default=600, ge=1)
+    retries: int = Field(default=3, ge=1)
+    retry_delay: int = Field(default=5, ge=1)
     language: str = Field(default="en")
     first_run_lookback_commits: int = Field(default=3, ge=1)
 

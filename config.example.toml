@@ -110,8 +110,21 @@ gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
 
 # Timeout in seconds for a single AI analysis call.
 # Complex analyses (large diffs) may need higher values.
+# Applies per attempt; each retry gets the full window.
 # Env: PROGRESS_ANALYSIS__TIMEOUT
 # timeout = 600
+
+# Total number of attempts for a single AI analysis call, including the first.
+# Transient failures (timeouts, rate limits, provider overload) are retried with
+# exponential backoff; permanent failures (tool not found, auth errors) are not.
+# Set to 1 to disable retry and try only once.
+# Env: PROGRESS_ANALYSIS__RETRIES
+# retries = 3
+
+# Initial delay in seconds before the first retry. Doubles on each subsequent
+# retry (exponential backoff), capped at 60 seconds.
+# Env: PROGRESS_ANALYSIS__RETRY_DELAY
+# retry_delay = 5
 
 # Output language for AI analysis results (titles, summaries, diff descriptions).
 # This is independent from the top-level `language` setting.

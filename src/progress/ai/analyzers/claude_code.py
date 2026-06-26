@@ -1,32 +1,13 @@
 from __future__ import annotations
 
-import logging
-import subprocess
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 
-from progress.errors import AnalysisException
-
-if TYPE_CHECKING:
-    from progress.config import AnalysisConfig
-
+from ..runner import run_tool
 from ..types import ParserType, R
 from .base import Analyzer, noop
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class CommandResult:
-    stdout: str
-    stderr: str
-    returncode: int
-
 
 class ClaudeCodeAnalyzer(Analyzer):
-    def __init__(self, config: AnalysisConfig) -> None:
-        super().__init__(config)
-
     @override
     def analyze(
         self,
@@ -34,46 +15,5 @@ class ClaudeCodeAnalyzer(Analyzer):
         prompt: str = "",
         parser: ParserType[R] = noop,
     ) -> R:
-        result = _run_command(
-            ["claude", "-p", prompt],
-            input_text=content if content else None,
-            timeout=self._config.timeout,
-        )
-        if result.returncode != 0:
-            logger.error(
-                "Claude Code failed with exit code %d: %s",
-                result.returncode,
-                result.stderr.strip(),
-            )
-            raise AnalysisException(
-                f"Claude Code failed with exit code {result.returncode}: {result.stderr.strip()}"
-            )
-
-        return self.apply_parser(parser, result.stdout)
-
-
-def _run_command(
-    args: list[str],
-    *,
-    input_text: str | None,
-    timeout: int,
-) -> CommandResult:
-    logger.debug("Executing command: %s", args[0] if args else "empty")
-    try:
-        result = subprocess.run(
-            args,
-            input=input_text,
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, OSError) as e:
-        logger.error("Command failed: %s", e)
-        raise AnalysisException(f"Command failed: {e}") from e
-
-    return CommandResult(
-        stdout=result.stdout or "",
-        stderr=result.stderr or "",
-        returncode=int(result.returncode),
-    )
+        stdout = run_tool("claude_code", prompt, content, config=self._config)
+        return self.apply_parser(parser, stdout)
