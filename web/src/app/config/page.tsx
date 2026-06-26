@@ -1,102 +1,59 @@
 "use client";
 
 import { Dialog } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Header, PageContainer } from "@/components/layout";
 import { SectionNav } from "@/components/config/SectionNav";
 import { ConfigSections } from "@/components/config/ConfigSections";
 import { showToast } from "@/components/providers";
-import {
-  saveConfigData,
-  saveConfigToml,
-  validateConfig,
-  validateConfigData,
-} from "@/lib/api";
+import { saveConfig, validateConfig } from "@/lib/api";
+import { jsonSchemaToSections } from "@/lib/config/schemaAdapter";
 import { useConfig, useConfigSchema, useScrollSpy } from "@/hooks";
-import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { configKeys } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
-import { RotateCcw, Save, Check, AlertCircle, FileCode, Settings2 } from "lucide-react";
+import { RotateCcw, Save, Check, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function ConfigPage() {
   const { data, error, isLoading } = useConfig();
   const { data: schema, error: schemaError, isLoading: schemaLoading } = useConfigSchema();
   const queryClient = useQueryClient();
 
-  const [tomlContent, setTomlContent] = useState("");
-  const [editorMode, setEditorMode] = useState<"visual" | "toml">("visual");
-  const [isTomlModified, setIsTomlModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [configDraft, setConfigDraft] = useState<Record<string, unknown>>({});
+  const [version, setVersion] = useState<number>(0);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
 
-  const sectionIds = useMemo(() => schema?.sections.map((s) => s.id) ?? [], [schema?.sections]);
-  const activeSection = useScrollSpy(editorMode === "visual" ? sectionIds : []);
+  const sections = useMemo(
+    () => (schema ? jsonSchemaToSections(schema) : []),
+    [schema],
+  );
+  const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
+  const activeSection = useScrollSpy(sectionIds);
 
   useEffect(() => {
-    if (data?.toml) {
-      setTomlContent(data.toml);
-      setIsTomlModified(false);
+    if (data) {
+      setConfigDraft(data.data);
+      setVersion(data.version);
     }
-    if (data?.data) {
-      setConfigDraft(data.data as Record<string, unknown>);
-    }
-  }, [data?.toml, data?.data]);
+  }, [data]);
 
-  const handleTomlChange = (value: string) => {
-    setTomlContent(value);
-    setIsTomlModified(value !== (data?.toml || ""));
+  const isModified =
+    JSON.stringify(configDraft) !== JSON.stringify(data?.data ?? {});
+
+  const handleReset = () => {
+    if (window.confirm("Reset to saved configuration? Unsaved changes will be lost.")) {
+      setConfigDraft(data?.data ?? {});
+      setVersion(data?.version ?? 0);
+    }
   };
 
-  const handleSaveToml = async () => {
-    setIsSaving(true);
+  const handleValidate = async () => {
     try {
-      const validation = await validateConfig(tomlContent);
-      if (!validation.success) {
-        setValidationError(validation.error || "Unknown validation error");
-        setShowValidationDialog(true);
-        showToast("Validation failed", "error");
-        return;
-      }
-
-      const result = await saveConfigToml(tomlContent);
-      if (result.success) {
-        showToast("Configuration saved successfully!", "success");
-        setIsTomlModified(false);
-        queryClient.invalidateQueries({ queryKey: configKeys.data() });
-      } else {
-        showToast("Save failed: " + (result.error || ""), "error");
-      }
-    } catch (e) {
-      showToast("Save error: " + (e as Error).message, "error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResetToml = () => {
-    if (window.confirm("Reset to original configuration? Unsaved changes will be lost.")) {
-      setTomlContent(data?.toml || "");
-      setIsTomlModified(false);
-    }
-  };
-
-  const isVisualModified =
-    JSON.stringify(configDraft) !== JSON.stringify((data?.data || {}) as Record<string, unknown>);
-
-  const handleResetVisual = () => {
-    if (window.confirm("Reset to original configuration? Unsaved changes will be lost.")) {
-      setConfigDraft((data?.data || {}) as Record<string, unknown>);
-    }
-  };
-
-  const handleValidateVisual = async () => {
-    try {
-      const validation = await validateConfigData(configDraft);
+      const validation = await validateConfig(configDraft);
       if (!validation.success) {
         setValidationError(validation.error || "Unknown validation error");
         setShowValidationDialog(true);
@@ -109,25 +66,10 @@ export default function ConfigPage() {
     }
   };
 
-  const handleValidateToml = async () => {
-    try {
-      const validation = await validateConfig(tomlContent);
-      if (!validation.success) {
-        setValidationError(validation.error || "Unknown validation error");
-        setShowValidationDialog(true);
-        showToast("Validation failed", "error");
-        return;
-      }
-      showToast("Configuration is valid", "success");
-    } catch (e) {
-      showToast("Validation error: " + (e as Error).message, "error");
-    }
-  };
-
-  const handleSaveVisual = async () => {
+  const handleSave = async () => {
     setIsSaving(true);
     try {
-      const validation = await validateConfigData(configDraft);
+      const validation = await validateConfig(configDraft);
       if (!validation.success) {
         setValidationError(validation.error || "Unknown validation error");
         setShowValidationDialog(true);
@@ -135,15 +77,22 @@ export default function ConfigPage() {
         return;
       }
 
-      const result = await saveConfigData(configDraft);
-      if (result.success) {
-        showToast("Configuration saved successfully!", "success");
+      const result = await saveConfig(configDraft, version);
+      setConfigDraft(result.data);
+      setVersion(result.version);
+      queryClient.setQueryData(configKeys.data(), {
+        data: result.data,
+        version: result.version,
+      });
+      showToast("Configuration saved successfully!", "success");
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (err.status === 409) {
+        showToast("Configuration was modified elsewhere; refreshing.", "error");
         queryClient.invalidateQueries({ queryKey: configKeys.data() });
       } else {
-        showToast("Save failed: " + (result.error || ""), "error");
+        showToast("Save failed: " + err.message, "error");
       }
-    } catch (e) {
-      showToast("Save error: " + (e as Error).message, "error");
     } finally {
       setIsSaving(false);
     }
@@ -174,7 +123,7 @@ export default function ConfigPage() {
         <PageContainer size="medium">
           <div className="py-12 text-center">
             <div className="text-error mb-4 text-lg font-medium">Failed to load configuration</div>
-            <p className="text-muted-foreground">Unable to load the configuration file.</p>
+            <p className="text-muted-foreground">Unable to load the configuration from the server.</p>
           </div>
         </PageContainer>
       </>
@@ -196,48 +145,29 @@ export default function ConfigPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-bold text-foreground">Configuration Editor</h1>
-              <p className="mt-1 text-sm text-muted-foreground">{data?.path}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Stored in the database (version {version})
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                onClick={() => setEditorMode((m) => (m === "visual" ? "toml" : "visual"))}
-                title={editorMode === "visual" ? "Switch to TOML editor" : "Switch to Visual editor"}
-              >
-                {editorMode === "visual" ? (
-                  <FileCode className="h-4 w-4" />
-                ) : (
-                  <Settings2 className="h-4 w-4" />
-                )}
-              </Button>
-
-              <Button
                 variant="outline"
                 size="sm"
                 type="button"
-                onClick={editorMode === "visual" ? handleResetVisual : handleResetToml}
+                onClick={handleReset}
                 leftIcon={<RotateCcw className="h-4 w-4" />}
               >
                 Reset
               </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                onClick={editorMode === "visual" ? handleValidateVisual : handleValidateToml}
-              >
+              <Button variant="outline" size="sm" type="button" onClick={handleValidate}>
                 Validate
               </Button>
-
               <Button
                 size="sm"
                 type="button"
-                onClick={editorMode === "visual" ? handleSaveVisual : handleSaveToml}
-                disabled={editorMode === "visual" ? !isVisualModified || isSaving : !isTomlModified || isSaving}
+                onClick={handleSave}
+                disabled={!isModified || isSaving}
                 loading={isSaving}
                 leftIcon={<Save className="h-4 w-4" />}
               >
@@ -247,84 +177,72 @@ export default function ConfigPage() {
           </div>
         </div>
 
-        {editorMode === "visual" ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-            <aside className="hidden lg:block">
-              <div className="sticky top-24">
-                <div className="mb-3 text-sm font-semibold text-foreground">Sections</div>
-                {schema && (
-                  <SectionNav
-                    sections={schema.sections}
-                    activeSection={activeSection}
-                    onSectionClick={handleSectionClick}
-                  />
-                )}
-              </div>
-            </aside>
-
-            <main>
-              {schemaLoading && (
-                <div className="animate-pulse space-y-4">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              )}
-              {schemaError && (
-                <div className="py-8 text-center">
-                  <AlertCircle className="mx-auto mb-3 h-8 w-8 text-error" />
-                  <p className="font-medium text-error">Failed to load config schema</p>
-                </div>
-              )}
-              {schema && (
-                <ConfigSections
-                  sections={schema.sections}
-                  configDraft={configDraft}
-                  onConfigChange={setConfigDraft}
-                />
-              )}
-            </main>
-          </div>
-        ) : (
-          <div>
-            <Textarea
-              value={tomlContent}
-              onChange={(e) => handleTomlChange(e.target.value)}
-              className="h-[calc(100vh-280px)] min-h-[400px] font-mono text-sm"
-              spellCheck={false}
-            />
-            <div className="mt-4 flex items-center gap-2 text-sm">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5",
-                  isTomlModified
-                    ? "text-warning-600 dark:text-warning-500"
-                    : "text-success-600 dark:text-success-500",
-                )}
-              >
-                {isTomlModified ? (
-                  <>
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-warning-500" />
-                    Unsaved changes
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" />
-                    No changes
-                  </>
-                )}
-              </span>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24">
+              <div className="mb-3 text-sm font-semibold text-foreground">Sections</div>
+              <SectionNav
+                sections={sections}
+                activeSection={activeSection}
+                onSectionClick={handleSectionClick}
+              />
             </div>
-          </div>
-        )}
+          </aside>
+
+          <main>
+            {schemaLoading && (
+              <div className="animate-pulse space-y-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            )}
+            {schemaError && (
+              <div className="py-8 text-center">
+                <AlertCircle className="mx-auto mb-3 h-8 w-8 text-error" />
+                <p className="font-medium text-error">Failed to load config schema</p>
+              </div>
+            )}
+            {sections.length > 0 && (
+              <ConfigSections
+                sections={sections}
+                configDraft={configDraft}
+                onConfigChange={setConfigDraft}
+              />
+            )}
+          </main>
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5",
+              isModified
+                ? "text-warning-600 dark:text-warning-500"
+                : "text-success-600 dark:text-success-500",
+            )}
+          >
+            {isModified ? (
+              <>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-warning-500" />
+                Unsaved changes
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                No changes
+              </>
+            )}
+          </span>
+        </div>
 
         <Dialog
           open={showValidationDialog}
           onClose={() => setShowValidationDialog(false)}
           title="Validation Errors"
         >
-          <pre className="whitespace-pre-wrap break-words text-sm text-foreground bg-muted p-4 rounded-lg overflow-auto max-h-[60vh]">
+          <pre className="whitespace-pre-wrap break-words bg-muted p-4 text-sm text-foreground rounded-lg overflow-auto max-h-[60vh]">
             {validationError}
           </pre>
         </Dialog>
