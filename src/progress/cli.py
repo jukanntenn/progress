@@ -9,13 +9,19 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .ai import Analyzer, create_analyzer
 from .config import Config
-from .consts import DATABASE_PATH
 from .contrib.changelog.changelog_tracker import ChangelogTrackerManager
 from .contrib.proposal import ProposalKind, ProposalReport, ProposalTracker
 from .contrib.repo.owner import OwnerManager
 from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
-from .db import close_db, create_tables, init_db, save_report
+from .db import (
+    close_db,
+    create_tables,
+    init_db,
+    log_db_state,
+    resolve_db_path,
+    save_report,
+)
 from .db.models import Batch, Report, Repository
 from .errors import ProgressException
 from .github import GitClient
@@ -35,9 +41,11 @@ from .utils.markpost import MarkpostClient
 logger = logging.getLogger(__name__)
 
 
-def initialize_components(cfg):
-    init_db(DATABASE_PATH)
+def initialize_components(cfg, config_path: str | None = None):
+    db_path = resolve_db_path(cfg.data_dir, config_path)
+    init_db(db_path)
     create_tables()
+    log_db_state()
 
     markpost_client = None
     if cfg.markpost.enabled and cfg.markpost.url:
@@ -672,7 +680,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
         initialize(ui_language=cfg.language)
 
         markpost_client, repo_manager, proposal_tracker, reporter = (
-            initialize_components(cfg)
+            initialize_components(cfg, config)
         )
 
         try:
@@ -829,7 +837,9 @@ def track_proposals(ctx):
         cfg = Config.load_from_file(config)
         initialize(ui_language=cfg.language)
 
-        markpost_client, repo_manager, proposal_tracker, _ = initialize_components(cfg)
+        markpost_client, repo_manager, proposal_tracker, _ = initialize_components(
+            cfg, config
+        )
 
         if cfg.proposal_trackers:
             from .contrib.proposal.status import should_notify

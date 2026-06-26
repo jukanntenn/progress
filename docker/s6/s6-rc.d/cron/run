@@ -8,6 +8,7 @@ export PYTHONPATH=/app/src
 export PYTHONUNBUFFERED=1
 export PATH="/root/.local/bin:$PATH"
 
+cd /app || exit 1
 /usr/local/bin/progress --config "$CONFIG_FILE"
 
 mkdir -p /etc/supercronic

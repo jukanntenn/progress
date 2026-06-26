@@ -1,6 +1,7 @@
 """Database initialization and operations."""
 
 import logging
+import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -42,7 +43,51 @@ def init_db(db_path: str):
     )
 
     database_proxy.initialize(database)
-    logger.info(f"Database connection pool initialized: {db_path}")
+    logger.info(f"Database connection pool initialized: {db_file.resolve()}")
+
+
+def resolve_db_path(data_dir: str, config_path: str | None = None) -> str:
+    """Resolve the SQLite database path to an absolute, CWD-independent location.
+
+    PROGRESS_DB_PATH overrides everything. Otherwise ``<data_dir>/progress.db`` is
+    anchored to PROGRESS_HOME, then the config file directory, then the CWD — so the
+    active database no longer depends on which working directory a process starts in.
+    """
+    env_path = os.environ.get("PROGRESS_DB_PATH")
+    if env_path:
+        return str(Path(env_path).expanduser().resolve())
+
+    base = Path(data_dir)
+    if not base.is_absolute():
+        home = os.environ.get("PROGRESS_HOME")
+        if home:
+            anchor = Path(home).expanduser()
+        elif config_path:
+            anchor = Path(config_path).expanduser().resolve().parent
+        else:
+            anchor = Path.cwd()
+        base = anchor / base
+
+    return str(base.joinpath("progress.db").resolve())
+
+
+def log_db_state() -> None:
+    """Log a checkpoint summary so the active database is observable at startup."""
+    try:
+        total = Repository.select().count()
+        with_checkpoint = (
+            Repository.select()
+            .where(Repository.last_commit_hash.is_null(False))
+            .count()
+        )
+    except Exception as e:
+        logger.debug(f"Skipping database state summary: {e}")
+        return
+
+    logger.info(
+        f"Database state: {total} repository record(s), "
+        f"{with_checkpoint} with commit checkpoint"
+    )
 
 
 def migrate_database():
