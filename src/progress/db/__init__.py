@@ -12,6 +12,7 @@ from playhouse.pool import PooledSqliteDatabase
 from progress.config import Config
 from progress.consts import DB_MAX_CONNECTIONS, DB_PRAGMAS, DB_STALE_TIMEOUT
 from progress.db.models import (
+    AppConfig,
     Batch,
     Report,
     Repository,
@@ -247,6 +248,7 @@ def create_tables():
             Repository,
             Report,
             Batch,
+            AppConfig,
             GitHubOwner,
             ChangelogTracker,
         ],

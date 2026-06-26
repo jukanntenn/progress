@@ -33,10 +33,25 @@ logger = logging.getLogger(__name__)
 class MarkpostConfig(BaseModel):
     """Markpost configuration."""
 
-    enabled: bool = False
-    url: HttpUrl | None = None
-    timeout: int = Field(default=30, ge=1)
-    max_batch_size: int = Field(default=1048576, gt=0)
+    enabled: bool = Field(
+        default=False,
+        description="Enable Markpost uploads. When enabled, markpost.url must be set.",
+    )
+    url: HttpUrl | None = Field(
+        default=None,
+        description="Markpost publish URL including the post key.",
+        json_schema_extra={"format": "password", "writeOnly": True},
+    )
+    timeout: int = Field(
+        default=30,
+        ge=1,
+        description="HTTP request timeout in seconds for Markpost API calls.",
+    )
+    max_batch_size: int = Field(
+        default=1048576,
+        gt=0,
+        description="Maximum batch upload size in bytes. Reports exceeding this are split.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -61,34 +76,82 @@ class MarkpostConfig(BaseModel):
 class GitHubConfig(BaseModel):
     """GitHub configuration."""
 
-    gh_token: str
-    protocol: Protocol = Field(default=Protocol.HTTPS)
-    proxy: str = ""
-    git_timeout: int = Field(default=300, ge=1)
-    gh_timeout: int = Field(default=300, ge=1)
+    gh_token: str = Field(
+        description="GitHub personal access token (PAT).",
+        json_schema_extra={"format": "password", "writeOnly": True},
+    )
+    protocol: Protocol = Field(
+        default=Protocol.HTTPS, description="Git clone protocol: 'https' or 'ssh'."
+    )
+    proxy: str = Field(
+        default="", description="HTTP/HTTPS/SOCKS5 proxy URL; empty disables proxy."
+    )
+    git_timeout: int = Field(
+        default=300, ge=1, description="Timeout in seconds for git CLI commands."
+    )
+    gh_timeout: int = Field(
+        default=300,
+        ge=1,
+        description="Timeout in seconds for GitHub CLI (gh) commands.",
+    )
 
 
 class AnalysisConfig(BaseModel):
     """AI analysis configuration."""
 
-    provider: str = "claude_code"
-    max_diff_length: int = Field(default=100000, gt=0)
-    truncate_chars: int = Field(default=200, ge=1)
-    concurrency: int = Field(default=1, ge=1)
-    timeout: int = Field(default=600, ge=1)
-    retries: int = Field(default=3, ge=1)
-    retry_delay: int = Field(default=5, ge=1)
-    language: str = Field(default="en")
-    first_run_lookback_commits: int = Field(default=3, ge=1)
+    provider: str = Field(
+        default="claude_code",
+        description="Analyzer provider: 'claude_code', 'codex', or 'truncate'.",
+    )
+    max_diff_length: int = Field(
+        default=100000, gt=0, description="Max characters of diff sent to the analyzer."
+    )
+    truncate_chars: int = Field(
+        default=200,
+        ge=1,
+        description="Characters retained when provider is 'truncate'.",
+    )
+    concurrency: int = Field(
+        default=1, ge=1, description="Number of concurrent analysis tasks."
+    )
+    timeout: int = Field(
+        default=600,
+        ge=1,
+        description="Timeout in seconds for a single analysis call (per attempt).",
+    )
+    retries: int = Field(
+        default=3,
+        ge=1,
+        description="Total attempts per call including the first; 1 disables retry.",
+    )
+    retry_delay: int = Field(
+        default=5,
+        ge=1,
+        description="Initial retry delay in seconds; doubles each retry (cap 60s).",
+    )
+    language: str = Field(
+        default="en", description="Output language for AI analysis results."
+    )
+    first_run_lookback_commits: int = Field(
+        default=3,
+        ge=1,
+        description="Commits analyzed on the first run of a repository.",
+    )
 
 
 class RepositoryConfig(BaseModel):
     """Repository configuration."""
 
-    url: str
-    branch: str = "main"
-    enabled: bool = True
-    protocol: Protocol = Field(default=Protocol.HTTPS)
+    url: str = Field(
+        description="Repository id: 'owner/repo', 'https://...', or 'git@...'."
+    )
+    branch: str = Field(default="main", description="Branch to track.")
+    enabled: bool = Field(
+        default=True, description="Set false to temporarily skip this repository."
+    )
+    protocol: Protocol = Field(
+        default=Protocol.HTTPS, description="Override github.protocol for this repo."
+    )
 
     @field_validator("url")
     @classmethod
@@ -105,9 +168,9 @@ class RepositoryConfig(BaseModel):
 
 
 class OwnerConfig(BaseModel):
-    type: Literal["user", "organization"]
-    name: str
-    enabled: bool = True
+    type: Literal["user", "organization"] = Field(description="Owner type.")
+    name: str = Field(description="GitHub username or organization name.")
+    enabled: bool = Field(default=True, description="Set false to skip this owner.")
 
     @field_validator("name")
     @classmethod
@@ -121,10 +184,12 @@ ProposalTrackerKind = Literal["eip", "erc", "pep", "rfc", "dep"]
 
 
 class ChangelogTrackerConfig(BaseModel):
-    name: str
-    url: HttpUrl
-    parser_type: Literal["markdown_heading", "html_chinese_version"]
-    enabled: bool = True
+    name: str = Field(description="Human-readable tracker name.")
+    url: HttpUrl = Field(description="Changelog page or file URL.")
+    parser_type: Literal["markdown_heading", "html_chinese_version"] = Field(
+        description="Version parser type."
+    )
+    enabled: bool = Field(default=True, description="Set false to skip this tracker.")
 
 
 class StorageType(str, Enum):
@@ -135,26 +200,50 @@ class StorageType(str, Enum):
 
 
 class ReportConfig(BaseModel):
-    storage: StorageType = StorageType.AUTO
+    storage: StorageType = Field(
+        default=StorageType.AUTO,
+        description="Report storage: 'auto', 'db', 'file', or 'markpost'.",
+    )
 
 
 class Config(BaseSettings):
     """Application configuration."""
 
-    language: str = Field(default="en")
-    timezone: str = Field(default="UTC")
-    data_dir: str = Field(default="data")
-    workspace_dir: str = Field(default=WORKSPACE_DIR_DEFAULT)
+    language: str = Field(
+        default="en",
+        description="App language for UI text, reports, and notifications.",
+    )
+    timezone: str = Field(
+        default="UTC",
+        description="IANA timezone, e.g. 'UTC' or 'Asia/Shanghai'.",
+        json_schema_extra={"format": "timezone"},
+    )
+    data_dir: str = Field(
+        default="data",
+        description="Base directory for runtime data (infra; not editable here).",
+    )
+    workspace_dir: str = Field(
+        default=WORKSPACE_DIR_DEFAULT,
+        description="Directory where repos are cloned (infra).",
+    )
 
     report: ReportConfig = Field(default_factory=ReportConfig)
     markpost: MarkpostConfig = Field(default_factory=MarkpostConfig)
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
     github: GitHubConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
-    repos: List[RepositoryConfig] = Field(default_factory=list)
-    owners: List[OwnerConfig] = Field(default_factory=list)
-    proposal_trackers: List[ProposalTrackerKind] = Field(default_factory=list)
-    changelog_trackers: List[ChangelogTrackerConfig] = Field(default_factory=list)
+    repos: List[RepositoryConfig] = Field(
+        default_factory=list, description="Repositories to track."
+    )
+    owners: List[OwnerConfig] = Field(
+        default_factory=list, description="GitHub owners to monitor for new repos."
+    )
+    proposal_trackers: List[ProposalTrackerKind] = Field(
+        default_factory=list, description="Proposal kinds to track."
+    )
+    changelog_trackers: List[ChangelogTrackerConfig] = Field(
+        default_factory=list, description="Changelog trackers."
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="PROGRESS_",

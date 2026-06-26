@@ -108,6 +108,29 @@ class Batch(BaseModel):
         return super().save(*args, **kwargs)
 
 
+class AppConfig(BaseModel):
+    """Single-row application configuration store.
+
+    Holds the versioned JSON blob of editable app config. ``id`` is always 1.
+    ``version`` drives optimistic concurrency control and ``schema_version``
+    tracks which config-schema revision the blob was written under.
+    """
+
+    version = IntegerField(default=1)
+    schema_version = IntegerField(default=0)
+    data = TextField(default="{}")
+    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+
+    class Meta:
+        table_name = "app_config"
+
+    def save(self, *args, **kwargs):
+        """Override save method to auto-update updated_at"""
+        if self._pk is not None:
+            self.updated_at = datetime.now(UTC)
+        return super().save(*args, **kwargs)
+
+
 def create_tables():
     """Create database tables and migrate schema."""
     from . import database, migrate_database

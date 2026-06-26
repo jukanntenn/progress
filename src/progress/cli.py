@@ -47,6 +47,8 @@ def initialize_components(cfg, config_path: str | None = None):
     create_tables()
     log_db_state()
 
+    cfg = _resolve_runtime_config(cfg)
+
     markpost_client = None
     if cfg.markpost.enabled and cfg.markpost.url:
         markpost_client = MarkpostClient(cfg.markpost)
@@ -64,7 +66,31 @@ def initialize_components(cfg, config_path: str | None = None):
         language=cfg.analysis.language,
     )
 
-    return markpost_client, repo_manager, proposal_tracker, reporter
+    return cfg, markpost_client, repo_manager, proposal_tracker, reporter
+
+
+def _resolve_runtime_config(file_cfg: Config) -> Config:
+    """Seed the DB config blob from the file config, then build the runtime config.
+
+    The file is a one-time seed + infra provider; after the first run the blob
+    is the source of truth, so the returned config reflects DB edits made via
+    the web UI rather than later file changes.
+    """
+    from .config_store import (
+        build_runtime_config,
+        load_app_config,
+        seed_app_config_if_needed,
+    )
+
+    seed_app_config_if_needed(file_cfg.model_dump(mode="json"))
+    loaded = load_app_config()
+    if loaded is None:
+        return file_cfg
+    blob_data, _ = loaded
+    return build_runtime_config(
+        blob_data,
+        {"data_dir": file_cfg.data_dir, "workspace_dir": file_cfg.workspace_dir},
+    )
 
 
 def send_notification(
@@ -679,7 +705,7 @@ def _run_check_command(config: str, trackers_only: bool = False):
 
         initialize(ui_language=cfg.language)
 
-        markpost_client, repo_manager, proposal_tracker, reporter = (
+        cfg, markpost_client, repo_manager, proposal_tracker, reporter = (
             initialize_components(cfg, config)
         )
 
@@ -837,7 +863,7 @@ def track_proposals(ctx):
         cfg = Config.load_from_file(config)
         initialize(ui_language=cfg.language)
 
-        markpost_client, repo_manager, proposal_tracker, _ = initialize_components(
+        cfg, markpost_client, repo_manager, proposal_tracker, _ = initialize_components(
             cfg, config
         )
 
@@ -863,6 +889,93 @@ def track_proposals(ctx):
                 )
         else:
             logger.info("No proposal trackers configured")
+    finally:
+        close_db()
+
+
+@cli.group(name="config")
+def config_group():
+    """Manage application configuration (DB blob <-> file)."""
+
+
+@config_group.command(name="import")
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Overwrite the DB blob even if already seeded.",
+)
+@click.pass_context
+def config_import(ctx, force: bool):
+    """Import the config file into the DB blob (file -> DB)."""
+    config = ctx.obj["config_path"]
+    try:
+        file_cfg = Config.load_from_file(config)
+        db_path = resolve_db_path(file_cfg.data_dir, config)
+        init_db(db_path)
+        create_tables()
+
+        from .config_store import import_app_config, is_seeded
+
+        if is_seeded() and not force:
+            raise click.ClickException(
+                "DB config already seeded. Re-run with --force to overwrite."
+            )
+        version = import_app_config(file_cfg.model_dump(mode="json"))
+        click.echo(f"Imported configuration into DB (version {version}).")
+    except click.ClickException:
+        raise
+    except Exception as e:
+        raise click.ClickException(str(e))
+    finally:
+        close_db()
+
+
+@config_group.command(name="export")
+@click.option(
+    "--output",
+    "-o",
+    default=None,
+    help="Output file path (defaults to stdout).",
+)
+@click.pass_context
+def config_export(ctx, output: str | None):
+    """Export the DB config blob to a TOML file (DB -> file)."""
+    import tomlkit
+
+    config = ctx.obj["config_path"]
+    try:
+        file_cfg = Config.load_from_file(config)
+        db_path = resolve_db_path(file_cfg.data_dir, config)
+        init_db(db_path)
+        create_tables()
+
+        from .config_store import INFRA_FIELDS, load_app_config
+
+        loaded = load_app_config()
+        if loaded is None:
+            raise click.ClickException("DB config has not been seeded.")
+        data = dict(loaded[0])
+        for field in INFRA_FIELDS:
+            data.setdefault(field, getattr(file_cfg, field, None))
+
+        def drop_none(node):
+            if isinstance(node, dict):
+                return {k: drop_none(v) for k, v in node.items() if v is not None}
+            if isinstance(node, list):
+                return [drop_none(v) for v in node if v is not None]
+            return node
+
+        toml_text = tomlkit.dumps(tomlkit.item(drop_none(data)))
+        if output:
+            Path(output).write_text(toml_text, encoding="utf-8")
+            click.echo(f"Exported configuration to {output}.")
+        else:
+            click.echo(toml_text)
+    except click.ClickException:
+        raise
+    except Exception as e:
+        raise click.ClickException(str(e))
     finally:
         close_db()
 
