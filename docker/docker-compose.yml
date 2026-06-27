@@ -5,7 +5,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./config.toml:/app/config.toml
+      - ./config.toml:/app/config.toml:ro
       - ./claude_settings.json:/root/.claude/settings.json
       - ./codex_config.toml:/root/.codex/config.toml:ro
       - ./codex_auth.json:/root/.codex/auth.json:ro
