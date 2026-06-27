@@ -169,15 +169,30 @@ On first run, the program will automatically clone configured repositories to th
 
 ## Configuration
 
-Configuration is managed through the `config.toml` file. Copy `config.example.toml` as a starting template.
+Application configuration lives in the **database**. The `config.toml` file is a
+one-time **seed** (plus the provider of infrastructure settings like `data_dir`
+and the schedule): on first run it seeds the database, after which the database
+is the source of truth. Copy `config.example.toml` to `config.toml` as a starting
+template.
+
+- **Edit ongoing configuration via the web UI** (the *Configuration* page, plus
+  *Repositories* / *Owners* sections) or the API.
+- **Move config between file and DB** with `progress config import` (file → DB)
+  and `progress config export` (DB → file).
+- The TOML examples below document every option and double as the seed-file
+  contents for a first deploy.
+
+See [guides/config.md](guides/config.md) for the full model.
 
 ### Configuration Priority
 
-The priority of configuration items from high to low is: **Environment Variables > Configuration File > Default Values**
+- **Infrastructure** (`data_dir`, `workspace_dir`, db path, schedule): resolved
+  every startup as **Environment Variables > config file > defaults**.
+- **Application config**: the **database** is the single source of truth. Env
+  vars for app keys are captured at seed time only; to re-import from the file,
+  run `progress config import`.
 
-Environment variables can override any value in the configuration file.
-
-### Configuration File
+### Configuration File (seed + infrastructure)
 
 #### Basic Configuration Structure
 

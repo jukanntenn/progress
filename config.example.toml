@@ -2,21 +2,34 @@
 # Progress Tracker Configuration
 # =============================================================================
 #
-# This file documents every available configuration option.
-# Optional settings are commented out and show their default values.
+# Role of this file: SEED + INFRASTRUCTURE.
+#
+# Application configuration now lives in the DATABASE (a versioned JSON blob
+# for settings; the repositories/github_owners tables for repos and owners).
+# This file is read on FIRST RUN (empty database) to seed that state, and it
+# always provides infrastructure settings (data_dir, workspace_dir, db path,
+# schedule) that are needed before the database can be opened.
+#
+#   - First run:  this file seeds the database (app settings -> blob,
+#                 [[repos]] -> repositories table, [[owners]] -> github_owners).
+#   - After that: the DATABASE is the source of truth. Edits happen via the
+#                 web UI (Configuration page) or `progress config import/export`.
+#                 Changing this file later does NOT update the running config
+#                 unless you run `progress config import` (file -> DB).
+#
+# Optional settings below are commented out and show their default values.
 # Required settings use an example value and are uncommented.
 #
-# Configuration priority: Environment Variables > config file > defaults
-#
-# Environment variable override rules:
+# Infrastructure priority: Environment Variables > config file > defaults.
+# Environment variable override rules (apply at startup):
 #   - Prefix:    PROGRESS_
 #   - Separator: __ (double underscore) for nested keys
 #   - Examples:  PROGRESS_TIMEZONE="Asia/Shanghai"
 #                PROGRESS_GITHUB__GH_TOKEN="ghp_xxx"
-#                PROGRESS_ANALYSIS__PROVIDER="codex"
-#                PROGRESS_WEB__PORT=8080
+#                PROGRESS_DATA_DIR="/app/data"
 #   - Boolean env vars: use "true" or "false"
-#   - List/array env vars are not well supported via env; use config file
+#   - List/array env vars are not well supported via env; use the config file
+#     or the web UI.
 #
 # =============================================================================
 

@@ -21,10 +21,6 @@ progress/
 ├── .claude/               # Claude Code configuration
 ├── .vscode/               # VS Code configuration
 │   └── tasks.json        # VS Code tasks
-├── config/                # Configuration files directory
-│   ├── docker.toml       # Docker configuration
-│   ├── full.toml         # Full configuration
-│   └── simple.toml       # Simple configuration
 ├── data/                  # Application data directory
 │   ├── progress.db       # SQLite database
 │   ├── progress.log      # Application log
@@ -70,16 +66,16 @@ progress/
 │   └── progress/          # Main package directory
 │       ├── __init__.py    # Package initialization
 │       ├── cli.py         # CLI entry point
-│       ├── config.py      # Configuration management
+│       ├── config.py      # Pydantic config models (canonical schema)
+│       ├── config_store.py # DB-backed config blob (load/save/seed/migrate)
 │       ├── consts.py      # Constants
-│       ├── db.py          # Database operations
+│       ├── db/            # Database (init, migrations, Peewee models)
 │       ├── enums.py       # Enum definitions
 │       ├── errors.py      # Custom errors
 │       ├── github.py      # GitHub CLI interactions
 │       ├── i18n.py        # Internationalization
 │       ├── log.py         # Logging
 │       ├── markpost.py    # Markpost functionality
-│       ├── models.py      # Peewee ORM models
 │       ├── ai/             # AI analysis (analyzers/factory)
 │       ├── notification/  # Notifications (channels/messages/factory)
 │       ├── notifier.py    # Notifications (legacy)
@@ -120,6 +116,17 @@ progress/
     ├── test_repo.py
     └── test_utils.py
 ```
+
+## Configuration Architecture
+
+Application configuration is **database-backed**, not file-backed:
+
+- The `config.toml` file is a one-time **seed** + the provider of **infrastructure** settings (`data_dir`, `workspace_dir`, db path, schedule). On first run it seeds the database; thereafter the database is the source of truth and the file's app-config is ignored (only infra keys are re-read at startup).
+- **App settings** live in a versioned JSON blob (`app_config` table; see `src/progress/config_store.py`). The pydantic `Config` model in `src/progress/config.py` is the canonical schema; `Config.model_json_schema()` drives the web UI form. Writes use optimistic locking (`version`); secrets are masked (`writeOnly`/`format: password`).
+- **Repos and owners** live in the `repositories` / `github_owners` tables (edited via the web UI or `GET/PUT /api/v1/config/{repos,owners}`), not the blob.
+- Cross file↔DB explicitly with `progress config import` (file → DB) / `export` (DB → file).
+
+See `guides/config.md` for the full model. When changing config fields, edit the pydantic models (titles/descriptions/secret hints) — the JSON Schema is generated from them.
 
 ## Commands
 

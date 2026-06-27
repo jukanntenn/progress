@@ -167,15 +167,27 @@ python -m progress.cli -c config.toml
 
 ## 配置说明
 
-配置通过 `config.toml` 文件管理，复制 `config.example.toml` 作为起始模板。
+应用配置存储在**数据库**中。`config.toml` 文件是一次性的**种子**
+（同时提供 `data_dir`、调度计划等基础设施配置）：首次运行时它会把配置
+写入数据库，此后数据库即为唯一事实来源。复制 `config.example.toml` 为
+`config.toml` 作为起始模板。
+
+- **日常配置通过 Web UI 修改**（*Configuration* 页面，以及 *Repositories* /
+  *Owners* 区块），或通过 API。
+- **在文件与数据库之间迁移配置**：`progress config import`（文件 → 数据库）、
+  `progress config export`（数据库 → 文件）。
+- 下面的 TOML 示例同时用作首次部署的种子文件内容，并逐项说明每个配置项。
+
+完整模型见 [guides/config.md](guides/config.md)。
 
 ### 配置项优先级
 
-配置项的优先级从高到低为：**环境变量 > 配置文件 > 默认值**
+- **基础设施**（`data_dir`、`workspace_dir`、数据库路径、调度计划）：每次
+  启动时按 **环境变量 > 配置文件 > 默认值** 解析。
+- **应用配置**：**数据库**是唯一事实来源。应用配置的环境变量仅在首次
+  种子写入时生效；如需从文件重新导入，请运行 `progress config import`。
 
-环境变量可以覆盖配置文件中的任意值。
-
-### 配置文件
+### 配置文件（种子 + 基础设施）
 
 #### 基本配置结构
 
