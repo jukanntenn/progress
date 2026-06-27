@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, available_timezones
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     ValidationError,
@@ -168,7 +169,13 @@ class RepositoryConfig(BaseModel):
 
 
 class OwnerConfig(BaseModel):
-    type: Literal["user", "organization"] = Field(description="Owner type.")
+    model_config = ConfigDict(populate_by_name=True)
+
+    # DB column and web API use ``owner_type``; the TOML seed key stays
+    # ``type`` (accepted via alias) so existing config files keep working.
+    owner_type: Literal["user", "organization"] = Field(
+        alias="type", description="Owner type."
+    )
     name: str = Field(description="GitHub username or organization name.")
     enabled: bool = Field(default=True, description="Set false to skip this owner.")
 

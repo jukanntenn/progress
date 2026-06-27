@@ -179,3 +179,16 @@ def test_owners_replace_preserves_enabled_flag(client: TestClient):
     assert response.status_code == 200
     by_name = {o["name"]: o["enabled"] for o in response.json()}
     assert by_name == {"torvalds": True, "bytedance": False}
+
+
+def test_owners_replace_accepts_owner_type_payload(client: TestClient):
+    response = client.put(
+        "/api/v1/config/owners",
+        json=[
+            {"owner_type": "user", "name": "torvalds"},
+            {"owner_type": "organization", "name": "bytedance"},
+        ],
+    )
+    assert response.status_code == 200
+    by_type = {o["name"]: o["owner_type"] for o in response.json()}
+    assert by_type == {"torvalds": "user", "bytedance": "organization"}

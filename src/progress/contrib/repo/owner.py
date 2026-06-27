@@ -25,11 +25,10 @@ def _parse_github_datetime(value: str | datetime | None) -> datetime | None:
 def replace_owners(owners_config) -> dict:
     """Persist the desired owners to the table, upserting and pruning the rest.
 
-    Unlike :meth:`OwnerManager.sync_owners`, the ``enabled`` flag is preserved:
-    a disabled owner is kept (and skipped at check time) rather than deleted.
-    Used by the config UI and ``config import``.
+    The ``enabled`` flag is preserved: a disabled owner is kept (and skipped at
+    check time) rather than deleted. Used by the config UI and ``config import``.
     """
-    desired = {(cfg.type, cfg.name): cfg for cfg in owners_config or []}
+    desired = {(cfg.owner_type, cfg.name): cfg for cfg in owners_config or []}
     created = 0
     updated = 0
     deleted = 0
