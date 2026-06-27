@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 
-from progress.config import OwnerConfig
 from progress.contrib.repo.models import GitHubOwner
 from progress.contrib.repo.owner import OwnerManager
 from progress.db import close_db, create_tables, init_db
@@ -17,37 +16,6 @@ def temp_db(tmp_path):
         yield
     finally:
         close_db()
-
-
-def test_owner_manager_sync_owners_create_update_delete(temp_db):
-    manager = OwnerManager(gh_token=None)
-
-    result = manager.sync_owners(
-        [OwnerConfig(type="organization", name="bytedance", enabled=True)]
-    )
-    assert result["created"] == 1
-    assert GitHubOwner.select().count() == 1
-
-    result = manager.sync_owners(
-        [OwnerConfig(type="organization", name="bytedance", enabled=True)]
-    )
-    assert result["created"] == 0
-
-    result = manager.sync_owners(
-        [OwnerConfig(type="organization", name="bytedance", enabled=False)]
-    )
-    assert result["deleted"] == 1
-    assert GitHubOwner.select().count() == 0
-
-
-def test_owner_manager_sync_owners_removes_missing(temp_db):
-    manager = OwnerManager(gh_token=None)
-    manager.sync_owners([OwnerConfig(type="user", name="torvalds", enabled=True)])
-    assert GitHubOwner.select().count() == 1
-
-    result = manager.sync_owners([])
-    assert result["deleted"] == 1
-    assert GitHubOwner.select().count() == 0
 
 
 def test_owner_manager_check_owner_first_check_returns_most_recent(

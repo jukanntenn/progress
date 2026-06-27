@@ -60,40 +60,6 @@ class OwnerManager:
         self.github_client = GitHubClient(token=gh_token, proxy=proxy)
         self.logger = logger
 
-    def sync_owners(self, owner_configs) -> dict:
-        desired = {
-            (cfg.type, cfg.name): {"enabled": getattr(cfg, "enabled", True)}
-            for cfg in owner_configs or []
-        }
-
-        created = 0
-        updated = 0
-        deleted = 0
-
-        existing = {(o.owner_type, o.name): o for o in GitHubOwner.select()}
-
-        for (owner_type, name), cfg_data in desired.items():
-            enabled = cfg_data.get("enabled", True)
-            if not enabled:
-                continue
-
-            existing_owner = existing.get((owner_type, name))
-
-            if not existing_owner:
-                GitHubOwner.create(owner_type=owner_type, name=name, enabled=True)
-                created += 1
-            elif not existing_owner.enabled:
-                existing_owner.enabled = True
-                existing_owner.save()
-                updated += 1
-
-        for key, existing_owner in existing.items():
-            if key not in desired or not desired[key].get("enabled", True):
-                existing_owner.delete_instance()
-                deleted += 1
-
-        return {"created": created, "updated": updated, "deleted": deleted}
-
     def check_all(self) -> list[dict]:
         new_repos: list[dict] = []
         owners = GitHubOwner.select().where(GitHubOwner.enabled)

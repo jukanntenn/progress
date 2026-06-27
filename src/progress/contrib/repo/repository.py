@@ -47,10 +47,9 @@ def replace_repositories(
 ) -> SyncResult:
     """Persist the desired repos to the table, upserting and pruning the rest.
 
-    Unlike :meth:`RepositoryManager.sync`, this performs no GitHub verification
-    — it simply makes the ``repositories`` table match the desired set. Used by
-    the config UI and ``config import``; the tracking check verifies repos
-    lazily and skips ones that no longer exist.
+    This performs no GitHub verification — it simply makes the ``repositories``
+    table match the desired set. Used by the config UI and ``config import``; the
+    tracking check verifies repos lazily and skips ones that no longer exist.
     """
     from ...consts import parse_repo_name
 
@@ -166,85 +165,6 @@ class RepositoryManager:
         self.protocol = config.github.protocol
 
         self.github_client = GitHubClient(token=self.gh_token, proxy=self.proxy)
-
-    def sync(self, repos_config: list) -> SyncResult:
-        """Sync repository configuration to database.
-
-        Args:
-            repos_config: List of repository configurations
-
-        Returns:
-            SyncResult synchronization result
-        """
-        from ...consts import parse_repo_name
-
-        database = _get_database()
-        configured_urls = set()
-        created_count = 0
-        updated_count = 0
-        skipped_count = 0
-
-        with database.atomic():
-            for repo_config in repos_config:
-                url = repo_config.url
-                branch = repo_config.branch
-                enabled = repo_config.enabled
-                repo_protocol = repo_config.protocol
-                normalized_url = normalize_repo_url(
-                    url, repo_protocol, self.config.github.protocol
-                )
-                name = parse_repo_name(url)
-
-                try:
-                    owner, repo_name = name.split("/", 1)
-                    self.github_client.github.get_repo(f"{owner}/{repo_name}")
-                except Exception:
-                    self.logger.debug(
-                        f"Repository {name} does not exist on GitHub, skipping sync"
-                    )
-                    configured_urls.add(normalized_url)
-                    skipped_count += 1
-                    continue
-
-                configured_urls.add(normalized_url)
-
-                repo, created = Repository.get_or_create(
-                    url=normalized_url,
-                    defaults={
-                        "name": name,
-                        "branch": branch,
-                        "enabled": enabled,
-                    },
-                )
-
-                if not created:
-                    repo.name = name
-                    repo.branch = branch
-                    repo.enabled = enabled
-                    repo.url = normalized_url
-                    repo.save()
-                    updated_count += 1
-                    self.logger.debug(
-                        f"Updated repository config: {repo.name} ({repo.url})"
-                    )
-                else:
-                    created_count += 1
-                    self.logger.info(f"Added new repository: {repo.name} ({repo.url})")
-
-            deleted_count = (
-                Repository.delete()
-                .where(Repository.url.not_in(configured_urls))
-                .execute()
-            )
-
-            if deleted_count > 0:
-                self.logger.info(
-                    f"Deleted {deleted_count} repositories not in configuration"
-                )
-
-        return SyncResult(
-            created=created_count, updated=updated_count, deleted=deleted_count
-        )
 
     def list_enabled(self) -> list[Repository]:
         """Get all enabled repositories.
