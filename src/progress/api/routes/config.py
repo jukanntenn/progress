@@ -16,7 +16,7 @@ from ...config_store import (
     load_app_config,
     mask_secrets,
     save_app_config,
-    validate_config_dict,
+    validate_app_config,
 )
 from ...contrib.repo.models import GitHubOwner
 from ...contrib.repo.owner import replace_owners
@@ -76,7 +76,7 @@ def save_config(request: ConfigSaveRequest):
 @router.post("/validate", response_model=ConfigValidateResponse)
 def validate_config(request: ConfigValidateRequest):
     try:
-        validate_config_dict(request.config)
+        validate_app_config(request.config)
     except ConfigException as e:
         return ConfigValidateResponse(success=False, error=str(e))
     return ConfigValidateResponse(success=True)

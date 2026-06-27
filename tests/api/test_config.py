@@ -192,3 +192,32 @@ def test_owners_replace_accepts_owner_type_payload(client: TestClient):
     assert response.status_code == 200
     by_type = {o["name"]: o["owner_type"] for o in response.json()}
     assert by_type == {"torvalds": "user", "bytedance": "organization"}
+
+
+def test_validate_accepts_masked_secrets(client: TestClient):
+    data = client.get("/api/v1/config").json()["data"]
+    data["notification"]["channels"] = [
+        {
+            "type": "feishu",
+            "enabled": True,
+            "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/real",
+            "timeout": 30,
+        }
+    ]
+    saved = client.post("/api/v1/config", json={"config": data, "version": 1})
+    assert saved.status_code == 200
+
+    masked = client.get("/api/v1/config").json()["data"]
+    assert masked["notification"]["channels"][0]["webhook_url"] == "********"
+
+    response = client.post("/api/v1/config/validate", json={"config": masked})
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
+def test_validate_still_rejects_invalid_non_secret(client: TestClient):
+    data = client.get("/api/v1/config").json()["data"]
+    data["github"]["protocol"] = "not-a-protocol"
+    response = client.post("/api/v1/config/validate", json={"config": data})
+    assert response.status_code == 200
+    assert response.json()["success"] is False

@@ -327,6 +327,21 @@ def validate_config_dict(data: dict) -> None:
         raise ConfigException(_format_validation_error(e)) from e
 
 
+def validate_app_config(data: dict) -> None:
+    """Validate ``data`` the way :func:`save_app_config` would.
+
+    Masked secret placeholders (:data:`SECRET_MASK`) are merged back from
+    the stored blob first, so a config that round-tripped through a masked
+    GET validates exactly like an actual save. The web UI sends masked
+    secrets back on save, so its pre-save validation must match. Raises
+    :class:`ConfigException` on failure.
+    """
+    stored = load_app_config()
+    stored_data = stored[0] if stored is not None else {}
+    merged = _merge_secret_placeholders(_strip_excluded(data), stored_data)
+    validate_config_dict(merged)
+
+
 def save_app_config(data: dict, expected_version: int) -> tuple[dict, int]:
     """Validate and persist ``data`` under optimistic locking.
 
@@ -385,5 +400,6 @@ __all__ = [
     "save_app_config",
     "seed_lists_if_needed",
     "seed_app_config_if_needed",
+    "validate_app_config",
     "validate_config_dict",
 ]
