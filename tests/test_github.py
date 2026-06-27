@@ -396,12 +396,16 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         def fake_clone_or_update(self):
             pass
 
+        def fake_check_releases(self):
+            return None
+
         def fake_update(self, current_commit):
             pass
 
         m.setattr(
             "progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update
         )
+        m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None
@@ -469,12 +473,16 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         def fake_clone_or_update(self):
             pass
 
+        def fake_check_releases(self):
+            return None
+
         def fake_update(self, current_commit):
             pass
 
         m.setattr(
             "progress.contrib.repo.repo.Repo.clone_or_update", fake_clone_or_update
         )
+        m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
         report = manager.check(repo)
         assert report is not None
