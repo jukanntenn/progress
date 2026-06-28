@@ -62,6 +62,48 @@ language = "en"
 
 
 # -----------------------------------------------------------------------------
+# Observability [observability]  (optional, infrastructure)
+# -----------------------------------------------------------------------------
+# OpenTelemetry traces/metrics export to JSON-Lines files (no external service)
+# for human/AI inspection, and errors/crashes are sent to a Bugsink
+# (Sentry-compatible) server. Like data_dir, this is infrastructure: read from
+# the file/environment at startup, never stored in the editable config blob.
+#
+# Env overrides use the PROGRESS_OBSERVABILITY__OTEL__* / PROGRESS_OBSERVABILITY__BUGSINK__*
+# prefix, e.g. PROGRESS_OBSERVABILITY__BUGSINK__DSN="http://key@host:port/1"
+
+[observability.otel]
+# Enable OpenTelemetry traces + metrics export to JSON-Lines files.
+# Env: PROGRESS_OBSERVABILITY__OTEL__ENABLED
+# enabled = false
+
+# Directory for traces.jsonl / metrics.jsonl (relative to the working directory).
+# Env: PROGRESS_OBSERVABILITY__OTEL__EXPORT_DIR
+# export_dir = "data/telemetry"
+
+# Export traces (spans) and metrics. Disable either to skip that signal.
+# Env: PROGRESS_OBSERVABILITY__OTEL__TRACES / PROGRESS_OBSERVABILITY__OTEL__METRICS
+# traces = true
+# metrics = true
+
+# Trace sampling ratio; 1.0 captures everything (recommended for this low-volume
+# internal tool). 0 disables trace capture.
+# Env: PROGRESS_OBSERVABILITY__OTEL__SAMPLING_RATE
+# sampling_rate = 1.0
+
+[observability.bugsink]
+# Bugsink DSN. Format: http://{public_key}@{host}:{port}/{project_id}
+# Example: http://3a2b8c9d@192.168.5.50:8770/1
+# Empty (default) disables error reporting. This value is a secret.
+# Env: PROGRESS_OBSERVABILITY__BUGSINK__DSN
+# dsn = ""
+
+# Deployment environment tag attached to error events.
+# Env: PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT
+# environment = "production"
+
+
+# -----------------------------------------------------------------------------
 # GitHub [github]  (required)
 # -----------------------------------------------------------------------------
 # Credentials and settings for accessing GitHub repositories.

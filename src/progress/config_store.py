@@ -35,8 +35,8 @@ UTC = ZoneInfo("UTC")
 APP_CONFIG_ID = 1
 CURRENT_SCHEMA_VERSION = 2
 SECRET_MASK = "********"
-INFRA_FIELDS = ("data_dir", "workspace_dir")
-EXCLUDED_FROM_BLOB = ("data_dir", "workspace_dir", "repos", "owners")
+INFRA_FIELDS = ("data_dir", "workspace_dir", "observability")
+EXCLUDED_FROM_BLOB = ("data_dir", "workspace_dir", "repos", "owners", "observability")
 
 
 class ConfigVersionConflict(ConfigException):
@@ -46,8 +46,8 @@ class ConfigVersionConflict(ConfigException):
 def get_config_json_schema() -> dict:
     """JSON Schema for the editable app config.
 
-    Infra fields (data_dir/workspace_dir) and table-backed lists (repos/owners)
-    are excluded: they are not stored in or edited through the blob.
+    Infra fields (data_dir/workspace_dir/observability) and table-backed lists
+    (repos/owners) are excluded: they are not stored in or edited through the blob.
     """
     schema = deepcopy(Config.model_json_schema())
     props = schema.setdefault("properties", {})

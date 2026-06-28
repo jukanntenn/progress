@@ -213,6 +213,58 @@ class ReportConfig(BaseModel):
     )
 
 
+class OTelConfig(BaseModel):
+    """OpenTelemetry infrastructure settings (traces + metrics to files)."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable OpenTelemetry traces/metrics export to JSON-Lines files.",
+    )
+    export_dir: str = Field(
+        default="data/telemetry",
+        description="Directory for traces.jsonl / metrics.jsonl (infra; relative to cwd).",
+    )
+    traces: bool = Field(
+        default=True,
+        description="Export traces (spans) to export_dir/traces.jsonl.",
+    )
+    metrics: bool = Field(
+        default=True,
+        description="Export metrics to export_dir/metrics.jsonl.",
+    )
+    sampling_rate: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Trace sampling ratio; 1.0 captures everything.",
+    )
+
+
+class BugsinkConfig(BaseModel):
+    """Bugsink (Sentry-compatible) error-tracking settings."""
+
+    dsn: str | None = Field(
+        default=None,
+        description="Bugsink DSN, e.g. http://key@host:port/project_id. Empty disables.",
+        json_schema_extra={"format": "password", "writeOnly": True},
+    )
+    environment: str = Field(
+        default="production",
+        description="Deployment environment tag attached to error events.",
+    )
+
+
+class ObservabilityConfig(BaseModel):
+    """Observability infrastructure (OpenTelemetry + Bugsink).
+
+    Treated as infrastructure like data_dir: read from the TOML file /
+    environment at startup, never stored in the editable config blob.
+    """
+
+    otel: OTelConfig = Field(default_factory=OTelConfig)
+    bugsink: BugsinkConfig = Field(default_factory=BugsinkConfig)
+
+
 class Config(BaseSettings):
     """Application configuration."""
 
@@ -235,6 +287,10 @@ class Config(BaseSettings):
     )
 
     report: ReportConfig = Field(default_factory=ReportConfig)
+    observability: ObservabilityConfig = Field(
+        default_factory=ObservabilityConfig,
+        description="Observability (OpenTelemetry + Bugsink) infrastructure settings.",
+    )
     markpost: MarkpostConfig = Field(default_factory=MarkpostConfig)
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
     github: GitHubConfig
