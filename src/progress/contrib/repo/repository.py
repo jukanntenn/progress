@@ -5,6 +5,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
+from opentelemetry import context as otel_context
+
 from progress.ai import Analyzer
 from progress.config import Config
 from progress.consts import WORKSPACE_DIR_DEFAULT
@@ -13,6 +15,7 @@ from progress.enums import Protocol
 from progress.github import GitClient, normalize_repo_url
 from progress.github_client import GitHubClient
 from progress.i18n import gettext as _
+from progress.telemetry import get_tracer, record_repo_checked
 
 from .analysis import analyze_diff, analyze_releases
 from .repo import Repo
@@ -331,7 +334,11 @@ class RepositoryManager:
         )
 
         # Clone or update repository
-        repo_obj.clone_or_update()
+        with get_tracer("progress.repo").start_as_current_span(
+            "repo.sync",
+            attributes={"repo.name": str(repo.name), "repo.branch": str(repo.branch)},
+        ):
+            repo_obj.clone_or_update()
 
         # Check releases (independent from commits)
         releases_list = None
@@ -391,21 +398,28 @@ class RepositoryManager:
             if diff.strip():
                 self.logger.info(f"Found {commit_count} new commits")
                 self.logger.info("Analyzing code changes...")
-                (
-                    analysis_summary,
-                    analysis_detail,
-                    truncated,
-                    original_length,
-                    analyzed_length,
-                ) = analyze_diff(
-                    self.analyzer,
-                    str(repo.name),
-                    str(repo.branch),
-                    diff,
-                    commit_messages,
-                    self.max_diff_length,
-                    self.language,
-                )
+                with get_tracer("progress.repo").start_as_current_span(
+                    "repo.analyze",
+                    attributes={
+                        "repo.name": str(repo.name),
+                        "repo.branch": str(repo.branch),
+                    },
+                ):
+                    (
+                        analysis_summary,
+                        analysis_detail,
+                        truncated,
+                        original_length,
+                        analyzed_length,
+                    ) = analyze_diff(
+                        self.analyzer,
+                        str(repo.name),
+                        str(repo.branch),
+                        diff,
+                        commit_messages,
+                        self.max_diff_length,
+                        self.language,
+                    )
                 current_commit = repo_obj.get_current_commit()
                 repo_obj.update(current_commit)
             else:
@@ -451,19 +465,26 @@ class RepositoryManager:
         reports = []
         total_commits = 0
         repo_statuses = {}
+        parent_context = otel_context.get_current()
 
         def process(repo_obj: Repository) -> tuple[RepositoryReport | None, str]:
             """Process single repository, return (report, status)."""
+            token = otel_context.attach(parent_context)
+            status = "failed"
+            result: RepositoryReport | None = None
             try:
                 result = self.check(repo_obj)
-                if result:
-                    return result, "success"
-                return None, "skipped"
+                status = "success" if result else "skipped"
             except Exception as e:
                 self.logger.error(
                     f"Failed to check repository {repo_obj.name}: {e}", exc_info=True
                 )
-                return None, "failed"
+                status = "failed"
+                result = None
+            finally:
+                record_repo_checked(status=status)
+                otel_context.detach(token)
+            return result, status
 
         if concurrency > 1:
             self.logger.info(

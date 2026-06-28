@@ -6,6 +6,8 @@ from pathlib import Path, PurePath
 
 import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from opentelemetry import context as otel_context
+from opentelemetry import trace as otel_trace
 
 from .ai import Analyzer, create_analyzer
 from .config import Config
@@ -35,6 +37,13 @@ from .notification import (
     create_proposal_message,
 )
 from .notification.utils import ChangelogEntry, DiscoveredRepo
+from .telemetry import (
+    get_tracer,
+    record_notification_sent,
+    record_report_generated,
+    setup_observability,
+    shutdown_observability,
+)
 from .utils import get_now
 from .utils.markpost import MarkpostClient
 
@@ -93,7 +102,11 @@ def _resolve_runtime_config(file_cfg: Config) -> Config:
     blob_data, _ = loaded
     return build_runtime_config(
         blob_data,
-        {"data_dir": file_cfg.data_dir, "workspace_dir": file_cfg.workspace_dir},
+        {
+            "data_dir": file_cfg.data_dir,
+            "workspace_dir": file_cfg.workspace_dir,
+            "observability": file_cfg.observability.model_dump(mode="json"),
+        },
     )
 
 
@@ -121,6 +134,8 @@ def send_notification(
             context = _build_notification_context(channel_config.type, **data)
         if not message.send(context, fail_silently=True):
             failures += 1
+        else:
+            record_notification_sent(channel=channel_config.type)
 
     if failures:
         logger.warning(
@@ -378,6 +393,7 @@ def process_reports(
                         commit_count=report.commit_count,
                         content=report.content,
                     )
+                    record_report_generated(storage="db")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save report for {report.repo_name}: {db_error}"
@@ -703,15 +719,24 @@ def check(ctx, trackers_only: bool):
 
 def _run_check_command(config: str, trackers_only: bool = False):
     """Run the main check command logic."""
+    root_span = None
+    otel_token = None
     try:
         logger.info(f"Loading configuration file: {config}")
         cfg = Config.load_from_file(config)
+        setup_observability(cfg.observability, component="cli")
 
         initialize(ui_language=cfg.language)
 
         cfg, markpost_client, repo_manager, proposal_tracker, reporter = (
             initialize_components(cfg, config)
         )
+
+        root_span = get_tracer().start_span(
+            "progress.check",
+            attributes={"progress.trackers_only": trackers_only},
+        )
+        otel_token = otel_context.attach(otel_trace.set_span_in_context(root_span))
 
         try:
             changelog_manager = ChangelogTrackerManager.from_config(cfg)
@@ -747,6 +772,8 @@ def _run_check_command(config: str, trackers_only: bool = False):
 
         if not trackers_only:
             repos = repo_manager.list_enabled()
+            if root_span is not None:
+                root_span.set_attribute("progress.repo_count", len(repos))
             logger.info(f"Starting to check {len(repos)} repositories")
 
             check_result = repo_manager.check_all(
@@ -845,12 +872,23 @@ def _run_check_command(config: str, trackers_only: bool = False):
         logger.info(_("All repository checks completed"))
 
     except ProgressException as e:
+        if root_span is not None:
+            root_span.record_exception(e)
+            root_span.set_status(otel_trace.Status(otel_trace.StatusCode.ERROR, str(e)))
         logger.error(f"Application error: {e}", exc_info=True)
         raise click.ClickException(str(e))
     except Exception as e:
+        if root_span is not None:
+            root_span.record_exception(e)
+            root_span.set_status(otel_trace.Status(otel_trace.StatusCode.ERROR, str(e)))
         logger.error(f"Program execution failed: {e}", exc_info=True)
         raise click.ClickException(str(e))
     finally:
+        if otel_token is not None:
+            otel_context.detach(otel_token)
+        if root_span is not None:
+            root_span.end()
+        shutdown_observability()
         close_db()
 
 

@@ -39,6 +39,7 @@ def create_app(config_obj=None) -> FastAPI:
             {
                 "data_dir": config_obj.data_dir,
                 "workspace_dir": config_obj.workspace_dir,
+                "observability": config_obj.observability.model_dump(mode="json"),
             },
         )
 
@@ -51,8 +52,18 @@ def create_app(config_obj=None) -> FastAPI:
     api_router.include_router(rss.router)
     app.include_router(api_router)
 
+    from ..telemetry import (
+        instrument_fastapi_app,
+        setup_observability,
+        shutdown_observability,
+    )
+
+    setup_observability(config_obj.observability, component="api")
+    instrument_fastapi_app(app)
+
     @app.on_event("shutdown")
     def shutdown_db():
+        shutdown_observability()
         close_db()
 
     return app

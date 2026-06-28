@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 from typing import TYPE_CHECKING
 
 from progress.errors import AnalysisException
+from progress.telemetry import get_tracer, record_analysis
 from progress.utils import retry
 
 if TYPE_CHECKING:
@@ -84,9 +86,20 @@ def run_tool(
         max_delay=_MAX_DELAY,
     )(_run_once)
 
+    tracer = get_tracer("progress.ai")
+    started = time.monotonic()
+    ok = False
+    failure_reason = ""
     try:
-        stdout = run_with_retry(command, executable, content, config.timeout)
+        with tracer.start_as_current_span(
+            "ai.call",
+            attributes={"ai.provider": provider, "ai.executable": executable},
+        ):
+            stdout = run_with_retry(command, executable, content, config.timeout)
+        ok = True
+        return stdout
     except TransientAnalysisError as e:
+        failure_reason = "transient"
         logger.error(
             "AI tool '%s' unavailable after %d attempt(s) (last exit code %s): %s",
             executable,
@@ -95,7 +108,16 @@ def run_tool(
             e.stderr_preview,
         )
         raise
-    return stdout
+    except Exception:
+        failure_reason = "error"
+        raise
+    finally:
+        record_analysis(
+            provider=provider,
+            duration_s=time.monotonic() - started,
+            ok=ok,
+            reason=failure_reason,
+        )
 
 
 def _run_once(
