@@ -41,6 +41,7 @@ progress/
 │   ├── dev.md            # Development guide
 │   ├── i18n.md           # Internationalization guide
 │   ├── proposal_tracking.md # Proposal tracking guide
+│   ├── observability.md # Observability (OpenTelemetry + Bugsink) guide
 │   └── testing.md        # Testing guide
 ├── scripts/               # Utility scripts
 │   ├── compilemessages.sh # Compile localization messages
@@ -76,6 +77,7 @@ progress/
 │       ├── i18n.py        # Internationalization
 │       ├── log.py         # Logging
 │       ├── markpost.py    # Markpost functionality
+│       ├── telemetry.py   # OpenTelemetry + Bugsink observability setup
 │       ├── ai/             # AI analysis (analyzers/factory)
 │       ├── notification/  # Notifications (channels/messages/factory)
 │       ├── notifier.py    # Notifications (legacy)
