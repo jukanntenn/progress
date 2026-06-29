@@ -5,6 +5,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from progress.ai import Analyzer
 from progress.contrib.repo.analysis import AnalysisResultParser
+from progress.telemetry import record_analysis_failure, report_error
 
 from .types import ProposalKind
 
@@ -55,4 +56,13 @@ def run_analysis(
         return ("", "")
     except Exception as e:
         logger.warning("Proposal analysis failed for %s #%s: %s", kind.value, number, e)
+        provider = getattr(analyzer, "provider", "unknown")
+        report_error(
+            e,
+            kind=kind.value,
+            proposal_number=number,
+            provider=provider,
+            stage="proposal_analysis",
+        )
+        record_analysis_failure(provider=provider, reason="parse")
         return ("", "")

@@ -9,6 +9,7 @@ from progress.ai import Analyzer
 from progress.consts import TEMPLATE_ANALYSIS_PROMPT, TEMPLATE_README_ANALYSIS_PROMPT
 from progress.errors import AnalysisException
 from progress.i18n import gettext as _
+from progress.telemetry import record_analysis_failure, report_error
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ def analyze_diff(
         )
     except Exception as e:
         logger.warning("Code analysis failed: %s", e)
+        provider = getattr(analyzer, "provider", "unknown")
+        report_error(e, repo=repo_name, provider=provider, stage="diff_analysis")
+        record_analysis_failure(provider=provider, reason="parse")
         summary = _("Code analysis unavailable")
         detail = _("Claude Code analysis failed or timed out. See logs for details.")
 

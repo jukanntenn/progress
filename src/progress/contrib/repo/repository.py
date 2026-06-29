@@ -15,7 +15,7 @@ from progress.enums import Protocol
 from progress.github import GitClient, normalize_repo_url
 from progress.github_client import GitHubClient
 from progress.i18n import gettext as _
-from progress.telemetry import get_tracer, record_repo_checked
+from progress.telemetry import get_tracer, record_repo_checked, report_error
 
 from .analysis import analyze_diff, analyze_releases
 from .repo import Repo
@@ -269,6 +269,13 @@ class RepositoryManager:
             except Exception as e:
                 self.logger.warning(
                     f"Failed to analyze release {release['tag_name']}: {e}"
+                )
+                report_error(
+                    e,
+                    repo=repo_name,
+                    provider=getattr(self.analyzer, "provider", "unknown"),
+                    release_tag=release["tag_name"],
+                    stage="release_analysis",
                 )
                 summary = _("**AI analysis unavailable for {tag_name}**").format(
                     tag_name=release["tag_name"]
