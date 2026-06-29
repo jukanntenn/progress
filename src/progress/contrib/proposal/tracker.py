@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from progress.ai import Analyzer
 from progress.errors import GitException, ProposalParseError
 from progress.github import GitClient, sanitize_repo_name
+from progress.telemetry import report_error
 from progress.utils import run_command
 
 from .analysis import run_analysis
@@ -65,7 +66,11 @@ class ProposalTracker:
         logger.info("Proposal check started: kind=%s", kind.value)
         start = time.monotonic()
 
-        repo_path = self._clone_or_update(config)
+        try:
+            repo_path = self._clone_or_update(config)
+        except GitException as e:
+            report_error(e, kind=kind.value, stage="clone")
+            raise
         current_commit = self.git.get_current_commit(repo_path)
         logger.info(
             "Proposal repo ready: kind=%s commit=%s",

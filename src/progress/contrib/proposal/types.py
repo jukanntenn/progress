@@ -54,7 +54,7 @@ KIND_CONFIGS: dict[ProposalKind, KindConfig] = {
     ),
     ProposalKind.ERC: KindConfig(
         repo_url="https://github.com/ethereum/ercs",
-        branch="main",
+        branch="master",
         proposal_dir="ERCS",
         file_pattern=["erc-*.md"],
     ),
