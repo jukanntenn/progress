@@ -27,6 +27,10 @@ class Analyzer(ABC):
     def language(self) -> str:
         return self._config.language
 
+    @property
+    def provider(self) -> str:
+        return self._config.provider
+
     @staticmethod
     def apply_parser(parser: ParserType[R], result: str) -> R:
         if is_parseable(parser):

@@ -71,6 +71,7 @@ _SECRET_KEYS = frozenset(
 @dataclass
 class _TelemetryState:
     enabled: bool = False
+    bugsink_enabled: bool = False
     component: str = ""
     tracer_provider: TracerProvider | None = None
     meter_provider: MeterProvider | None = None
@@ -251,6 +252,7 @@ def _setup_bugsink(cfg: "ObservabilityConfig", *, component: str) -> None:
             before_send=_before_send,
         )
         sentry_sdk.set_tag("component", component)
+        _STATE.bugsink_enabled = True
         logger.info("Bugsink error reporting enabled (environment=%s)", environment)
     except Exception as e:
         logger.warning("Bugsink initialization failed: %s", e)
@@ -325,6 +327,7 @@ def shutdown_observability() -> None:
     _STATE.tracer_provider = None
     _STATE.meter_provider = None
     _STATE.metric_reader = None
+    _STATE.bugsink_enabled = False
     _STATE.enabled = False
 
 
@@ -362,14 +365,46 @@ def record_report_generated(*, storage: str = "") -> None:
         counter.add(1, {"storage": storage or "default"})
 
 
+def record_analysis_failure(*, provider: str, reason: str = "error") -> None:
+    """Increment the analysis-failure counter only (no duration histogram).
+
+    Use at sites where ``run_tool`` already returned ``ok=True`` but a later
+    step (e.g. JSON parsing) failed, so the failure is still counted without
+    double-recording the call duration that ``record_analysis`` already logged.
+    """
+    failures = _STATE.instruments.get("analysis_failures")
+    if failures is not None:
+        failures.add(1, {"provider": provider, "reason": reason})
+
+
+def report_error(exc: BaseException | None = None, **tags: Any) -> None:
+    """Forward a swallowed exception to Bugsink; no-op when not configured.
+
+    Call this from ``except`` blocks that intentionally degrade to a warning
+    and continue, so the otherwise-invisible failure still reaches Bugsink.
+    ``tags`` are scoped to this single event (via ``push_scope``) so they aid
+    grouping/filtering without leaking onto subsequent events. Pass ``exc``
+    explicitly, or call with no args inside an ``except`` to capture the
+    active exception.
+    """
+    if not _STATE.bugsink_enabled:
+        return
+    with sentry_sdk.push_scope() as scope:
+        for key, value in tags.items():
+            scope.set_tag(key, value)
+        sentry_sdk.capture_exception(exc)
+
+
 __all__ = [
     "get_tracer",
     "instrument_fastapi_app",
     "is_enabled",
     "record_analysis",
+    "record_analysis_failure",
     "record_notification_sent",
     "record_report_generated",
     "record_repo_checked",
+    "report_error",
     "setup_observability",
     "shutdown_observability",
 ]
