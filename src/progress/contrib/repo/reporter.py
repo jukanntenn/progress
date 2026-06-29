@@ -92,11 +92,45 @@ class MarkdownReporter:
             report.content = content
             rendered_reports.append(content)
 
+        return self.render_aggregated_body(
+            rendered_reports,
+            total_commits,
+            repo_statuses,
+            timezone,
+            batch_index,
+            total_batches,
+        )
+
+    def render_aggregated_body(
+        self,
+        sections: list[str],
+        total_commits: int,
+        repo_statuses: dict[str, str],
+        timezone: ZoneInfo = ZoneInfo("UTC"),
+        batch_index: int = 0,
+        total_batches: int = 1,
+    ) -> str:
+        """Render an aggregated report from pre-rendered section strings.
+
+        Unlike :meth:`generate_aggregated_report`, the sections are passed in
+        already rendered (or stubbed), so the caller controls exactly what each
+        MarkPost batch contains without mutating ``RepositoryReport.content``.
+
+        Args:
+            sections: Pre-rendered Markdown section strings (one per repo)
+            total_commits: Total commit count across all repos
+            repo_statuses: Dict mapping repo names to status ("success" | "failed" | "skipped")
+            timezone: Timezone for timestamps
+            batch_index: Current batch index (0-based)
+            total_batches: Total number of batches
+
+        Returns:
+            Complete aggregated Markdown report
+        """
         now = datetime.now(timezone)
         template = self.jinja_env.get_template(TEMPLATE_AGGREGATED_REPORT)
         return template.render(
-            reports=reports,
-            rendered_reports=rendered_reports,
+            rendered_reports=sections,
             total_commits=total_commits,
             repo_statuses=repo_statuses,
             timezone=timezone,

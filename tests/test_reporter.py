@@ -254,3 +254,21 @@ def test_aggregated_report_separates_each_repo_and_footer(reporter):
 
     assert not _has_consecutive_separators(result)
     assert result.count("---") == 2
+
+
+def test_render_aggregated_body_uses_pre_rendered_sections(reporter):
+    """render_aggregated_body must assemble the wrapper around caller-supplied
+    section strings verbatim (including a stub), without re-rendering reports."""
+    sections = ["RAW SECTION ONE", "RAW SECTION TWO"]
+
+    result = reporter.render_aggregated_body(
+        sections,
+        total_commits=5,
+        repo_statuses={"owner/a": "success", "owner/b": "failed"},
+    )
+
+    assert "RAW SECTION ONE" in result
+    assert "RAW SECTION TWO" in result
+    # Both sections appear exactly once (no duplication from re-rendering).
+    assert result.count("RAW SECTION ONE") == 1
+    assert result.count("---") == 2  # one separator between each pair of sections

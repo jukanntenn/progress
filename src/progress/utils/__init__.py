@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 BackoffStrategy = Literal["exponential", "fixed"]
 
+# Fraction of markpost.max_batch_size that collected report sections may fill
+# within a single batch; the remainder is reserved for the unified summary and
+# the aggregated-report template (status block + footer) added during assembly.
+BATCH_MARGIN = 0.8
+
 
 def canonicalify(p: Path | str) -> Path:
     return Path(p).expanduser().resolve()
@@ -243,15 +248,18 @@ def create_report_batches(reports: list, max_batch_size: int) -> list[ReportBatc
 
     Notes:
         - Each batch contains at least 1 report
-        - If a single report exceeds max_batch_size, it gets its own batch (will be skipped during upload)
+        - If a single report exceeds the effective limit, it gets its own batch
+          (and is stubbed or skipped by the caller during upload)
         - Batch size is calculated based on rendered report content
-        - Uses 0.8 factor to reserve space for summary/title
+        - Uses BATCH_MARGIN (0.8) to reserve space for summary/template overhead
     """
     if not reports:
         return []
 
-    effective_limit = int(max_batch_size * 0.8)
-    logger.info(f"Batch size limit: {effective_limit} bytes (0.8 * {max_batch_size})")
+    effective_limit = int(max_batch_size * BATCH_MARGIN)
+    logger.info(
+        f"Batch size limit: {effective_limit} bytes ({BATCH_MARGIN} * {max_batch_size})"
+    )
 
     batches = []
     current_batch = []

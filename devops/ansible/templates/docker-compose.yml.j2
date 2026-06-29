@@ -16,4 +16,5 @@ services:
       - PROGRESS_OBSERVABILITY__OTEL__EXPORT_DIR=/app/data/telemetry
       - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
       - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=prod
+      - PROGRESS_WEB__BASE_URL=http://192.168.5.50:5053
     restart: always

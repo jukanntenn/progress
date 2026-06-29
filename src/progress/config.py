@@ -51,7 +51,11 @@ class MarkpostConfig(BaseModel):
     max_batch_size: int = Field(
         default=1048576,
         gt=0,
-        description="Maximum batch upload size in bytes. Reports exceeding this are split.",
+        description=(
+            "Maximum MarkPost body size in bytes. Reports exceeding this are split "
+            "into batches, or replaced with a WebUI stub when even a single batch is "
+            "too large. Set to the MarkPost service's real body limit."
+        ),
     )
 
     @model_validator(mode="before")
@@ -213,6 +217,26 @@ class ReportConfig(BaseModel):
     )
 
 
+class WebConfig(BaseModel):
+    """Web UI settings.
+
+    ``base_url`` is the public address of the Progress WebUI. It is used to
+    build links back to the WebUI inside MarkPost stubs when a report is too
+    large to publish in full. It is optional: when unset, oversized reports are
+    skipped instead of stubbed.
+    """
+
+    base_url: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "Public base URL of the Progress WebUI "
+            "(e.g. https://progress.example.com). Used to build links back to the "
+            "WebUI inside MarkPost stubs when a report exceeds the size limit. "
+            "Optional; when unset, oversized reports are skipped instead of stubbed."
+        ),
+    )
+
+
 class OTelConfig(BaseModel):
     """OpenTelemetry infrastructure settings (traces + metrics to files)."""
 
@@ -287,6 +311,7 @@ class Config(BaseSettings):
     )
 
     report: ReportConfig = Field(default_factory=ReportConfig)
+    web: WebConfig = Field(default_factory=WebConfig)
     observability: ObservabilityConfig = Field(
         default_factory=ObservabilityConfig,
         description="Observability (OpenTelemetry + Bugsink) infrastructure settings.",

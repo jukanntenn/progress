@@ -226,3 +226,58 @@ class TestStripGitSuffix:
         assert result == expected, (
             f"Failed for {input_name!r}: got {result!r}, expected {expected!r}"
         )
+
+
+def _report(name, content):
+    """Minimal stand-in for a RepositoryReport with a rendered ``content``."""
+    obj = Mock()
+    obj.repo_name = name
+    obj.content = content
+    return obj
+
+
+class TestCreateReportBatches:
+    """Tests for create_report_batches size-based splitting."""
+
+    def test_empty_returns_no_batches(self):
+        from progress.utils import create_report_batches
+
+        assert create_report_batches([], 1000) == []
+
+    def test_groups_until_effective_limit_then_splits(self):
+        from progress.utils import create_report_batches
+
+        limit = 1000
+        # Two reports that each fit alone but together exceed the 80% limit.
+        reports = [
+            _report("a", "x" * 500),
+            _report("b", "x" * 500),
+        ]
+
+        batches = create_report_batches(reports, limit)
+
+        assert len(batches) == 2
+        assert [b.batch_index for b in batches] == [0, 1]
+        assert batches[0].total_batches == 2
+        # Each batch holds exactly one report.
+        assert [b.reports[0].repo_name for b in batches] == ["a", "b"]
+
+    def test_oversized_report_gets_own_batch(self):
+        from progress.utils import create_report_batches
+
+        # A single report exceeding the effective (80%) limit lands in its own
+        # batch; the caller decides to stub or skip it during upload.
+        reports = [_report("big", "x" * 900)]
+        batches = create_report_batches(reports, 1000)
+
+        assert len(batches) == 1
+        assert batches[0].reports[0].repo_name == "big"
+
+    def test_many_small_reports_pack_into_one_batch(self):
+        from progress.utils import create_report_batches
+
+        reports = [_report(f"r{i}", "x" * 50) for i in range(5)]
+        batches = create_report_batches(reports, 1000)
+
+        assert len(batches) == 1
+        assert len(batches[0].reports) == 5

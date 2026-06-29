@@ -214,6 +214,19 @@ gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
 
 
 # -----------------------------------------------------------------------------
+# Web UI [web]  (optional)
+# -----------------------------------------------------------------------------
+# Public base URL of the Progress WebUI. When a report is too large to publish
+# to MarkPost in full, a short stub linking back to the full report is uploaded
+# instead; this URL is the prefix for those /report/<id> links.
+# Leave unset to disable stubs (oversized reports are then skipped, not stubbed).
+# Example: "https://progress.example.com"
+# Env: PROGRESS_WEB__BASE_URL
+# [web]
+# base_url = "https://progress.example.com"
+
+
+# -----------------------------------------------------------------------------
 # Markpost [markpost]
 # -----------------------------------------------------------------------------
 # Markpost is a markdown publishing service. When configured, reports are
