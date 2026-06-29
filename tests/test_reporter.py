@@ -1,7 +1,9 @@
 """Test MarkdownReporter functionality."""
 
-import pytest
 from zoneinfo import ZoneInfo
+
+import pytest
+
 from progress.contrib.repo.reporter import MarkdownReporter
 from progress.contrib.repo.repository import RepositoryReport
 
@@ -158,3 +160,97 @@ def test_generate_discovered_repos_report_empty(reporter):
 
     assert "# New repositories discovered" in result
     assert "## [" not in result  # No repo sections
+
+
+def _make_release(tag="v1.0.0"):
+    return {
+        "title": tag,
+        "tag_name": tag,
+        "notes": "Release notes for " + tag,
+        "ai_summary": "Summary for " + tag,
+        "ai_detail": "Detail for " + tag,
+    }
+
+
+def _make_report(repo_name, commit_count=0, releases=None, commit_messages=None):
+    return RepositoryReport(
+        repo_name=repo_name,
+        repo_slug=repo_name.replace("/", "-"),
+        repo_web_url="https://github.com/" + repo_name,
+        branch="main",
+        commit_count=commit_count,
+        current_commit="abc123",
+        previous_commit=None,
+        commit_messages=commit_messages or [],
+        analysis_summary="Summary",
+        analysis_detail="Detail",
+        truncated=False,
+        original_diff_length=1000,
+        analyzed_diff_length=800,
+        releases=releases,
+    )
+
+
+def _has_consecutive_separators(markdown):
+    lines = [line.strip() for line in markdown.split("\n")]
+    return any(
+        lines[i] == "---" and lines[i + 1] == "---" for i in range(len(lines) - 1)
+    )
+
+
+def test_repository_report_releases_only_has_no_separator(reporter):
+    report = _make_report("owner/releases-only", releases=[_make_release()])
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "---" not in rendered
+
+
+def test_repository_report_releases_with_commits_keeps_single_inner_separator(reporter):
+    report = _make_report(
+        "owner/both",
+        commit_count=1,
+        commit_messages=["feat: add thing"],
+        releases=[_make_release()],
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert rendered.count("---") == 1
+
+
+def test_aggregated_report_has_no_consecutive_separators(reporter):
+    reports = [
+        _make_report("owner/releases-only", releases=[_make_release()]),
+        _make_report("owner/commits-only", commit_count=1, commit_messages=["feat: x"]),
+        _make_report(
+            "owner/both",
+            commit_count=1,
+            commit_messages=["feat: y"],
+            releases=[_make_release()],
+        ),
+    ]
+
+    result = reporter.generate_aggregated_report(
+        reports,
+        total_commits=2,
+        repo_statuses={r.repo_name: "success" for r in reports},
+    )
+
+    assert not _has_consecutive_separators(result)
+
+
+def test_aggregated_report_separates_each_repo_and_footer(reporter):
+    reports = [
+        _make_report("owner/a", commit_count=1, commit_messages=["feat: a"]),
+        _make_report("owner/b", commit_count=1, commit_messages=["feat: b"]),
+    ]
+
+    result = reporter.generate_aggregated_report(
+        reports,
+        total_commits=2,
+        repo_statuses={r.repo_name: "success" for r in reports},
+    )
+
+    assert not _has_consecutive_separators(result)
+    assert result.count("---") == 2
