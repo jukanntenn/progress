@@ -330,3 +330,35 @@ class TestLanguagePropagation:
 
         prompt = analyzer.analyze.call_args.kwargs["prompt"]
         assert 'language is "en"' in prompt
+
+
+class TestCloneFailure:
+    def test_clone_failure_reports_error_and_reraises(
+        self, db, tmp_path: Path, monkeypatch
+    ):
+        from progress.errors import GitException
+
+        analyzer = _mock_analyzer()
+        tracker = _make_tracker(analyzer, _mock_git(tmp_path, "abc"))
+        tracker._clone_or_update = Mock(side_effect=GitException("exit status 128"))
+
+        reported = []
+        monkeypatch.setattr(
+            "progress.contrib.proposal.tracker.report_error",
+            lambda exc, **tags: reported.append((exc, tags)),
+        )
+
+        with pytest.raises(GitException):
+            tracker.check(ProposalKind.ERC)
+
+        assert len(reported) == 1
+        assert isinstance(reported[0][0], GitException)
+        assert reported[0][1]["kind"] == "erc"
+        assert reported[0][1]["stage"] == "clone"
+
+
+def test_erc_tracker_branch_is_master():
+    """ethereum/ercs default branch is master, not main (clone exit 128 regression)."""
+    from progress.contrib.proposal.types import KIND_CONFIGS
+
+    assert KIND_CONFIGS[ProposalKind.ERC].branch == "master"

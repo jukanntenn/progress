@@ -199,6 +199,35 @@ class TestRepositoryManager:
             assert "Release 1.0.0" in result[0]["ai_detail"]
             assert "Important release notes" in result[0]["ai_detail"]
 
+    def test_release_analysis_failure_reports_error(self, repo_manager):
+        """A swallowed release-analysis failure must still reach Bugsink."""
+        release_data = {
+            "releases": [
+                {
+                    "tag_name": "v1.0.0",
+                    "title": "Release 1.0.0",
+                    "notes": "notes",
+                    "published_at": "2024-01-01T00:00:00Z",
+                    "commit_hash": "abc123",
+                }
+            ]
+        }
+
+        with (
+            patch(
+                "progress.contrib.repo.repository.analyze_releases",
+                side_effect=Exception("AI service unavailable"),
+            ),
+            patch("progress.contrib.repo.repository.report_error") as mock_report,
+        ):
+            repo_manager._analyze_all_releases("test/repo", "main", release_data)
+
+        mock_report.assert_called_once()
+        assert isinstance(mock_report.call_args.args[0], Exception)
+        assert mock_report.call_args.kwargs["release_tag"] == "v1.0.0"
+        assert mock_report.call_args.kwargs["stage"] == "release_analysis"
+        assert mock_report.call_args.kwargs["repo"] == "test/repo"
+
     def test_analyze_all_releases_preserves_original_fields(self, repo_manager):
         """Test that all original release fields are preserved"""
         release_data = {

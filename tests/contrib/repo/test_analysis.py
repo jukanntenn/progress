@@ -150,6 +150,35 @@ class TestAnalyzeDiff:
         assert summary != ""
         assert detail != ""
 
+    def test_failure_reports_error_and_parse_metric(self, monkeypatch):
+        analyzer = _make_analyzer(side_effect=ValueError("bad json"))
+        reported = []
+        counted = []
+        monkeypatch.setattr(
+            "progress.contrib.repo.analysis.report_error",
+            lambda exc, **tags: reported.append((exc, tags)),
+        )
+        monkeypatch.setattr(
+            "progress.contrib.repo.analysis.record_analysis_failure",
+            lambda **kw: counted.append(kw),
+        )
+
+        analyze_diff(
+            analyzer,
+            repo_name="owner/repo",
+            branch="main",
+            diff="diff",
+            commit_messages=["msg"],
+            max_diff_length=10000,
+            language="en",
+        )
+
+        assert len(reported) == 1
+        assert isinstance(reported[0][0], ValueError)
+        assert reported[0][1]["stage"] == "diff_analysis"
+        assert reported[0][1]["repo"] == "owner/repo"
+        assert counted == [{"provider": analyzer.provider, "reason": "parse"}]
+
 
 def _make_release_data():
     return {

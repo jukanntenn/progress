@@ -119,3 +119,61 @@ def test_shutdown_clears_provider_references():
 
     telemetry.setup_observability(ObservabilityConfig(), component="cli")
     assert telemetry.is_enabled() is False
+
+
+def test_report_error_noop_when_disabled(monkeypatch):
+    telemetry._STATE.bugsink_enabled = False
+    called = []
+    monkeypatch.setattr(
+        telemetry.sentry_sdk, "capture_exception", lambda exc=None: called.append(exc)
+    )
+
+    telemetry.report_error(ValueError("boom"), repo="r")
+
+    assert called == []
+
+
+def test_report_error_captures_exception_with_tags(monkeypatch):
+    telemetry._STATE.bugsink_enabled = True
+
+    tags = {}
+
+    class _Scope:
+        def set_tag(self, key, value):
+            tags[key] = value
+
+    class _ScopeCM:
+        def __enter__(self):
+            return _Scope()
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(telemetry.sentry_sdk, "push_scope", lambda: _ScopeCM())
+    captured = []
+    monkeypatch.setattr(
+        telemetry.sentry_sdk, "capture_exception", lambda exc=None: captured.append(exc)
+    )
+
+    exc = ValueError("boom")
+    telemetry.report_error(exc, repo="owner/repo", provider="claude_code")
+
+    assert captured == [exc]
+    assert tags == {"repo": "owner/repo", "provider": "claude_code"}
+
+
+def test_record_analysis_failure_noop_when_disabled():
+    telemetry.record_analysis_failure(provider="claude_code", reason="parse")
+
+
+def test_record_analysis_failure_increments_counter(tmp_path):
+    cfg = ObservabilityConfig(otel=OTelConfig(enabled=True, export_dir=str(tmp_path)))
+    telemetry.setup_observability(cfg, component="cli")
+
+    counter = telemetry._STATE.instruments["analysis_failures"]
+    added = []
+    counter.add = lambda amount, attributes=None: added.append((amount, attributes))
+
+    telemetry.record_analysis_failure(provider="claude_code", reason="parse")
+
+    assert added == [(1, {"provider": "claude_code", "reason": "parse"})]
