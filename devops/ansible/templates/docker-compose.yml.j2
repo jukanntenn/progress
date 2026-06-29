@@ -12,4 +12,8 @@ services:
       - ./codex_auth.json:/root/.codex/auth.json:ro
     environment:
       - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
+      - PROGRESS_OBSERVABILITY__OTEL__ENABLED=true
+      - PROGRESS_OBSERVABILITY__OTEL__EXPORT_DIR=/app/data/telemetry
+      - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
+      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=prod
     restart: always
