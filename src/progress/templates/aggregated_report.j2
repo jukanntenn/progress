@@ -11,9 +11,10 @@
 
 {% for content in rendered_reports %}
 {{ content }}
-{% endfor %}
 
 ---
+
+{% endfor %}
 
 {% if total_batches > 1 and batch_index < total_batches - 1 %}
 

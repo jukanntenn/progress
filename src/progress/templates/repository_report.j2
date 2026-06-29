@@ -24,7 +24,9 @@
 
 {% endfor %}
 
+{% if report.commit_count > 0 %}
 ---
+{% endif %}
 {% endif %}
 {% if report.commit_count > 0 %}
 
@@ -53,5 +55,3 @@
 {{ report.analysis_detail }}
 </details>
 {% endif %}
-
----
