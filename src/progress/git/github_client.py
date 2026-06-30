@@ -1,4 +1,4 @@
-"""GitHub API client using PyGithub"""
+"""GitHub API client using PyGithub."""
 
 import logging
 import os
@@ -12,7 +12,7 @@ from github import (
     UnknownObjectException,
 )
 
-from .errors import GitException
+from ..errors import GitException
 
 logger = logging.getLogger(__name__)
 
@@ -315,3 +315,6 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Failed to get README for {owner}/{repo}: {e}")
             raise GitException(f"Failed to get README for {owner}/{repo}: {e}") from e
+
+
+__all__ = ["GitHubClient"]

@@ -12,13 +12,13 @@ from ...db import UTC
 from ...db.models import Repository
 from ...enums import Protocol
 from ...errors import GitException
-from ...github import (
+from ...git import (
     GitClient,
+    GitHubClient,
     parse_protocol_from_url,
     resolve_repo_url,
     sanitize_repo_name,
 )
-from ...github_client import GitHubClient
 from ...utils import get_now, retry, run_command, sanitize
 
 logger = logging.getLogger(__name__)

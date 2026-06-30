@@ -26,7 +26,7 @@ from .db import (
 )
 from .db.models import Repository
 from .errors import ProgressException
-from .github import GitClient
+from .git import GitClient
 from .i18n import gettext as _
 from .i18n import initialize
 from .log import setup as setup_log

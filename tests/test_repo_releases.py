@@ -9,8 +9,7 @@ import pytest
 from progress.contrib.repo.repo import Repo
 from progress.db.models import Repository
 from progress.errors import GitException
-from progress.github import GitClient
-from progress.github_client import GitHubClient
+from progress.git import GitClient, GitHubClient
 
 
 @pytest.fixture

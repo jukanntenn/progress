@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from progress.contrib.repo.repository import RepositoryManager
-from progress.github import GitClient, resolve_repo_url, sanitize_repo_name
+from progress.git import GitClient, resolve_repo_url, sanitize_repo_name
 
 # ========== Test Cases ==========
 
@@ -243,7 +243,7 @@ def test_git_client_recent_commit_helpers(monkeypatch):
     """Test: GitClient recent commit helper parsing"""
     client = GitClient("/tmp/test_workspace")
 
-    def fake_run_git_command(args, repo_path):
+    def fake_run_git_command(args, repo_path, timeout):
         if args[:3] == ["rev-list", "--count", "HEAD"]:
             return "4\n"
         if args[:2] == ["log", "-3"] and "--format=%H" in args:
@@ -254,7 +254,7 @@ def test_git_client_recent_commit_helpers(monkeypatch):
             return "diff --git a/a b/a\n"
         raise AssertionError(f"Unexpected args: {args}")
 
-    monkeypatch.setattr(client, "_run_git_command", fake_run_git_command)
+    monkeypatch.setattr("progress.git.client._run_git_command", fake_run_git_command)
     repo_path = Path("/tmp/repo")
 
     assert client.get_total_commit_count(repo_path) == 4

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from progress.ai import Analyzer
 from progress.errors import GitException, ProposalParseError
-from progress.github import GitClient, sanitize_repo_name
+from progress.git import GitClient, sanitize_repo_name
 from progress.telemetry import report_error
 from progress.utils import run_command
 

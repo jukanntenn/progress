@@ -6,8 +6,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from progress.github_client import GitHubClient
 from progress.errors import GitException
+from progress.git import GitHubClient
 
 
 def test_github_client_initialization():
@@ -15,7 +15,7 @@ def test_github_client_initialization():
     mock_github = Mock()
     with patch.dict(os.environ, {}, clear=True):
         with patch(
-            "progress.github_client.Github", return_value=mock_github
+            "progress.git.github_client.Github", return_value=mock_github
         ) as mock_ctor:
             GitHubClient(token="test_token", proxy="http://proxy")
             mock_ctor.assert_called_once_with("test_token")
@@ -30,7 +30,7 @@ def test_github_client_initialization_without_proxy():
     mock_github = Mock()
     with patch.dict(os.environ, {}, clear=True):
         with patch(
-            "progress.github_client.Github", return_value=mock_github
+            "progress.git.github_client.Github", return_value=mock_github
         ) as mock_ctor:
             GitHubClient(token="test_token")
             mock_ctor.assert_called_once_with("test_token")

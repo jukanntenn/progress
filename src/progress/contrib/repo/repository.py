@@ -12,8 +12,7 @@ from progress.config import Config
 from progress.consts import WORKSPACE_DIR_DEFAULT
 from progress.db.models import Repository
 from progress.enums import Protocol
-from progress.github import GitClient, normalize_repo_url
-from progress.github_client import GitHubClient
+from progress.git import GitClient, GitHubClient, normalize_repo_url
 from progress.i18n import gettext as _
 from progress.telemetry import get_tracer, record_repo_checked, report_error
 

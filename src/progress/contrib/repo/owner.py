@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from ...github_client import GitHubClient
+from ...git import GitHubClient
 from .models import GitHubOwner
 
 logger = logging.getLogger(__name__)

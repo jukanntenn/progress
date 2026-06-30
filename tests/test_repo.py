@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 from progress.config import Config
 from progress.contrib.repo.repo import Repo
 from progress.db.models import Repository
-from progress.github import GitClient
+from progress.git import GitClient
 
 
 class TestRepo:
