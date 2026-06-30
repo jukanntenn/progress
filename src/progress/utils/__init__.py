@@ -52,7 +52,7 @@ def retry(
                     error_msg = str(e)[:100]
 
                     if is_last_attempt:
-                        logger.error(f"Command failed, max retries ({times}) reached")
+                        logger.warning(f"Command failed, max retries ({times}) reached")
                         raise
 
                     logger.warning(

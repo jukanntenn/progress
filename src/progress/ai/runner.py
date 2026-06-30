@@ -101,11 +101,8 @@ def run_tool(
     except TransientAnalysisError as e:
         failure_reason = "transient"
         logger.error(
-            "AI tool '%s' unavailable after %d attempt(s) (last exit code %s): %s",
-            executable,
-            config.retries,
-            e.returncode,
-            e.stderr_preview,
+            f"AI tool '{executable}' unavailable after {config.retries} "
+            f"attempt(s) (last exit code {e.returncode}): {e.stderr_preview}"
         )
         raise
     except Exception:
