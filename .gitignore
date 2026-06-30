@@ -246,3 +246,4 @@ web/.next/
 
 .local/
 .fa/
+.playwright-cli/
