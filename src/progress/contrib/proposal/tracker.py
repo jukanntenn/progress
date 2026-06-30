@@ -243,7 +243,8 @@ class ProposalTracker:
                     config.repo_url,
                     str(local_dir),
                 ],
-                timeout=self.git.timeout,
+                # Full clone pulls the entire history; allow longer than incremental ops.
+                timeout=self.git.timeout * 2,
                 check=True,
             )
             logger.info("Cloned proposal repo: %s -> %s", config.repo_url, sanitized)
