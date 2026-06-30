@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -75,10 +74,24 @@ class TestAnalysisResultParser:
         with pytest.raises(AnalysisException, match="Could not extract JSON"):
             parser.parse("no json here")
 
-    def test_raises_on_invalid_json(self):
+    def test_raises_on_unparseable_json(self):
         parser = AnalysisResultParser()
-        with pytest.raises(json.JSONDecodeError):
+        with pytest.raises(AnalysisException, match="Could not extract JSON"):
             parser.parse("{invalid json}")
+
+    def test_repairs_truncated_output_missing_brace(self):
+        parser = AnalysisResultParser()
+        output = '{"summary": "batch update", "detail": "24 plugins bumped'
+        summary, detail = parser.parse(output)
+        assert summary == "batch update"
+        assert "24 plugins bumped" in detail
+
+    def test_repairs_truncated_output_unterminated_string(self):
+        parser = AnalysisResultParser()
+        output = '{"summary": "ok", "detail": "some markdown detail without close'
+        summary, detail = parser.parse(output)
+        assert summary == "ok"
+        assert "some markdown detail" in detail
 
 
 def _make_analyzer(return_value=None, side_effect=None):

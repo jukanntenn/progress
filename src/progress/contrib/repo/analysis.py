@@ -3,6 +3,7 @@ import logging
 import re
 from pathlib import Path
 
+import json_repair
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from progress.ai import Analyzer
@@ -24,8 +25,16 @@ _jinja_env = Environment(
 
 class AnalysisResultParser:
     def parse(self, output: str) -> tuple[str, str]:
-        json_str = _extract_json(output)
-        data = json.loads(json_str)
+        try:
+            json_str = _extract_json(output)
+            data = json.loads(json_str)
+        except (AnalysisException, json.JSONDecodeError):
+            data = json_repair.repair_json(output, return_objects=True)
+            if not isinstance(data, dict):
+                raise AnalysisException("Could not extract JSON from Claude output")
+            logger.warning(
+                "Claude output malformed or truncated; recovered via json_repair"
+            )
         summary = data.get("summary", "")
         detail = data.get("detail", "")
         if not summary or not detail:
