@@ -1,549 +1,122 @@
+English | [简体中文](README_zh.md)
+
+<div align="center">
+
 # Progress
 
-[简体中文](./README_zh.md) | English
+**Trace multi-repo code changes, run AI analysis, and deliver progress reports for the open-source projects you follow.**
 
-Progress is a GitHub project tracking tool that traces multi-repo code changes, runs AI analysis, and generates reports to help users track open-source project progress.
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js)](https://nextjs.org/)
+
+</div>
+
+---
 
 ## Features
 
-- **Multi-repo Monitoring** - Monitor multiple GitHub repositories simultaneously and track code changes
-- **Release Tracking** - Automatically track GitHub releases and analyze changes between versions
-- **AI-Powered Analysis** - Use Claude Code CLI to analyze code changes and generate Markdown analysis reports
-- **Proposal Tracking** - Track proposal repositories (EIPs, Rust RFCs, PEPs, Django DEPs) and notify on high-priority events
-- **Changelog Tracking** - Monitor changelog URLs and notify when new versions are detected
-- **Notifications** - Support for Feishu and email notifications to deliver analysis reports timely
-- **Web Service** - Built-in web interface for browsing aggregated reports and RSS feed support
-- **Docker Deployment** - Containerized deployment with Docker, ready to run in as fast as one minute
+- 📊 **Multi-repo Monitoring** — Track commits and releases across many GitHub repositories at once
+- 🤖 **AI-Powered Analysis** — Turn raw diffs into concise Markdown change reports via Claude Code or OpenAI Codex
+- 📝 **Proposal Tracking** — Watch EIP / ERC / PEP / RFC / DEP proposals and notify on status changes
+- 📋 **Changelog Tracking** — Detect new versions from arbitrary changelog URLs
+- 📬 **Notifications** — Deliver reports to Feishu, email, or any webhook
+- 🌐 **Web Dashboard** — Browse aggregated reports, edit live config, and subscribe via RSS
+- 🐳 **Single-Container Deploy** — One Docker image (Caddy + FastAPI + Next.js), ready in a minute
 
-## Requirements
+## How It Works
 
-### Docker Deployment
-
-- [Docker Engine](https://docs.docker.com/engine/install/) required
-
-### Host Machine Deployment
-
-- Python 3.12 or higher
-- [uv package manager](https://github.com/astral-sh/uv) (recommended) or pip
-- [GitHub CLI](https://cli.github.com/) (only required for initial repository clone)
-- [Claude Code CLI](https://claude.com/product/claude-code)
+1. **Clone & diff** — Progress fetches each configured repository and computes the diff since the last run
+2. **Analyze** — The diff is sent to an AI provider (Claude Code or Codex), which produces a human-readable summary
+3. **Publish** — Reports are stored in the database, optionally uploaded to [Markpost](https://github.com/jukanntenn/markpost), and pushed to your notification channels
+4. **Schedule** — A cron expression triggers the whole pipeline on the cadence you choose
 
 ## Quick Start
 
-### Running in Docker
+For the full guide, see [docs/deployment.md](docs/deployment.md).
 
-1. Prepare the configuration file:
+1. Prepare the configuration, AI credentials, and data directory:
 
-```bash
-cp config.example.toml config.toml
-```
+   ```bash
+   cp config.example.toml config.toml
+   cp ~/.claude/settings.json ./claude_settings.json   # Claude Code credentials
+   mkdir -p data
+   ```
 
-Edit the configuration file and fill in the required items (see [Configuration](#configuration) for details).
+2. Edit `config.toml` — at minimum set `github.gh_token` and add a `[[repos]]` entry (see [Configuration](#configuration)).
 
-2. Create a data directory for persistent storage:
+3. Create `docker-compose.yml`:
 
-```bash
-mkdir -p data
-```
+   ```yaml
+   services:
+     progress:
+       image: jukanntenn/progress:latest
+       container_name: progress
+       ports:
+         - "5000:5000"
+       volumes:
+         - ./config.toml:/app/config.toml:ro
+         - ./claude_settings.json:/root/.claude/settings.json:ro
+         - ./data:/app/data
+       environment:
+         - PROGRESS_SCHEDULE_CRON=0 8 * * *   # daily at 08:00
+       restart: always
+   ```
 
-3. Prepare the Claude Code configuration file. Copy your local Claude Code configuration to the project directory:
+4. Start the container, then open the web UI at `http://<your-host>:5000`:
 
-```bash
-cp ~/.claude/settings.json ./claude_settings.json
-```
+   ```bash
+   docker compose up -d
+   docker compose logs -f
+   ```
 
-Minimal `claude_settings.json` example:
-
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "xxxxxxxx",
-    "API_TIMEOUT_MS": "3000000",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-  },
-  "alwaysThinkingEnabled": true
-}
-```
-
-4. Start the container using Docker Compose (recommended).
-
-Create a `docker-compose.yml` file:
-
-```yaml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * * # Run daily at 8:00 AM
-    restart: always
-```
-
-Start the container:
-
-```bash
-docker-compose up -d
-```
-
-5. Or run directly with Docker command:
-
-```bash
-docker run --rm \
-  -v $(pwd)/config.toml:/app/config.toml:ro \
-  -v $(pwd)/claude_settings.json:/root/.claude/settings.json:ro \
-  -v $(pwd)/data:/app/data \
-  jukanntenn/progress:latest
-```
-
-6. View container logs to confirm the program is running properly:
-
-```bash
-docker-compose logs -f
-```
-
-Or using Docker command:
-
-```bash
-docker logs -f progress
-```
-
-7. Verify the scheduled task configuration is correct by checking container logs to ensure the program runs as expected.
-
-### Running on Host Machine
-
-1. Clone the project to local:
-
-```bash
-git clone https://github.com/your-username/progress.git
-cd progress
-```
-
-2. Install Python dependencies:
-
-Using uv (recommended):
-
-```bash
-uv sync
-```
-
-Or using pip:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Create configuration file:
-
-```bash
-cp config.example.toml config.toml
-```
-
-4. Edit the configuration file and fill in the required items (see [Configuration](#configuration) for details):
-
-```bash
-vim config.toml
-```
-
-Ensure Claude Code CLI is installed and configured properly so the program can invoke it.
-
-5. Run the program:
-
-```bash
-uv run progress -c config.toml
-```
-
-Or using pip installation:
-
-```bash
-python -m progress.cli -c config.toml
-```
-
-On first run, the program will automatically clone configured repositories to the local data directory, detect code changes, generate diffs, perform AI analysis, generate reports, and push them via configured notification methods.
-
-6. For continuous tracking, run the program regularly. See [Scheduled Task Configuration](#scheduled-task-configuration).
+   When `PROGRESS_SCHEDULE_CRON` is set, Progress runs the pipeline once on startup and then on the given cron schedule. Leave it unset to drive runs manually with `docker compose exec progress progress check`.
 
 ## Configuration
 
-Application configuration lives in the **database**. The `config.toml` file is a
-one-time **seed** (plus the provider of infrastructure settings like `data_dir`
-and the schedule): on first run it seeds the database, after which the database
-is the source of truth. Copy `config.example.toml` to `config.toml` as a starting
-template.
+Application configuration lives in the **database**. `config.toml` is a one-time **seed** plus the provider of infrastructure settings (`data_dir`, db path, schedule). After the first run, the database is the source of truth — edit ongoing settings through the **web UI** (`/config` page) or the API, and run `progress config import` to re-seed from the file.
 
-- **Edit ongoing configuration via the web UI** (the *Configuration* page, plus
-  *Repositories* / *Owners* sections) or the API.
-- **Move config between file and DB** with `progress config import` (file → DB)
-  and `progress config export` (DB → file).
-- The TOML examples below document every option and double as the seed-file
-  contents for a first deploy.
-
-See [guides/config.md](guides/config.md) for the full model.
-
-### Configuration Priority
-
-- **Infrastructure** (`data_dir`, `workspace_dir`, db path, schedule): resolved
-  every startup as **Environment Variables > config file > defaults**.
-- **Application config**: the **database** is the single source of truth. Env
-  vars for app keys are captured at seed time only; to re-import from the file,
-  run `progress config import`.
-
-### Configuration File (seed + infrastructure)
-
-#### Basic Configuration Structure
+See [guides/config.md](guides/config.md) for the full model. A minimal seed:
 
 ```toml
-# Timezone configuration (optional, default: UTC)
-timezone = "UTC"
-
-# Application language (optional, default: en)
-# Controls the language of user interface text
 language = "en"
 
-[markpost]
-# Markpost publish URL (required)
-url = "https://markpost.example.com/p/your-post-key"
-# HTTP request timeout (seconds, default: 30)
-timeout = 30
-# Maximum batch size for uploads (bytes, default: 1048576)
-# Reports larger than this will be split into multiple batches
-max_batch_size = 1048576
-
-[notification]
-
-[[notification.channels]]
-type = "feishu"
-enabled = true
-# Feishu webhook URL (required)
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-# HTTP request timeout (seconds, default: 30)
-timeout = 30
-
-[[notification.channels]]
-type = "email"
-enabled = false
-# Email notification configuration
-host = "smtp.example.com"
-port = 587
-user = "user@example.com"
-password = "password"
-from_addr = "progress@example.com"  # Sender address (default: progress@example.com)
-recipient = ["recipient@example.com"]  # Recipient list
-starttls = false  # STARTTLS (default: false)
-ssl = false  # SSL (default: false)
-
 [github]
-# GitHub CLI token (required)
-gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
-# Global protocol configuration (optional, default: https)
-protocol = "https"
-# Global proxy configuration (optional)
-# Supports HTTP/HTTPS/SOCKS5 proxies, for example:
-# proxy = "http://127.0.0.1:7890"
-# proxy = "socks5://127.0.0.1:1080"
-proxy = ""
-# Git command timeout (seconds, default: 300)
-git_timeout = 300
-# GitHub CLI command timeout (seconds, default: 300)
-gh_timeout = 300
+gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"   # required
 
 [analysis]
-# Maximum diff length (characters, default: 100000)
-max_diff_length = 100000
-# Concurrency level (optional, default: 1 for serial execution)
-concurrency = 1
-# Claude Code analysis timeout (seconds, default: 600)
-timeout = 600
-# AI analysis output language (optional, default: en)
-# Supports any language code (e.g., zh, en, ja, ko, fr, de, es, pt, ru, ar, etc.)
-# This is independent from the top-level language setting
-language = "zh"
+provider = "claude_code"                # "claude_code" | "codex" | "truncate"
 
-# Repository configuration (at least one required)
 [[repos]]
-# GitHub repository format: owner/repo (recommended format, concise and clear)
-url = "vitejs/vite"
-# Monitored branch (optional, default: main)
-branch = "main"
-# Whether enabled (optional, default: true)
-enabled = true
-# Repository-level protocol configuration (optional, overrides global configuration)
-# Default: https
-# protocol = "ssh"
+url = "vitejs/vite"                     # "owner/repo", HTTPS, or SSH URL
 
 [[repos]]
 url = "facebook/react"
-# Branch not specified, defaults to main
-
-[[repos]]
-# Supports full HTTPS URL format
-url = "https://github.com/vitejs/vite.git"
-
-[[repos]]
-# Supports SSH URL format (for scenarios with SSH key configured)
-url = "git@github.com:vitejs/vite.git"
-
-[[repos]]
-url = "vue/core"
-# Repository-level protocol configuration, overrides global configuration
-protocol = "ssh"
-
-[[repos]]
-url = "mycompany/private-repo"
-branch = "develop"
-enabled = false  # Temporarily disabled
-
-# Owner monitoring configuration (optional)
-[[owners]]
-type = "organization"  # "user" or "organization"
-name = "bytedance"
-enabled = true
-
-[[owners]]
-type = "user"
-name = "torvalds"
-enabled = true
 ```
 
-#### Configuration Item Description
-
-**Required Configuration Items:**
-
-- `markpost.url` - Markpost publish URL (get it from [Markpost](https://markpost.cc/))
-- `notification.feishu.webhook_url` - Feishu webhook URL (see [Custom Bot Usage Guide](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot))
-- `github.gh_token` - GitHub CLI token (see [Managing Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens))
-- `repos` - At least one repository must be configured
-
-**Optional Configuration Items:**
-
-- `timezone` - Timezone configuration, default UTC
-- `language` - Application language, default en
-- `markpost.timeout` - Markpost HTTP request timeout, default 30 seconds
-- `markpost.max_batch_size` - Maximum batch size for uploads in bytes, default 1048576 (1MB). Reports larger than this will be split into multiple batches for uploading
-- `notification.feishu.timeout` - Feishu HTTP request timeout, default 30 seconds
-- `notification.email.*` - Email notification configuration (entire section optional)
-- `github.protocol` - Git protocol, default https
-- `github.proxy` - Proxy configuration, default empty
-- `github.git_timeout` - Git command timeout, default 300 seconds
-- `github.gh_timeout` - GitHub CLI command timeout, default 300 seconds
-- `analysis.max_diff_length` - Maximum diff length, default 100000 characters
-- `analysis.concurrency` - Concurrent analysis count, default 1
-- `analysis.timeout` - Analysis timeout, default 600 seconds
-- `analysis.language` - AI analysis output language, default en
-- `repos[].branch` - Repository branch, default main
-- `repos[].enabled` - Whether enabled, default true
-- `repos[].protocol` - Repository-level protocol configuration, default https
-- `owners` - Owner monitoring configuration (optional)
-- `owners[].type` - Owner type, "user" or "organization"
-- `owners[].name` - Owner name (cannot be empty)
-- `owners[].enabled` - Whether enabled, default true
-
-### Environment Variables
-
-You can use environment variables to override any configuration value using the `PROGRESS__` prefix.
-
-#### Naming Convention
-
-Format: `PROGRESS__<SECTION>__<KEY>`
-
-- `PROGRESS__` is a fixed prefix
-- `<SECTION>` is the configuration section name
-- `<KEY>` is the configuration item name
-- Use double underscore `__` to separate nested levels
-
-#### Environment Variable Examples
+Override any value through environment variables using the `PROGRESS_` prefix (nested keys separated by `__`):
 
 ```bash
-# Override GitHub token
-export PROGRESS__GITHUB__GH_TOKEN="ghp_your_token_here"
-
-# Override Feishu webhook URL
-export PROGRESS__NOTIFICATION__FEISHU__WEBHOOK_URL="https://open.feishu.cn/..."
-
-# Override Markpost URL
-export PROGRESS__MARKPOST__URL="https://markpost.cc/your-post-key"
-
-# Override proxy configuration
-export PROGRESS__GITHUB__PROXY="http://127.0.0.1:7890"
-
-# Override analysis language
-export PROGRESS__ANALYSIS__LANGUAGE="en"
-
-# Override timezone
-export PROGRESS__TIMEZONE="Asia/Shanghai"
-```
-
-#### Using Environment Variables in Docker Deployment
-
-When deploying with Docker, it's especially convenient to configure sensitive information through environment variables:
-
-```yaml
-# docker-compose.yml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    environment:
-      # Override sensitive configuration via environment variables
-      - PROGRESS__GITHUB__GH_TOKEN=${GH_TOKEN}
-      - PROGRESS__NOTIFICATION__FEISHU__WEBHOOK_URL=${FEISHU_WEBHOOK}
-      - PROGRESS__MARKPOST__URL=${MARKPOST_URL}
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
-```
-
-Use with `.env` file:
-
-```bash
-# .env
-GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
-MARKPOST_URL=https://markpost.cc/your-post-key
-```
-
-### Minimal Configuration Example
-
-A minimal `config.toml` with only required configuration items:
-
-```toml
-[markpost]
-url = "https://markpost.cc/your-post-key"
-
-[notification.feishu]
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-
-[github]
-gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
-
-[[repos]]
-url = "vitejs/vite"
-```
-
-All other configuration items will use default values.
-
-## Scheduled Task Configuration
-
-### Host Machine Scheduled Tasks
-
-When running on the host machine, you need to use the system's built-in scheduling tool to configure scheduled tasks. Crontab example:
-
-Edit crontab:
-
-```bash
-crontab -e
-```
-
-Add scheduled task configuration:
-
-```bash
-# Run every day at 8:00 AM
-0 8 * * * cd /path/to/progress && uv run progress -c config.toml
-```
-
-Crontab time format explanation:
-
-```text
-┌───────────── Minute (0 - 59)
-│ ┌───────────── Hour (0 - 23)
-│ │ ┌───────────── Day of month (1 - 31)
-│ │ │ ┌───────────── Month (1 - 12)
-│ │ │ │ ┌───────────── Day of week (0 - 7, Sunday is 0 or 7)
-│ │ │ │ │
-* * * * *
-```
-
-### Docker Scheduled Tasks
-
-When running in a Docker container, configure scheduled tasks through environment variables.
-
-Edit `docker-compose.yml` and add the `PROGRESS_SCHEDULE_CRON` environment variable:
-
-```yaml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    environment:
-      # Configure scheduled task (runs daily at 8:00 AM)
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
-```
-
-After configuration is complete, restart the container for the changes to take effect:
-
-```bash
-docker-compose down
-docker-compose up -d
+PROGRESS_TIMEZONE="Asia/Shanghai"
+PROGRESS_GITHUB__GH_TOKEN="ghp_xxx"
+PROGRESS_ANALYSIS__PROVIDER="codex"
+PROGRESS_DATA_DIR="/app/data"
 ```
 
 ## Web Service
 
-Progress includes a web service that allows you to browse aggregated reports and subscribe via RSS.
+The container exposes a web UI and JSON API on port `5000`:
 
-### Accessing the Web Interface
+| Path                  | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `/`                   | Aggregated report browser (paginated)            |
+| `/report/<id>`        | Full content of a single report                  |
+| `/config`             | Live configuration editor (writes to the DB)     |
+| `/api/v1/reports`     | Report list and detail (JSON)                    |
+| `/api/v1/rss`         | RSS feed of the latest reports                   |
+| `/api/v1/config`      | Read / write the live configuration (JSON)       |
 
-The web service runs automatically in the Docker container. You can access:
+## Development
 
-- **Report List**: `http://your-host:5000/` - Browse all aggregated reports with pagination (50 reports per page)
-- **Report Detail**: `http://your-host:5000/report/<id>` - View full content of a specific report
-- **RSS Feed**: `http://your-host:5000/api/v1/rss` - Subscribe to RSS feed for the latest reports
-
-### Docker Compose Configuration
-
-```yaml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    ports:
-      - "5000:5000"
-    environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
-```
-
-### Using RSS
-
-You can subscribe to the RSS feed using any RSS reader:
-
-1. Copy the RSS URL: `http://your-host:5000/api/v1/rss`
-2. Add it to your favorite RSS reader (e.g., Feedly, Inoreader, NetNewsWire)
-3. Receive updates when new aggregated reports are generated
-
-The RSS feed includes the 50 most recent reports.
-
-## Development Server
-
-For local development, run the backend and frontend separately:
-
-```bash
-# Terminal 1: Backend (FastAPI with hot reload)
-PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev
-
-# Terminal 2: Frontend (Next.js with Turbopack)
-cd web && pnpm dev
-```
-
-Or use the development environment manager:
-
-```bash
-python devops/dev.py start   # Start all services
-python devops/dev.py stop    # Stop all services
-```
-
+See [docs/development.md](docs/development.md).
