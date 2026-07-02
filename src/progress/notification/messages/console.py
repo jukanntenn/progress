@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
+from collections.abc import Mapping
 
 from ...i18n import gettext as _
 from ..channels.console import ConsoleChannel

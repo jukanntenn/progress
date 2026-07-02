@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from html import escape
 from pathlib import Path
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
+from collections.abc import Mapping
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 

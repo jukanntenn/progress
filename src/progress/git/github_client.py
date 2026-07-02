@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class GitHubClient:
     """GitHub API client using PyGithub."""
 
-    def __init__(self, token: Optional[str] = None, proxy: Optional[str] = None):
+    def __init__(self, token: str | None = None, proxy: str | None = None):
         """Initialize GitHub client.
 
         Args:
@@ -283,7 +283,7 @@ class GitHubClient:
                 f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}"
             ) from e
 
-    def get_readme(self, owner: str, repo: str) -> Optional[str]:
+    def get_readme(self, owner: str, repo: str) -> str | None:
         """Get README content.
 
         Args:

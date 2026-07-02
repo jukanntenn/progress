@@ -93,7 +93,7 @@ class MarkpostClient:
             args, kwargs, error, attempt
         ),
     )
-    def upload(self, content: str, title: Optional[str] = None) -> str:
+    def upload(self, content: str, title: str | None = None) -> str:
         """Upload content to Markpost and return the published URL.
 
         Args:
@@ -137,7 +137,7 @@ class MarkpostClient:
     def upload_batch(
         self,
         content: str,
-        title: Optional[str] = None,
+        title: str | None = None,
         batch_index: int = 0,
         total_batches: int = 1,
     ) -> str:

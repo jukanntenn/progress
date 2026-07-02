@@ -5,7 +5,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import NamedTuple
+from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
 from progress.ai import Analyzer

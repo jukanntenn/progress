@@ -308,7 +308,7 @@ class Repo:
             self.model.last_release_check_time = get_now(UTC)
             self.model.save()
 
-    def check_releases(self) -> Optional[dict]:
+    def check_releases(self) -> dict | None:
         """Check for new GitHub releases.
 
         Returns:
@@ -399,7 +399,7 @@ class Repo:
         return {"releases": new_releases, "is_first_check": is_first_check}
 
     def get_commit_messages(
-        self, old_commit: Optional[str], new_commit: str
+        self, old_commit: str | None, new_commit: str
     ) -> list[str]:
         """Get commit messages between two commits.
 
@@ -451,7 +451,7 @@ class Repo:
 
         self._run_command(cmd)
 
-    def _prepare_env(self, cmd: list[str]) -> Optional[Dict[str, str]]:
+    def _prepare_env(self, cmd: list[str]) -> dict[str, str] | None:
         """Prepare environment variables for gh command.
 
         Args:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from typing import Literal
+from collections.abc import Mapping
 
 NotificationType = Literal["repo_update", "changelog", "proposal", "discovered_repos"]
 

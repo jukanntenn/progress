@@ -39,7 +39,7 @@ def _handle_git_retry(args: tuple, kwargs: dict, error: Exception, attempt: int)
         args, kwargs, error, attempt
     ),
 )
-def _run_git_command(args: List[str], repo_path: Path, timeout: int) -> str:
+def _run_git_command(args: list[str], repo_path: Path, timeout: int) -> str:
     """Run Git command and return output.
 
     Args:
@@ -98,7 +98,7 @@ class GitClient:
         repo = git.Repo(str(repo_path))
         return repo.head.commit.hexsha
 
-    def get_previous_commit(self, repo_path: Path) -> Optional[str]:
+    def get_previous_commit(self, repo_path: Path) -> str | None:
         """Get second latest commit hash (HEAD^1).
 
         Returns:
@@ -111,7 +111,7 @@ class GitClient:
             return None
 
     def get_commit_diff(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+        self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> str:
         """Get diff between two commits.
 
@@ -144,7 +144,7 @@ class GitClient:
         )
 
     def get_changed_files(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+        self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> list[str]:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
         result = _run_git_command(
@@ -153,7 +153,7 @@ class GitClient:
         return [line.strip() for line in result.splitlines() if line.strip()]
 
     def get_changed_file_statuses(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+        self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> list[tuple[str, str]]:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
         result = _run_git_command(
@@ -173,7 +173,7 @@ class GitClient:
     def get_file_diff(
         self,
         repo_path: Path,
-        old_commit: Optional[str],
+        old_commit: str | None,
         new_commit: str,
         file_path: str,
     ) -> str:
@@ -182,7 +182,7 @@ class GitClient:
             ["diff", commit_range, "--", file_path], repo_path, self.timeout
         )
 
-    def get_file_creation_date(self, repo_path: Path, file_path: str) -> Optional[str]:
+    def get_file_creation_date(self, repo_path: Path, file_path: str) -> str | None:
         try:
             result = _run_git_command(
                 [
@@ -201,8 +201,8 @@ class GitClient:
             return None
 
     def get_commit_messages(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
-    ) -> List[str]:
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> list[str]:
         """Get list of commit messages (full messages including body)."""
         repo = git.Repo(str(repo_path))
         if old_commit:
@@ -215,7 +215,7 @@ class GitClient:
         return messages
 
     def get_commit_count(
-        self, repo_path: Path, old_commit: Optional[str], new_commit: str
+        self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> int:
         """Get commit count."""
         if not old_commit:
@@ -225,7 +225,7 @@ class GitClient:
         new = repo.commit(new_commit)
         return sum(1 for _ in repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
 
-    def get_nth_commit_from_head(self, repo_path: Path, n: int) -> Optional[str]:
+    def get_nth_commit_from_head(self, repo_path: Path, n: int) -> str | None:
         """Get nth commit hash from HEAD (0-indexed).
 
         Args:
@@ -260,7 +260,7 @@ class GitClient:
         )
         return [line.strip() for line in result.splitlines() if line.strip()]
 
-    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> List[str]:
+    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> list[str]:
         """Get recent commit messages (full messages including body)."""
         result = _run_git_command(
             ["log", f"-{max_count}", "--pretty=format:%B%n%x00"],

@@ -142,7 +142,7 @@ def _before_send(event: dict, _hint: dict) -> dict:
 
 
 def _setup_otel(
-    cfg: "ObservabilityConfig", *, component: str, environment: str
+    cfg: ObservabilityConfig, *, component: str, environment: str
 ) -> None:
     otel = cfg.otel
     if not otel.enabled:
@@ -235,7 +235,7 @@ def _register_business_metrics() -> None:
     )
 
 
-def _setup_bugsink(cfg: "ObservabilityConfig", *, component: str) -> None:
+def _setup_bugsink(cfg: ObservabilityConfig, *, component: str) -> None:
     dsn = cfg.bugsink.dsn
     if not dsn:
         return
@@ -258,7 +258,7 @@ def _setup_bugsink(cfg: "ObservabilityConfig", *, component: str) -> None:
         logger.warning("Bugsink initialization failed: %s", e)
 
 
-def setup_observability(cfg: "ObservabilityConfig", *, component: str) -> None:
+def setup_observability(cfg: ObservabilityConfig, *, component: str) -> None:
     """Configure OTel (traces/metrics to files) and Bugsink error reporting.
 
     Safe to call once per process; a second call is a no-op. When neither

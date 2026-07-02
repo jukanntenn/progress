@@ -83,7 +83,7 @@ def test_fetch_decodes_utf8_when_response_encoding_is_latin1(monkeypatch):
             return None
 
     def fake_get(*args, **kwargs):
-        payload = "uTools v7.5.1 【优化】主搜索框 UI 优化".encode("utf-8")
+        payload = "uTools v7.5.1 【优化】主搜索框 UI 优化".encode()
         return FakeResponse(payload)
 
     monkeypatch.setattr(cp.requests, "get", fake_get)

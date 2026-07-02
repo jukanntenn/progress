@@ -54,7 +54,7 @@ class EmailChannelConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_email_config(self) -> "EmailChannelConfig":
+    def validate_email_config(self) -> EmailChannelConfig:
         if not self.enabled:
             return self
 

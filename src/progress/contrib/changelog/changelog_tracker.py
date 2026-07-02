@@ -52,7 +52,7 @@ class ChangelogTrackerManager:
         self._cfg = cfg
 
     @classmethod
-    def from_config(cls, cfg: Config) -> "ChangelogTrackerManager":
+    def from_config(cls, cfg: Config) -> ChangelogTrackerManager:
         return cls(cfg=cfg)
 
     def sync(self, trackers: list[ChangelogTrackerConfig]) -> dict[str, int]:

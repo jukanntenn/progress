@@ -320,16 +320,16 @@ class Config(BaseSettings):
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
     github: GitHubConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
-    repos: List[RepositoryConfig] = Field(
+    repos: list[RepositoryConfig] = Field(
         default_factory=list, description="Repositories to track."
     )
-    owners: List[OwnerConfig] = Field(
+    owners: list[OwnerConfig] = Field(
         default_factory=list, description="GitHub owners to monitor for new repos."
     )
-    proposal_trackers: List[ProposalTrackerKind] = Field(
+    proposal_trackers: list[ProposalTrackerKind] = Field(
         default_factory=list, description="Proposal kinds to track."
     )
-    changelog_trackers: List[ChangelogTrackerConfig] = Field(
+    changelog_trackers: list[ChangelogTrackerConfig] = Field(
         default_factory=list, description="Changelog trackers."
     )
 

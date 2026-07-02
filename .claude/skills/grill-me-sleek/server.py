@@ -304,7 +304,7 @@ class _ContentWatcher:
         self._known = set()
         self._stop = threading.Event()
         try:
-            self._known = set(f for f in os.listdir(CONTENT_DIR) if f.endswith(".json"))
+            self._known = {f for f in os.listdir(CONTENT_DIR) if f.endswith(".json")}
         except FileNotFoundError:
             pass
 
@@ -321,7 +321,7 @@ class _ContentWatcher:
 
     def _poll(self):
         try:
-            cur = set(f for f in os.listdir(CONTENT_DIR) if f.endswith(".json"))
+            cur = {f for f in os.listdir(CONTENT_DIR) if f.endswith(".json")}
         except FileNotFoundError:
             return
         new = cur - self._known

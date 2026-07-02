@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional, Tuple, Type
+from typing import Dict, List, Literal, Optional, Tuple, Type
+from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,9 @@ def retry(
     times: int,
     initial_delay: int = 1,
     backoff: BackoffStrategy = "exponential",
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
-    on_retry: Optional[Callable[[tuple, dict, Exception, int], None]] = None,
-    max_delay: Optional[int] = None,
+    exceptions: tuple[type[Exception], ...] = (Exception,),
+    on_retry: Callable[[tuple, dict, Exception, int], None] | None = None,
+    max_delay: int | None = None,
 ):
     def decorator(func):
         @wraps(func)
@@ -160,12 +161,12 @@ def format_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
 
 
 def run_command(
-    cmd: List[str],
-    cwd: Optional[Path] = None,
-    timeout: Optional[float] = None,
+    cmd: list[str],
+    cwd: Path | None = None,
+    timeout: float | None = None,
     check: bool = True,
-    input: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
+    input: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> str:
     """Run subprocess command and return stdout.
 

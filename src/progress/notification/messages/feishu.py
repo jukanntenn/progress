@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Mapping, NamedTuple
+from typing import Any, NamedTuple
+from collections.abc import Mapping
 
 from ...i18n import gettext as _
 from ..channels.feishu import FeishuChannel
