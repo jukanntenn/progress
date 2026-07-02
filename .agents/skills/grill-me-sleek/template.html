@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>grill-me-sleek</title>
+<style>
+/* ── Design System Tokens (DESIGN.md) ─────── */
+:root{
+  /* Surface */
+  --c-canvas:#fff;
+  --c-surface:#f5f5f5;
+  --c-hairline:rgba(0,0,0,.10);
+  --c-hairline-soft:rgba(0,0,0,.06);
+  /* Text */
+  --c-ink:#1a1a1a;
+  --c-charcoal:#333;
+  --c-slate:#666;
+  --c-steel:#999;
+  --c-stone:#aaa;
+  --c-muted:#bbb;
+  /* Primary */
+  --c-primary:#1a1a1a;
+  --c-on-primary:#fff;
+  /* Brand */
+  --c-brand-coral:#e85d4a;
+  --c-brand-blue-200:#e0ecfc;
+  --c-brand-blue-deep:#1a56db;
+  /* Component-scoped */
+  --c-opt-bg:var(--c-primary);
+  --c-opt-text:var(--c-on-primary);
+  --c-card-bg:var(--c-canvas);
+  --c-card-bc:var(--c-hairline);
+  --shadow-card:none;
+  /* Radius */
+  --r-md:8px;
+  --r-lg:12px;
+  --r-xl:16px;
+  --r-full:9999px;
+  /* Transition */
+  --tr:150ms ease;
+  /* Font */
+  --font:'DM Sans','Inter','Helvetica Neue',Helvetica,Arial,sans-serif;
+}
+[data-theme=dark]{
+  --c-canvas:#111;
+  --c-surface:#1a1a1a;
+  --c-hairline:rgba(255,255,255,.10);
+  --c-hairline-soft:rgba(255,255,255,.06);
+  --c-ink:#e5e5e5;
+  --c-charcoal:#ccc;
+  --c-slate:#aaa;
+  --c-steel:#888;
+  --c-stone:#666;
+  --c-muted:#555;
+  --c-primary:#e5e5e5;
+  --c-on-primary:#111;
+  --c-opt-bg:var(--c-brand-coral);
+  --c-opt-text:#fff;
+  --c-card-bg:var(--c-surface);
+  --c-card-bc:transparent;
+  --shadow-card:0 0 22px 0 rgba(255,255,255,.04);
+}
+
+/* ── Reset ─────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--font);
+  background:var(--c-canvas);color:var(--c-ink);
+  font-size:16px;line-height:1.5;
+  transition:background var(--tr),color var(--tr);
+}
+a{color:inherit}
+
+/* ── Layout ────────────────────────────────── */
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px}
+
+/* ── Header — heading-lg + subtitle ───────── */
+.hdr{padding-bottom:16px;border-bottom:1px solid var(--c-hairline);margin-bottom:20px}
+.hdr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.hdr-text{flex:1;min-width:0}
+.hdr-text h1{
+  /* heading-md: 32px/600/1.25/-0.5px */
+  font-size:32px;font-weight:600;line-height:1.25;letter-spacing:-0.5px;
+  margin-bottom:4px;
+}
+.hdr-text p{
+  /* body-md: 16px/500/1.50 */
+  font-size:16px;font-weight:500;line-height:1.5;color:var(--c-slate);
+}
+.hdr-controls{display:flex;align-items:center;gap:8px;flex-shrink:0;padding-top:10px}
+
+/* ── Language Selector — pill-tab ──────────── */
+.lang-group{display:flex;border:1px solid var(--c-hairline);border-radius:var(--r-full);overflow:hidden}
+.lang-pill{
+  border:none;background:transparent;
+  /* body-sm-medium: 14px/500 */
+  font-family:var(--font);font-size:13px;font-weight:500;
+  color:var(--c-steel);padding:5px 10px;cursor:pointer;
+  transition:background var(--tr),color var(--tr);
+}
+.lang-pill:hover{color:var(--c-ink)}
+/* pill-tab-active */
+.lang-pill.active{background:var(--c-primary);color:var(--c-on-primary);font-weight:600}
+
+/* ── Theme Toggle — button-icon-circular ───── */
+.theme-btn{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  border:1px solid var(--c-hairline);background:var(--c-canvas);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--c-ink);
+  transition:background var(--tr),color var(--tr),border-color var(--tr);
+}
+.theme-btn:hover{border-color:var(--c-steel)}
+.theme-btn svg{width:18px;height:18px}
+.theme-btn .icon-moon,.theme-btn .icon-monitor{display:none}
+.theme-btn[data-mode=dark] .icon-sun{display:none}
+.theme-btn[data-mode=dark] .icon-moon{display:block}
+.theme-btn[data-mode=system] .icon-sun{display:none}
+.theme-btn[data-mode=system] .icon-monitor{display:block}
+
+/* ── Question Cards — card-base ────────────── */
+.q-card{
+  background:transparent;
+  border:none;
+  border-radius:0;
+  padding:12px 0;
+  margin-bottom:0;
+  box-shadow:none;
+  border-bottom:1px solid var(--c-hairline-soft);
+  transition:background var(--tr),border-color var(--tr);
+}
+.q-card:last-of-type{border-bottom:none}
+.q-text{font-size:15px;font-weight:600;line-height:1.4;margin-bottom:8px}
+
+/* ── Options — pill-tab style ──────────────── */
+.opts{display:flex;flex-direction:column;gap:0;margin-bottom:4px}
+.opt{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:4px 12px;
+  border:none;border-radius:var(--r-md);
+  cursor:pointer;background:transparent;
+  /* body-sm: 14px/400/1.40 */
+  font-family:var(--font);font-size:14px;line-height:1.4;
+  color:var(--c-slate);
+  transition:color var(--tr);
+}
+.opt:hover{color:var(--c-ink)}
+.opt input[type=radio]{
+  appearance:none;-webkit-appearance:none;
+  margin-top:5px;flex-shrink:0;
+  width:12px;height:12px;
+  border:1.5px solid var(--c-steel);border-radius:50%;
+  background:transparent;position:relative;cursor:pointer;
+  transition:border-color var(--tr);
+}
+.opt input[type=radio]:checked{border-color:var(--c-ink)}
+.opt input[type=radio]:checked::after{
+  content:'';position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  width:5px;height:5px;border-radius:50%;background:var(--c-ink);
+}
+.opt input[type=checkbox]{
+  appearance:none;-webkit-appearance:none;
+  margin-top:5px;flex-shrink:0;
+  width:14px;height:14px;
+  border:1.5px solid var(--c-steel);border-radius:3px;
+  background:transparent;position:relative;cursor:pointer;
+  transition:border-color var(--tr),background var(--tr);
+}
+.opt input[type=checkbox]:checked{border-color:var(--c-ink);background:var(--c-ink)}
+.opt input[type=checkbox]:checked::after{
+  content:'';position:absolute;
+  top:2px;left:4px;
+  width:4px;height:7px;
+  border:solid var(--c-on-primary);border-width:0 1.5px 1.5px 0;
+  transform:rotate(45deg);
+}
+/* pill-tab-active state */
+.opt.sel{background:transparent;color:var(--c-ink)}
+.opt-text{flex:1;word-break:break-word}
+
+/* ── Badge — badge-beta ────────────────────── */
+.rec-text{
+  font-size:13px;font-weight:600;color:var(--c-brand-coral);
+  margin-left:4px;
+}
+
+/* ── Explanation — caption ─────────────────── */
+.expl{
+  font-size:13px;line-height:1.6;color:var(--c-steel);
+  margin-left:24px;margin-top:2px;
+}
+
+/* ── Custom Input — text-input ─────────────── */
+.custom-input{
+  margin:6px 0 0 24px;width:calc(100% - 24px);
+  padding:8px 12px;
+  background:var(--c-surface);border:1px solid var(--c-hairline);
+  border-radius:var(--r-md);
+  font-family:var(--font);font-size:14px;color:var(--c-ink);
+  outline:none;
+  transition:background var(--tr),border-color var(--tr),color var(--tr);
+}
+.custom-input:focus{border-width:2px;border-color:var(--c-brand-blue-deep);background:var(--c-canvas);padding:7px 11px}
+.custom-input.hidden{display:none}
+
+/* ── Notes — card-base + text-input ────────── */
+.notes-card{
+  margin-top:20px;
+  background:transparent;border:none;
+  border-radius:0;padding:16px 0;
+  box-shadow:none;
+  border-top:1px solid var(--c-hairline-soft);
+  transition:background var(--tr),border-color var(--tr);
+}
+/* body-sm-medium: 14px/500 */
+.notes-card label{display:block;font-size:14px;font-weight:500;margin-bottom:8px}
+.notes-card textarea{
+  width:100%;min-height:80px;max-height:240px;
+  padding:10px 16px;
+  background:var(--c-surface);border:1px solid var(--c-hairline);
+  border-radius:var(--r-md);
+  font-family:var(--font);font-size:14px;color:var(--c-ink);
+  resize:vertical;outline:none;
+  transition:background var(--tr),border-color var(--tr),color var(--tr);
+}
+.notes-card textarea:focus{border-width:2px;border-color:var(--c-brand-blue-deep);background:var(--c-canvas);padding:9px 15px}
+
+/* ── Submit — button-primary ───────────────── */
+.btn-submit{
+  /* button-primary: primary bg, on-primary text, button-md(14px/600/1.40), 11px 24px, rounded-full */
+  margin-top:16px;width:100%;padding:11px 24px;
+  background:var(--c-primary);color:var(--c-on-primary);
+  border:none;border-radius:var(--r-full);
+  font-family:var(--font);font-size:14px;font-weight:600;
+  line-height:1.4;cursor:pointer;
+  transition:background var(--tr),color var(--tr),opacity var(--tr);
+}
+/* button-primary-pressed: charcoal */
+.btn-submit:active{opacity:.85}
+/* button-primary-disabled: hairline bg, muted text */
+.btn-submit:disabled{background:var(--c-hairline);color:var(--c-muted);cursor:default;opacity:1}
+
+/* ── Submitted State ───────────────────────── */
+.submitted{text-align:center;padding:40vh 0 0;color:var(--c-ink)}
+.submitted .sp{
+  display:inline-block;width:12px;height:12px;
+  border:2px solid var(--c-hairline);border-top-color:var(--c-ink);
+  border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px;
+}
+.submitted h2{font-size:16px;font-weight:700;margin-bottom:8px}
+.submitted p{font-size:14px;color:var(--c-slate)}
+.submitted .hint{margin-top:16px;font-size:13px;color:var(--c-stone)}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ── Done Mode ─────────────────────────────── */
+.mode-done,.mode-status{
+  text-align:center;padding:40vh 0 0;color:var(--c-ink)
+}
+.mode-done .ck,.mode-status .sp{
+  display:inline-block;margin-bottom:16px
+}
+.mode-done .ck{font-size:28px}
+.mode-status .sp{
+  width:12px;height:12px;
+  border:2px solid var(--c-hairline);border-top-color:var(--c-ink);
+  border-radius:50%;animation:spin .8s linear infinite
+}
+.mode-done h2,.mode-status h2{font-size:16px;font-weight:700;margin-bottom:8px}
+.mode-done p,.mode-status p{font-size:14px;color:var(--c-slate)}
+.mode-done .hint,.mode-status .hint{margin-top:16px;font-size:13px;color:var(--c-stone)}
+
+/* ── Responsive — DESIGN.md breakpoints ────── */
+@media(max-width:1023px){
+  /* heading-sm: 24px for tablets */
+  .hdr-text h1{font-size:24px;letter-spacing:0}
+  .hdr-text p{font-size:15px}
+}
+@media(max-width:767px){
+  .hdr-top{flex-direction:column}
+  .hdr-controls{padding-top:0;align-self:flex-start}
+  /* body-md: 20px for mobile */
+  .hdr-text h1{font-size:20px;letter-spacing:0}
+  .wrap{padding:20px 16px}
+}
+@media(max-width:479px){
+  .hdr-text h1{font-size:20px}
+  .wrap{padding:16px 12px}
+  .q-card,.notes-card{padding:12px 0}
+  /* Touch target 44px on mobile */
+  .btn-submit{padding:13px 24px}
+  .lang-pill{padding:4px 8px;font-size:12px}
+}
+</style>
+<script>
+(function(){
+  var saved=localStorage.getItem('grill-theme');
+  var mode=saved||'system';
+  var eff=mode==='system'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):mode;
+  document.documentElement.setAttribute('data-theme',eff);
+})();
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="hdr-top">
+      <div class="hdr-text">
+        <h1 id="title"></h1>
+        <p id="desc"></p>
+      </div>
+      <div class="hdr-controls">
+        <div class="lang-group" id="lang-group">
+          <button class="lang-pill" data-lang="zh-CN">中</button>
+          <button class="lang-pill" data-lang="zh-TW">繁</button>
+          <button class="lang-pill" data-lang="en">EN</button>
+          <button class="lang-pill" data-lang="ja">日</button>
+        </div>
+        <button class="theme-btn" id="theme-toggle">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="icon-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+  <form id="f" method="POST" action="/submit">
+    <div id="qs"></div>
+    <div class="notes-card">
+      <label for="additional_notes" id="label-notes"></label>
+      <textarea id="additional_notes" name="additional_notes"></textarea>
+    </div>
+    <button type="submit" class="btn-submit" id="btn-submit"></button>
+  </form>
+  <div id="mode-done" style="display:none" class="mode-done">
+    <div class="ck">&#10003;</div>
+    <h2 id="done-title">All done</h2>
+    <p id="done-text">You can close this tab.</p>
+  </div>
+  <div id="mode-status" style="display:none" class="mode-status">
+    <div class="sp"></div>
+    <h2 id="status-title"></h2>
+    <div id="status-extra"></div>
+  </div>
+</div>
+<script>
+var D=JSON.parse('{{GRILL_DATA}}');
+
+/* ── i18n ─────────────────────────────────── */
+var I18N={
+  en:{
+    submit:"Submit Answers",submitting:"Submitting...",
+    notes:"Additional Notes",notesPh:"Any other comments...",
+    specify:"Please specify...",recommended:"recommended",
+    customPh:"Additional notes (optional)...",
+    submitted:"Submitted.",waiting:"Waiting for the next batch...",
+    stay:"Stay on this tab — new questions will appear here.",
+    done:"All done",doneText:"You can close this tab."
+  },
+  "zh-CN":{
+    submit:"提交回答",submitting:"提交中...",
+    notes:"补充说明",notesPh:"其他想说的话...",
+    specify:"请具体说明...",recommended:"推荐",
+    customPh:"补充说明（可选）...",
+    submitted:"已提交。",
+    waiting:"等待下一批问题...",
+    stay:"请保持在此页面 — 新问题将自动显示在这里。",
+    done:"全部完成",doneText:"可以关闭此页面了。"
+  },
+  "zh-TW":{
+    submit:"提交回答",submitting:"提交中...",
+    notes:"補充說明",notesPh:"其他想說的話...",
+    specify:"請具體說明...",recommended:"推薦",
+    customPh:"補充說明（可選）...",
+    submitted:"已提交。",
+    waiting:"等待下一批問題...",
+    stay:"請保持在此頁面 — 新問題將自動顯示在這裡。",
+    done:"全部完成",doneText:"可以關閉此頁面了。"
+  },
+  ja:{
+    submit:"回答を送信",submitting:"送信中...",
+    notes:"追加メモ",notesPh:"その他のコメント...",
+    specify:"具体的に入力してください...",recommended:"おすすめ",
+    customPh:"補足説明（任意）...",
+    submitted:"送信完了。",
+    waiting:"次の質問を待っています...",
+    stay:"このタブを開いたままにしてください — 新しい質問がここに表示されます。",
+    done:"完了",doneText:"このタブを閉じてください。"
+  }
+};
+
+/* ── Language Detection ───────────────────── */
+function detectLang(data){
+  if(data.language&&I18N[data.language])return data.language;
+  var t=[data.title||'',data.description||''];
+  (data.questions||[]).forEach(function(q){t.push(q.text||'')});
+  var s=t.join(' ');
+  if(/[぀-ゟ゠-ヿ]/.test(s))return 'ja';
+  if(/[一-鿿]/.test(s)){
+    if(/[說學網計價買賣讓評點結轉練運體對長電開發問時東車義過還裡與適應關認經濟動樣見覺區實無產專級創給讀講銀減個親廣織構]/.test(s))return 'zh-TW';
+    return 'zh-CN';
+  }
+  return 'en';
+}
+
+var currentLang=detectLang(D);
+
+function t(k){return(I18N[currentLang]||I18N.en)[k]||I18N.en[k]}
+
+function setLang(lang){
+  if(!I18N[lang])return;
+  currentLang=lang;
+  applyI18n();
+  document.querySelectorAll('.lang-pill').forEach(function(p){
+    p.classList.toggle('active',p.getAttribute('data-lang')===lang);
+  });
+}
+
+function applyI18n(){
+  document.getElementById('label-notes').textContent=t('notes');
+  document.getElementById('additional_notes').placeholder=t('notesPh');
+  document.getElementById('btn-submit').textContent=t('submit');
+  document.querySelectorAll('.rec-text').forEach(function(b){b.textContent=' ('+t('recommended')+')'});
+  document.querySelectorAll('.custom-input').forEach(function(i){i.placeholder=t('customPh')});
+}
+
+/* ── Theme ────────────────────────────────── */
+var THEME_KEY='grill-theme';
+var THEMES=['light','dark','system'];
+var themeIdx=2;
+
+function initTheme(){
+  var saved=localStorage.getItem(THEME_KEY);
+  var idx=THEMES.indexOf(saved);
+  themeIdx=idx>=0?idx:2;
+  applyTheme(THEMES[themeIdx]);
+}
+
+function applyTheme(mode){
+  var eff=mode==='system'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):mode;
+  document.documentElement.setAttribute('data-theme',eff);
+  document.getElementById('theme-toggle').setAttribute('data-mode',mode);
+  localStorage.setItem(THEME_KEY,mode);
+}
+
+function cycleTheme(){
+  themeIdx=(themeIdx+1)%3;
+  applyTheme(THEMES[themeIdx]);
+}
+
+/* ── Render ───────────────────────────────── */
+function render(){
+  /* Mode handling */
+  if(D._mode==='done'){
+    document.getElementById('f').style.display='none';
+    document.querySelector('.notes-card')&&(document.querySelector('.notes-card').style.display='none');
+    var dm=document.getElementById('mode-done');dm.style.display='block';
+    if(D.title)document.getElementById('done-title').textContent=D.title;
+    if(D.description)document.getElementById('done-text').textContent=D.description;
+    return;
+  }
+  if(D._mode==='status'){
+    document.getElementById('f').style.display='none';
+    document.querySelector('.notes-card')&&(document.querySelector('.notes-card').style.display='none');
+    var sm=document.getElementById('mode-status');sm.style.display='block';
+    document.getElementById('status-title').textContent=D.title||'';
+    document.getElementById('status-extra').innerHTML=D.description||'';
+    return;
+  }
+
+  document.getElementById('title').textContent=D.title||'';
+  document.getElementById('desc').textContent=D.description||'';
+  var qs=document.getElementById('qs');
+  qs.innerHTML='';
+
+  (D.questions||[]).forEach(function(q){
+    var card=document.createElement('div');card.className='q-card';
+    var txt=document.createElement('div');txt.className='q-text';txt.textContent=q.text;
+    card.appendChild(txt);
+
+    var isMulti=q.multi===true;
+    var opts=document.createElement('div');opts.className='opts';
+    if(isMulti)opts.setAttribute('data-multiselect','');
+
+    q.options.forEach(function(o,i){
+      var lbl=document.createElement('label');lbl.className='opt';
+      var inp=document.createElement('input');
+      inp.type=isMulti?'checkbox':'radio';
+      inp.name=q.id;inp.value=o;
+      var isRec=(i===q.recommended);
+      if(isRec){inp.checked=true;lbl.classList.add('sel')}
+      var span=document.createElement('span');span.className='opt-text';
+      span.appendChild(document.createTextNode(o));
+      if(isRec){
+        var b=document.createElement('span');b.className='rec-text';
+        b.textContent=' ('+t('recommended')+')';span.appendChild(b);
+      }
+      lbl.appendChild(inp);lbl.appendChild(span);
+      lbl.addEventListener('click',function(e){
+        if(isMulti){
+          /* toggle behavior */
+          lbl.classList.toggle('sel',inp.checked);
+        }else{
+          /* radio: clicking already-selected deselects it */
+          if(inp.checked && lbl.classList.contains('sel')){
+            e.preventDefault();
+            inp.checked=false;
+            lbl.classList.remove('sel');
+          }else{
+            opts.querySelectorAll('.opt').forEach(function(x){x.classList.remove('sel')});
+            inp.checked=true;
+            lbl.classList.add('sel');
+          }
+        }
+      });
+      opts.appendChild(lbl);
+    });
+    card.appendChild(opts);
+
+    if(q.explanation){
+      var ex=document.createElement('div');ex.className='expl';
+      ex.textContent=q.explanation;card.appendChild(ex);
+    }
+
+    /* Always-visible custom text input */
+    var ci=document.createElement('input');
+    ci.type='text';ci.id=q.id+'_c';ci.name=q.id+'_c';
+    ci.className='custom-input';
+    ci.placeholder=t('customPh');
+    card.appendChild(ci);
+
+    qs.appendChild(card);
+  });
+
+  applyI18n();
+}
+
+/* ── Submit ───────────────────────────────── */
+document.getElementById('f').addEventListener('submit',function(e){
+  e.preventDefault();
+  var btn=document.getElementById('btn-submit');
+  btn.disabled=true;btn.textContent=t('submitting');
+  var fd=new FormData(e.target);
+  var params=new URLSearchParams();
+  var multiKeys={};
+  /* Collect multi-select keys */
+  document.querySelectorAll('.opts[data-multiselect]').forEach(function(c){
+    c.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+      if(!multiKeys[cb.name])multiKeys[cb.name]=[];
+      if(cb.checked)multiKeys[cb.name].push(cb.value);
+    });
+  });
+  /* Build params */
+  for(var pair of fd.entries()){
+    var k=pair[0],v=pair[1];
+    if(k in multiKeys){
+      /* skip — we handle multi-select separately */
+    }else{
+      params.append(k,v);
+    }
+  }
+  /* Add multi-select as JSON arrays */
+  for(var mk in multiKeys){
+    params.append(mk,JSON.stringify(multiKeys[mk]));
+  }
+  fetch('/submit',{method:'POST',body:params})
+    .then(function(){
+      document.querySelector('.wrap').innerHTML=
+        '<div class="submitted">'
+        +'<div class="sp"></div>'
+        +'<h2>'+t('submitted')+'</h2>'
+        +'<p>'+t('waiting')+'</p>'
+        +'<p class="hint">'+t('stay')+'</p>'
+        +'</div>';
+    })
+    .catch(function(){
+      btn.disabled=false;btn.textContent=t('submit');
+    });
+});
+
+/* ── Init ─────────────────────────────────── */
+document.getElementById('theme-toggle').addEventListener('click',cycleTheme);
+document.querySelectorAll('.lang-pill').forEach(function(p){
+  p.addEventListener('click',function(){setLang(p.getAttribute('data-lang'))});
+});
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
+  if(THEMES[themeIdx]==='system')applyTheme('system');
+});
+
+initTheme();
+setLang(currentLang);
+render();
+</script>
+<script src="/ws.js"></script>
+</body>
+</html>
