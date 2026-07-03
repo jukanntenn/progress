@@ -17,6 +17,7 @@ mkdir -p "$LOCALE_DIR"
 xgettext \
     --keyword=_ \
     --keyword=gettext \
+    --keyword=ngettext:1,2 \
     --language=Python \
     --from-code=UTF-8 \
     --output="$LOCALE_DIR/$DOMAIN.pot" \
