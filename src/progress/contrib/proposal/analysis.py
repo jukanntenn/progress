@@ -1,23 +1,13 @@
 import logging
-from pathlib import Path
-
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from progress.ai import Analyzer
 from progress.contrib.repo.analysis import AnalysisResultParser
 from progress.telemetry import record_analysis_failure, report_error
+from progress.templates import render
 
 from .types import ProposalKind
 
 logger = logging.getLogger(__name__)
-
-_template_dir = Path(__file__).parent.parent.parent / "templates"
-_jinja_env = Environment(
-    loader=FileSystemLoader(_template_dir),
-    autoescape=select_autoescape(),
-    trim_blocks=True,
-    lstrip_blocks=True,
-)
 
 
 def run_analysis(
@@ -32,8 +22,8 @@ def run_analysis(
     language: str = "en",
 ) -> tuple[str, str]:
     try:
-        template = _jinja_env.get_template(template_name)
-        prompt = template.render(
+        prompt = render(
+            template_name,
             kind=kind.value,
             number=number,
             title=title or "",

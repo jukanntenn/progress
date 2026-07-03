@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 from html import escape
-from pathlib import Path
 from typing import NamedTuple
 from collections.abc import Mapping
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from ...consts import TEMPLATE_EMAIL_NOTIFICATION
 from ...i18n import gettext as _
+from ...templates import render
 from ..channels.email import EmailChannel
 from ..utils import (
     ChangelogEntry,
@@ -46,14 +44,6 @@ class EmailProposalContext(NamedTuple):
 class EmailMessage(Message):
     def __init__(self, channel: EmailChannel) -> None:
         super().__init__(channel)
-        template_dir = Path(__file__).resolve().parents[2] / "templates"
-        self._jinja_env = Environment(
-            loader=FileSystemLoader(template_dir),
-            autoescape=select_autoescape(),
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
-        self._jinja_env.globals["_"] = _
 
     def get_payload(self, context: EmailContext) -> str:
         subject_with_batch = add_batch_indicator(
@@ -70,8 +60,8 @@ class EmailMessage(Message):
 
     def _build_default_html(self, context: EmailContext) -> str:
         stats = compute_notification_stats(context.repo_statuses)
-        template = self._jinja_env.get_template(TEMPLATE_EMAIL_NOTIFICATION)
-        return template.render(
+        return render(
+            TEMPLATE_EMAIL_NOTIFICATION,
             subject=context.title,
             summary=context.summary,
             total_commits=context.total_commits,

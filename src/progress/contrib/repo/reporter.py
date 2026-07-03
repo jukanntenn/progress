@@ -2,49 +2,20 @@
 
 import logging
 from datetime import datetime
-from html import escape
-from pathlib import Path
 from zoneinfo import ZoneInfo
-
-from jinja2 import Environment, FileSystemLoader
 
 from ...consts import (
     TEMPLATE_AGGREGATED_REPORT,
     TEMPLATE_DISCOVERED_REPOS_REPORT,
     TEMPLATE_REPOSITORY_REPORT,
 )
-from ...i18n import gettext as _
+from ...templates import render
 
 logger = logging.getLogger(__name__)
 
 
-def _escape_html(text: str) -> str:
-    """Escape HTML tags in text.
-
-    Args:
-        text: Text to escape
-
-    Returns:
-        HTML-escaped text
-    """
-    return escape(text)
-
-
 class MarkdownReporter:
     """Generate Markdown format reports with Jinja2 templates and i18n."""
-
-    def __init__(self):
-        """Initialize reporter with i18n support."""
-
-        template_dir = Path(__file__).parent.parent.parent / "templates"
-        self.jinja_env = Environment(
-            loader=FileSystemLoader(template_dir),
-            autoescape=False,
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
-        self.jinja_env.globals["_"] = _
-        self.jinja_env.filters["escape_html"] = _escape_html
 
     def generate_repository_report(
         self, report, timezone: ZoneInfo = ZoneInfo("UTC")
@@ -58,8 +29,8 @@ class MarkdownReporter:
         Returns:
             Rendered Markdown report
         """
-        template = self.jinja_env.get_template(TEMPLATE_REPOSITORY_REPORT)
-        return template.render(
+        return render(
+            TEMPLATE_REPOSITORY_REPORT,
             report=report,
             timezone=timezone,
         )
@@ -128,8 +99,8 @@ class MarkdownReporter:
             Complete aggregated Markdown report
         """
         now = datetime.now(timezone)
-        template = self.jinja_env.get_template(TEMPLATE_AGGREGATED_REPORT)
-        return template.render(
+        return render(
+            TEMPLATE_AGGREGATED_REPORT,
             rendered_reports=sections,
             total_commits=total_commits,
             repo_statuses=repo_statuses,
@@ -155,8 +126,9 @@ class MarkdownReporter:
             Rendered Markdown report
         """
         now = datetime.now(timezone)
-        template = self.jinja_env.get_template(TEMPLATE_DISCOVERED_REPOS_REPORT)
-        return template.render(
+        return render(
+            TEMPLATE_DISCOVERED_REPOS_REPORT,
             repos=repos,
             report_date=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+            generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
         )

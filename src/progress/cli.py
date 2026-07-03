@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path, PurePath
 
 import click
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 
@@ -44,6 +43,7 @@ from .telemetry import (
     setup_observability,
     shutdown_observability,
 )
+from .templates import render
 from .utils import get_now
 from .utils.markpost import MarkpostClient
 
@@ -606,16 +606,6 @@ def _send_proposal_notification(
     reports: list[ProposalReport],
     timezone,
 ) -> None:
-    template_dir = Path(__file__).parent / "templates"
-    env = Environment(
-        loader=FileSystemLoader(template_dir),
-        autoescape=select_autoescape(),
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
-    env.filters["basename"] = lambda p: PurePath(p).name
-    template = env.get_template("proposal_events_report.j2")
-
     from .contrib.proposal.types import KIND_CONFIGS
 
     grouped: dict[str, list] = {}
@@ -627,9 +617,12 @@ def _send_proposal_notification(
 
     tracker_urls = {k.value: KIND_CONFIGS[k].repo_url for k in KIND_CONFIGS}
 
-    report_content = template.render(
+    now = get_now(timezone)
+    report_content = render(
+        "proposal_events_report.j2",
         grouped_events=grouped,
         tracker_urls=tracker_urls,
+        generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
     )
 
     try:
@@ -679,17 +672,10 @@ def _send_changelog_update_notification(
     timezone,
 ) -> None:
     now = get_now(timezone)
-    template_dir = Path(__file__).parent / "templates"
-    env = Environment(
-        loader=FileSystemLoader(template_dir),
-        autoescape=select_autoescape(),
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
-    template = env.get_template("changelog_updates_report.j2")
-
-    report_content = template.render(
+    report_content = render(
+        "changelog_updates_report.j2",
         now=now.strftime("%Y-%m-%d %H:%M"),
+        generation_time=now.strftime("%Y-%m-%d %H:%M:%S %Z"),
         updates=updates,
     )
 

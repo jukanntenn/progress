@@ -1,26 +1,17 @@
 import json
 import logging
 import re
-from pathlib import Path
 
 import json_repair
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from progress.ai import Analyzer
 from progress.consts import TEMPLATE_ANALYSIS_PROMPT, TEMPLATE_README_ANALYSIS_PROMPT
 from progress.errors import AnalysisException
 from progress.i18n import gettext as _
 from progress.telemetry import record_analysis_failure, report_error
+from progress.templates import render
 
 logger = logging.getLogger(__name__)
-
-_template_dir = Path(__file__).parent.parent.parent / "templates"
-_jinja_env = Environment(
-    loader=FileSystemLoader(_template_dir),
-    autoescape=select_autoescape(),
-    trim_blocks=True,
-    lstrip_blocks=True,
-)
 
 
 class AnalysisResultParser:
@@ -74,8 +65,8 @@ def analyze_diff(
             max_diff_length,
         )
 
-    template = _jinja_env.get_template(TEMPLATE_ANALYSIS_PROMPT)
-    prompt = template.render(
+    prompt = render(
+        TEMPLATE_ANALYSIS_PROMPT,
         repo_name=repo_name,
         branch=branch,
         commit_messages=commit_messages,
@@ -108,10 +99,10 @@ def analyze_releases(
     release_data: dict,
     language: str,
 ) -> tuple[str, str]:
-    template = _jinja_env.get_template("release_analysis_prompt.j2")
     releases = release_data.get("releases", [])
     is_first_check = len(releases) == 1
-    prompt = template.render(
+    prompt = render(
+        "release_analysis_prompt.j2",
         repo_name=repo_name,
         branch=branch,
         release_data=release_data,
@@ -130,8 +121,8 @@ def analyze_readme(
     readme_content: str,
     language: str,
 ) -> tuple[str, str]:
-    template = _jinja_env.get_template(TEMPLATE_README_ANALYSIS_PROMPT)
-    prompt = template.render(
+    prompt = render(
+        TEMPLATE_README_ANALYSIS_PROMPT,
         repo_name=repo_name,
         description=description,
         readme_content=readme_content,
