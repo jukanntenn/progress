@@ -1,6 +1,6 @@
-# New repositories discovered
+{% from "report_base.j2" import footer %}
 
-_Generated at {{ report_date }}_
+# {{ _("New repositories discovered") }}
 
 {% if repos %}
 {% for repo in repos %}
@@ -16,7 +16,7 @@ _Generated at {{ report_date }}_
 
 {% if repo.readme_detail %}
 <details>
-<summary>Click to view detailed analysis</summary>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
 
 {{ repo.readme_detail }}
 
@@ -30,5 +30,7 @@ _Generated at {{ report_date }}_
 {% endif %}
 {% endfor %}
 {% else %}
-_No repositories discovered._
+_{{ _("No repositories discovered.") }}_
 {% endif %}
+
+{{ footer(generation_time) }}

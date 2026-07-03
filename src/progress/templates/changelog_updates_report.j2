@@ -1,10 +1,17 @@
+{% from "report_base.j2" import footer %}
+
 {% for item in updates %}
 ## [{{ item.name }}]({{ item.url }})
 
 {% for e in item.new_entries %}
-### {{ e.version }}
+### 🏷️ {{ e.version }}
 
 {{ e.description }}
 
 {% endfor %}
+{% if not loop.last %}
+---
+{% endif %}
 {% endfor %}
+
+{{ footer(generation_time) }}

@@ -1,13 +1,11 @@
 ## [{{ report.repo_name }}]({{ report.repo_web_url }})
 
-**Branch**: `{{ report.branch }}`
+🔗 {{ _("branch") }} `{{ report.branch }}` · {{ report.commit_count }} {{ _("commits") }}
 
 {% if report.releases %}
-**{{ report.releases|length }} release{{ 's' if report.releases|length != 1 else '' }}**:
-
 {% for release in report.releases %}
 <details>
-<summary>🚀 {{ release.title }} 🏷 {{ release.tag_name }}</summary>
+<summary>🚀 {{ release.title }} 🏷️ {{ release.tag_name }}</summary>
 
 {{ release.notes }}
 
@@ -23,27 +21,25 @@
 </details>
 
 {% endfor %}
-
 {% if report.commit_count > 0 %}
 ---
+
 {% endif %}
 {% endif %}
 {% if report.commit_count > 0 %}
-
 {% if report.truncated %}
-⚠️ {{ _("Diff truncated") }} ({{ report.original_diff_length }} → {{ report.analyzed_diff_length }} chars)
+⚠️ {{ _("Diff truncated") }} ({{ report.original_diff_length }} → {{ report.analyzed_diff_length }} {{ _("chars") }})
 
 {% endif %}
-**{{ report.commit_count }} Commits**:
-
 {% for msg in report.commit_messages %}
 {% if '\n' in msg %}
 <details>
 <summary>{{ msg.split('\n')[0]|escape_html }}</summary>
+
 {{ msg|escape_html }}
 </details>
 {% else %}
-{{ msg|escape_html }}
+- {{ msg|escape_html }}
 {% endif %}
 {% endfor %}
 

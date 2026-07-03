@@ -1,3 +1,5 @@
+{% from "report_base.j2" import footer %}
+
 {% for kind, items in grouped_events.items() %}
 {% set tracker_url = tracker_urls.get(kind) %}
 {% if tracker_url %}
@@ -14,19 +16,24 @@
 📄 {{ file_name }}
 {% endif %}
 
-- **Number:** {{ e.number }}
-{% if e.title %}- **Title:** {{ e.title }}{% endif %}
-{% if e.old_status %}- **Status:** {{ e.old_status.value }} → {{ e.new_status.value }}{% else %}
-- **Status:** {{ e.new_status.value }} (new){% endif %}
+- **{{ _("Number") }}:** {{ e.number }}
+{% if e.title %}
+- **{{ _("Title") }}:** {{ e.title }}
+{% endif %}
+{% if e.old_status %}
+- **{{ _("Status") }}:** {{ e.old_status.value }} → {{ e.new_status.value }}
+{% else %}
+- **{{ _("Status") }}:** {{ e.new_status.value }} ({{ _("new") }})
+{% endif %}
 
-#### Summary
+#### {{ _("Summary") }}
 
-{{ e.analysis_summary or "No summary available." }}
+{{ e.analysis_summary or _("No summary available.") }}
 
 <details>
-<summary>Click to view detailed analysis</summary>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
 
-{{ e.analysis_detail or "No detailed analysis available." }}
+{{ e.analysis_detail or _("No detailed analysis available.") }}
 
 </details>
 
@@ -35,4 +42,11 @@
 
 {% endif %}
 {% endfor %}
+{% if not loop.last %}
+
+---
+
+{% endif %}
 {% endfor %}
+
+{{ footer(generation_time) }}
