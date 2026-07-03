@@ -1,0 +1,21 @@
+{% block task %}{% endblock %}
+
+Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output.
+
+{% block source %}You will receive the full proposal text via stdin.{% endblock %}
+
+Proposal context:
+- Kind: {{ kind }}
+- Number: {{ number }}
+- Title: {{ title }}
+{% block status_context %}{% if old_status %}
+- Old status: {{ old_status }}
+- New status: {{ new_status }}
+{% endif %}{% endblock %}
+CRITICAL FORMAT REQUIREMENTS:
+1. Output MUST be valid JSON
+2. Output MUST contain exactly two keys: "summary" and "detail"
+3. Do NOT output markdown code fences
+
+Content requirements:
+{% block content_requirements %}{% endblock %}
