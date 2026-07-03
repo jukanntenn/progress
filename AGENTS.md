@@ -64,19 +64,26 @@ progress/
 │       ├── repo.py        # Repository management
 │       ├── repository.py  # Extended repository operations
 │       ├── reporter.py    # Markdown report generator
+│       ├── templates.py   # Central Jinja2 template engine
 │       ├── utils.py       # Utility functions
 │       ├── api/           # Web API + static serving (FastAPI)
 │       └── web/           # Frontend (React + Vite)
 │       ├── templates/     # Jinja2 template files
+│       │   ├── report_base.j2            # Shared macros (footer/status icons)
 │       │   ├── aggregated_report.j2
 │       │   ├── analysis_prompt.j2
+│       │   ├── changelog_notification.j2
+│       │   ├── changelog_updates_report.j2
+│       │   ├── discovered_repositories_report.j2
 │       │   ├── email_notification.j2
+│       │   ├── readme_analysis_prompt.j2
 │       │   ├── release_analysis_prompt.j2
 │       │   ├── repository_report.j2
 │       │   ├── proposal_accepted_prompt.j2
 │       │   ├── proposal_content_modified_prompt.j2
 │       │   ├── proposal_events_report.j2
 │       │   ├── proposal_new_prompt.j2
+│       │   ├── proposal_prompt_base.j2   # Shared base for proposal_*_prompt
 │       │   ├── proposal_rejected_prompt.j2
 │       │   ├── proposal_status_change_prompt.j2
 │       │   ├── proposal_withdrawn_prompt.j2
