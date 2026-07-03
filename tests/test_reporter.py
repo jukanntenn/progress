@@ -191,6 +191,15 @@ def _make_report(repo_name, commit_count=0, releases=None, commit_messages=None)
     )
 
 
+def _separator_lines(markdown):
+    """Return only the standalone ``---`` horizontal-rule lines.
+
+    Markdown table alignment rows (e.g. ``|:---|:---|``) are intentionally
+    excluded so the count reflects real section separators only.
+    """
+    return [ln for ln in markdown.split("\n") if ln.strip() == "---"]
+
+
 def _has_consecutive_separators(markdown):
     lines = [line.strip() for line in markdown.split("\n")]
     return any(
@@ -253,7 +262,9 @@ def test_aggregated_report_separates_each_repo_and_footer(reporter):
     )
 
     assert not _has_consecutive_separators(result)
-    assert result.count("---") == 2
+    # One separator between the two sections; no trailing separator after the
+    # last section (the redesigned template drops the redundant trailing ---).
+    assert len(_separator_lines(result)) == 1
 
 
 def test_render_aggregated_body_uses_pre_rendered_sections(reporter):
@@ -271,4 +282,5 @@ def test_render_aggregated_body_uses_pre_rendered_sections(reporter):
     assert "RAW SECTION TWO" in result
     # Both sections appear exactly once (no duplication from re-rendering).
     assert result.count("RAW SECTION ONE") == 1
-    assert result.count("---") == 2  # one separator between each pair of sections
+    # One separator between the two pre-rendered sections; none trailing.
+    assert len(_separator_lines(result)) == 1
