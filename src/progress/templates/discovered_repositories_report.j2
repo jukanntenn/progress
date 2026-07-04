@@ -5,6 +5,7 @@
 {% if repos %}
 {% for repo in repos %}
 ## [{{ repo.owner_name }}/{{ repo.repo_name }}]({{ repo.repo_url }})
+<small>🗓️ {{ repo.discovered_at }}</small>
 
 {% if repo.description %}
 > {{ repo.description }}
@@ -22,8 +23,6 @@
 
 </details>
 {% endif %}
-
-🗓{{ repo.discovered_at }}
 
 {% if not loop.last %}
 ---

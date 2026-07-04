@@ -10,23 +10,16 @@
 
 {% for e in items %}
 {% set file_name = e.file_path | basename %}
-{% if e.file_url %}
-📄 [{{ file_name }}]({{ e.file_url }})
+{% if e.title and e.file_url %}
+### [{{ e.title }}]({{ e.file_url }})
+{% elif e.title %}
+### {{ e.title }}
+{% elif e.file_url %}
+### [#{{ e.number }} {{ file_name }}]({{ e.file_url }})
 {% else %}
-📄 {{ file_name }}
+### #{{ e.number }} {{ file_name }}
 {% endif %}
-
-- **{{ _("Number") }}:** {{ e.number }}
-{% if e.title %}
-- **{{ _("Title") }}:** {{ e.title }}
-{% endif %}
-{% if e.old_status %}
-- **{{ _("Status") }}:** {{ e.old_status.value }} → {{ e.new_status.value }}
-{% else %}
-- **{{ _("Status") }}:** {{ e.new_status.value }} ({{ _("new") }})
-{% endif %}
-
-#### {{ _("Summary") }}
+<small>#️⃣ #{{ e.number }} · 📌 {% if e.old_status %}{{ e.old_status.value }} → {{ e.new_status.value }}{% else %}{{ e.new_status.value }} ({{ _("new") }}){% endif %} · 📄 {{ file_name }}</small>
 
 {{ e.analysis_summary or _("No summary available.") }}
 

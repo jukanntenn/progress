@@ -4,12 +4,6 @@
 {% set failed_count = repo_statuses.values() | select('equalto', 'failed') | list | length %}
 {% set skipped_count = repo_statuses.values() | select('equalto', 'skipped') | list | length %}
 
-| {{ _("Status") }} | {{ _("Count") }} |
-|:-----------:|:-----:|
-| ✅ {{ _("Success") }} | {{ success_count }} |
-| ❌ {{ _("Failed") }} | {{ failed_count }} |
-| ➖ {{ _("Skipped") }} | {{ skipped_count }} |
-
 <details>
 <summary>✅ {{ success_count }}  ❌ {{ failed_count }}  ➖ {{ skipped_count }} — {{ _("Repository details") }}</summary>
 

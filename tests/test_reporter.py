@@ -146,8 +146,8 @@ def test_generate_discovered_repos_report(reporter):
     assert "[vitejs/vite](https://github.com/vitejs/vite)" in result
     assert "[facebook/react](https://github.com/facebook/react)" in result
     assert "> Next generation frontend tooling" in result
-    assert "🗓2026-02-11 14:30:00" in result
-    assert "🗓2026-02-11 12:00:00" in result
+    assert "🗓️ 2026-02-11 14:30:00" in result
+    assert "🗓️ 2026-02-11 12:00:00" in result
     assert "---" in result
     assert result.count("---") == 1  # Only one separator between repos
 

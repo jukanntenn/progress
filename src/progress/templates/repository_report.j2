@@ -1,6 +1,6 @@
 ## [{{ report.repo_name }}]({{ report.repo_web_url }})
 
-🔗 {{ _("branch") }} `{{ report.branch }}` · {{ report.commit_count }} {{ _("commits") }}
+<small>🌿 `{{ report.branch }}` · ✏️ {{ report.commit_count }} {{ _("commits") }}</small>
 
 {% if report.releases %}
 {% for release in report.releases %}
@@ -28,7 +28,7 @@
 {% endif %}
 {% if report.commit_count > 0 %}
 {% if report.truncated %}
-⚠️ {{ _("Diff truncated") }} ({{ report.original_diff_length }} → {{ report.analyzed_diff_length }} {{ _("chars") }})
+<small>⚠️ {{ _("Diff truncated") }} ({{ report.original_diff_length }} → {{ report.analyzed_diff_length }} {{ _("chars") }})</small>
 
 {% endif %}
 {% for msg in report.commit_messages %}
