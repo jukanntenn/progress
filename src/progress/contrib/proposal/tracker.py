@@ -224,11 +224,12 @@ class ProposalTracker:
         local_dir.parent.mkdir(parents=True, exist_ok=True)
 
         if local_dir.exists() and (local_dir / ".git").exists():
-            try:
-                self.git.fetch_and_reset(local_dir, config.branch)
+            if self._try_fetch_and_verify(config, local_dir):
                 return local_dir
-            except Exception as e:
-                raise GitException(str(e)) from e
+            logger.warning(
+                "Proposal repo HEAD unusable, re-cloning: %s", config.repo_url
+            )
+            shutil.rmtree(local_dir, ignore_errors=True)
 
         try:
             if local_dir.exists():
@@ -250,6 +251,27 @@ class ProposalTracker:
             )
             logger.info("Cloned proposal repo: %s -> %s", config.repo_url, sanitized)
             return local_dir
+        except Exception as e:
+            raise GitException(str(e)) from e
+
+    def _try_fetch_and_verify(self, config: KindConfig, local_dir: Path) -> bool:
+        """Fetch updates on an existing clone and verify its HEAD is readable.
+
+        ``fetch_and_reset`` succeeds even when the on-disk HEAD has been rewritten
+        to GitPython's ``refs/heads/.invalid`` placeholder (used to mark refs
+        incompatible with older clients); the breakage only surfaces on the next
+        ``get_current_commit`` read, which raises ``ValueError``. Re-reading here
+        lets the caller detect that state and re-clone instead of failing every
+        run. Assumes upstream repos are append-only; a force-pushed history would
+        leave ``state.last_seen_commit`` unreachable on re-clone (pre-existing
+        failure mode, not introduced here).
+        """
+        try:
+            self.git.fetch_and_reset(local_dir, config.branch)
+            self.git.get_current_commit(local_dir)
+            return True
+        except ValueError:
+            return False
         except Exception as e:
             raise GitException(str(e)) from e
 

@@ -362,3 +362,84 @@ def test_erc_tracker_branch_is_master():
     from progress.contrib.proposal.types import KIND_CONFIGS
 
     assert KIND_CONFIGS[ProposalKind.ERC].branch == "master"
+
+
+class TestCloneOrUpdateSelfHeal:
+    """_clone_or_update recovers from a corrupt HEAD (refs/heads/.invalid).
+
+    Reproduces the prod erc-tracker failure: fetch_and_reset leaves the on-disk
+    HEAD pointing at GitPython's ``.invalid`` placeholder, and the next
+    get_current_commit raises ValueError on every run. The fix re-clones.
+    """
+
+    def _make_remote(self, tmp_path: Path) -> Path:
+        remote = tmp_path / "remote"
+        remote.mkdir()
+        _git(remote, "init", "-b", "master", "--bare")
+        work = tmp_path / "work"
+        work.mkdir()
+        _git(work, "init", "-b", "master")
+        _git(work, "config", "user.email", "test@example.com")
+        _git(work, "config", "user.name", "test")
+        (work / "ERCS" / "erc-1.md").parent.mkdir(parents=True)
+        (work / "ERCS" / "erc-1.md").write_text(
+            "---\nern: 1\ntitle: T\nstatus: Draft\n---\n\nBody\n", encoding="utf-8"
+        )
+        _git(work, "add", ".")
+        _git(work, "commit", "-m", "init")
+        _git(work, "remote", "add", "origin", str(remote))
+        _git(work, "push", "-q", "origin", "master")
+        return remote
+
+    def _erc_config(self, remote: Path):
+        from progress.contrib.proposal.types import KindConfig
+
+        return KindConfig(
+            repo_url=str(remote),
+            branch="master",
+            proposal_dir="ERCS",
+            file_pattern=["erc-*.md"],
+        )
+
+    def _corrupt_head(self, repo_path: Path) -> None:
+        git_dir = repo_path / ".git"
+        (git_dir / "refs" / "heads").mkdir(parents=True, exist_ok=True)
+        (git_dir / "refs" / "heads" / ".invalid").write_text(
+            _git(repo_path, "rev-parse", "HEAD"), encoding="utf-8"
+        )
+        (git_dir / "HEAD").write_text("ref: refs/heads/.invalid\n", encoding="utf-8")
+
+    def test_re_clones_when_head_is_corrupt(self, db, tmp_path: Path):
+        from progress.git import GitClient
+
+        remote = self._make_remote(tmp_path)
+        git_client = GitClient(workspace_dir=str(tmp_path / "ws"), timeout=30)
+        config = self._erc_config(remote)
+        tracker = _make_tracker(_mock_analyzer(), git_client)
+
+        repo_path = tracker._clone_or_update(config)
+        self._corrupt_head(repo_path)
+        with pytest.raises(ValueError):
+            git_client.get_current_commit(repo_path)
+
+        returned = tracker._clone_or_update(config)
+
+        assert returned == repo_path
+        assert git_client.get_current_commit(repo_path) == _git(
+            repo_path, "rev-parse", "HEAD"
+        )
+
+    def test_healthy_clone_is_reused(self, db, tmp_path: Path):
+        from progress.git import GitClient
+
+        remote = self._make_remote(tmp_path)
+        git_client = GitClient(workspace_dir=str(tmp_path / "ws"), timeout=30)
+        config = self._erc_config(remote)
+        tracker = _make_tracker(_mock_analyzer(), git_client)
+
+        first = tracker._clone_or_update(config)
+        first_commit = git_client.get_current_commit(first)
+        second = tracker._clone_or_update(config)
+
+        assert second == first
+        assert git_client.get_current_commit(second) == first_commit
