@@ -40,31 +40,57 @@ def create_channel(
             raise ProgressException(f"Unknown notification channel type: {config.type}")
 
 
-def create_message(
-    config: NotificationChannelConfig,
-    channel: ConsoleChannel | FeishuChannel | EmailChannel,
-) -> Message:
+def create_message(config: NotificationChannelConfig) -> Message:
     match config.type:
         case "console":
-            return ConsoleMessage(channel)
+            return ConsoleMessage(ConsoleChannel())
         case "feishu":
-            return FeishuMessage(channel)
+            return FeishuMessage(
+                FeishuChannel(
+                    webhook_url=str(config.webhook_url),
+                    timeout=config.timeout,
+                )
+            )
         case "email":
-            return EmailMessage(channel)
+            return EmailMessage(
+                EmailChannel(
+                    host=config.host,
+                    port=config.port,
+                    user=config.user,
+                    password=config.password,
+                    from_addr=config.from_addr,
+                    recipient=list(config.recipient),
+                    starttls=config.starttls,
+                    ssl=config.ssl,
+                )
+            )
         case _:
             raise ProgressException(f"Unknown notification channel type: {config.type}")
 
 
-def create_proposal_message(
-    config: NotificationChannelConfig,
-    channel: ConsoleChannel | FeishuChannel | EmailChannel,
-) -> Message:
+def create_proposal_message(config: NotificationChannelConfig) -> Message:
     match config.type:
         case "console":
-            return ConsoleProposalMessage(channel)
+            return ConsoleProposalMessage(ConsoleChannel())
         case "feishu":
-            return FeishuProposalMessage(channel)
+            return FeishuProposalMessage(
+                FeishuChannel(
+                    webhook_url=str(config.webhook_url),
+                    timeout=config.timeout,
+                )
+            )
         case "email":
-            return EmailProposalMessage(channel)
+            return EmailProposalMessage(
+                EmailChannel(
+                    host=config.host,
+                    port=config.port,
+                    user=config.user,
+                    password=config.password,
+                    from_addr=config.from_addr,
+                    recipient=list(config.recipient),
+                    starttls=config.starttls,
+                    ssl=config.ssl,
+                )
+            )
         case _:
             raise ProgressException(f"Unknown notification channel type: {config.type}")

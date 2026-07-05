@@ -5,7 +5,7 @@ import re
 
 from ..consts import GIT_SUFFIX, GITHUB_HTTPS_PREFIX, GITHUB_SSH_PREFIX
 from ..enums import Protocol
-from ..utils import strip_git_suffix
+from ..utils.text import strip_git_suffix
 
 logger = logging.getLogger(__name__)
 
@@ -176,3 +176,44 @@ def resolve_repo_url(repo_url: str, protocol: str | Protocol) -> tuple[str, str]
             return full_url, short_url
 
     raise ValueError(f"Invalid repository URL format: {repo_url}")
+
+
+def parse_repo_name(url: str) -> str:
+    """Extract repository slug (owner/repo) from URL.
+
+    Args:
+        url: Repository URL in any supported format:
+             - owner/repo
+             - https://github.com/owner/repo(.git)
+             - git@github.com:owner/repo(.git)
+
+    Returns:
+        Repository slug in "owner/repo" format
+
+    Examples:
+        >>> parse_repo_name("vitejs/vite")
+        'vitejs/vite'
+        >>> parse_repo_name("https://github.com/vitejs/vite.git")
+        'vitejs/vite'
+        >>> parse_repo_name("git@github.com:vitejs/vite")
+        'vitejs/vite'
+    """
+    if re.match(r"^[\w-]+/[\w-]+$", url):
+        return url
+
+    https_match = re.match(r"^https?://github\.com/([^/]+)/([^/.]+)", url)
+    if https_match:
+        return f"{https_match.group(1)}/{https_match.group(2)}"
+
+    ssh_match = re.match(r"^git@github\.com:([^/]+)/([^/.]+)", url)
+    if ssh_match:
+        return f"{ssh_match.group(1)}/{ssh_match.group(2)}"
+
+    if "/" in url:
+        if url.endswith(GIT_SUFFIX):
+            url = url[:-4]
+        parts = url.split("/")
+        if len(parts) >= 2:
+            return f"{parts[-2]}/{parts[-1]}"
+
+    return url

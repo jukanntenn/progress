@@ -11,6 +11,7 @@ from .url import (
     normalize_repo_url,
     resolve_repo_url,
     sanitize_repo_name,
+    parse_repo_name,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "normalize_repo_url",
     "resolve_repo_url",
     "sanitize_repo_name",
+    "parse_repo_name",
 ]

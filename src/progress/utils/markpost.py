@@ -8,7 +8,8 @@ import requests
 
 from progress.config import MarkpostConfig
 from progress.errors import ClientError, ProgressException
-from progress.utils import retry, sanitize
+from progress.utils.functional import retry
+from progress.utils.sanitize import sanitize
 
 logger = logging.getLogger(__name__)
 
