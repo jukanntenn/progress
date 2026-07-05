@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import NamedTuple
+from typing import NamedTuple, override
 from collections.abc import Mapping
 
 from ...i18n import gettext as _
@@ -42,6 +42,7 @@ class ConsoleMessage(Message):
     def __init__(self, channel: ConsoleChannel) -> None:
         super().__init__(channel)
 
+    @override
     def get_payload(self, context: ConsoleContext) -> str:
         title_with_batch = add_batch_indicator(
             context.title, context.batch_index, context.total_batches
@@ -98,6 +99,7 @@ class ConsoleProposalMessage(Message):
     def __init__(self, channel: ConsoleChannel) -> None:
         super().__init__(channel)
 
+    @override
     def get_payload(self, context: ConsoleProposalContext) -> str:
         lines = [context.title, ""]
         for fname in context.filenames or []:

@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from peewee import (
+    AutoField,
     BooleanField,
     CharField,
     DatabaseProxy,
@@ -17,6 +18,7 @@ from peewee import (
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
 from progress.enums import ReportType
+from typing import override
 
 UTC = ZoneInfo("UTC")
 
@@ -27,16 +29,24 @@ logger = logging.getLogger(__name__)
 
 
 class BaseModel(Model):
-    """Base model class - supports thread-safe metadata"""
+    """Base model class - supports thread-safe metadata."""
 
     class Meta:
         database = database_proxy
         model_metadata_class = ThreadSafeDatabaseMetadata
 
+    @override
+    def save(self, *args, **kwargs):
+        """Auto-update updated_at on every save for models that declare it."""
+        if "updated_at" in self._meta.fields and self.get_id() is not None:
+            self.updated_at = datetime.now(UTC)
+        return super().save(*args, **kwargs)
+
 
 class Repository(BaseModel):
     """Repository model"""
 
+    id = AutoField()
     name = CharField()
     url = CharField(unique=True)
     branch = CharField()
@@ -52,16 +62,11 @@ class Repository(BaseModel):
     class Meta:
         table_name = "repositories"
 
-    def save(self, *args, **kwargs):
-        """Override save method to auto-update updated_at"""
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)
-
 
 class Report(BaseModel):
     """Report model"""
 
+    id = AutoField()
     report_type = CharField(default=ReportType.REPO_UPDATE.value)
     repo = ForeignKeyField(
         Repository,
@@ -80,16 +85,11 @@ class Report(BaseModel):
     class Meta:
         table_name = "reports"
 
-    def save(self, *args, **kwargs):
-        """Override save method to auto-update updated_at"""
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)
-
 
 class Batch(BaseModel):
     """Batch model — one published MarkPost article of a multi-part aggregated report."""
 
+    id = AutoField()
     report = ForeignKeyField(Report, backref="batches", on_delete="CASCADE")
     title = CharField()
     markpost_url = CharField(default="")
@@ -101,12 +101,6 @@ class Batch(BaseModel):
         table_name = "batch"
         indexes = ((("report_id", "seq"), True),)
 
-    def save(self, *args, **kwargs):
-        """Override save method to auto-update updated_at"""
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)
-
 
 class AppConfig(BaseModel):
     """Single-row application configuration store.
@@ -116,6 +110,7 @@ class AppConfig(BaseModel):
     tracks which config-schema revision the blob was written under.
     """
 
+    id = AutoField()
     version = IntegerField(default=1)
     schema_version = IntegerField(default=0)
     data = TextField(default="{}")
@@ -124,18 +119,12 @@ class AppConfig(BaseModel):
     class Meta:
         table_name = "app_config"
 
-    def save(self, *args, **kwargs):
-        """Override save method to auto-update updated_at"""
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)
 
-
-def create_tables():
+def create_tables() -> None:
     """Create database tables and migrate schema."""
-    from . import database, migrate_database
+    from . import _require_db, migrate_database
 
-    database.create_tables(
+    _require_db().create_tables(
         [
             Repository,
             Report,

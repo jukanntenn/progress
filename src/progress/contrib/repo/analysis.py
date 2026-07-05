@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from typing import Any
 
 import json_repair
 
@@ -15,6 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class AnalysisResultParser:
+    def __call__(self, output: str) -> tuple[str, str]:
+        return self.parse(output)
+
     def parse(self, output: str) -> tuple[str, str]:
         try:
             json_str = _extract_json(output)
@@ -96,7 +100,7 @@ def analyze_releases(
     analyzer: Analyzer,
     repo_name: str,
     branch: str,
-    release_data: dict,
+    release_data: dict[str, Any],
     language: str,
 ) -> tuple[str, str]:
     releases = release_data.get("releases", [])

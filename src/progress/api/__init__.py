@@ -61,7 +61,7 @@ def create_app(config_obj=None) -> FastAPI:
     setup_observability(config_obj.observability, component="api")
     instrument_fastapi_app(app)
 
-    @app.on_event("shutdown")
+    @app.on_event("shutdown")  # ty: ignore[deprecated]  # migration to lifespan handlers would change event timing; preserved for behavioral compatibility
     def shutdown_db():
         shutdown_observability()
         close_db()

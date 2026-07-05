@@ -4,15 +4,16 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from typing import Any, override
 
 from opentelemetry import context as otel_context
 
 from progress.ai import Analyzer
-from progress.config import Config
+from progress.config import Config, RepositoryConfig
 from progress.consts import WORKSPACE_DIR_DEFAULT
 from progress.db.models import Repository
 from progress.enums import Protocol
-from progress.git import GitClient, GitHubClient, normalize_repo_url
+from progress.git import GitClient, GitHubClient, normalize_repo_url, parse_repo_name
 from progress.i18n import gettext as _
 from progress.telemetry import get_tracer, record_repo_checked, report_error
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_database():
-    """Get database instance (lazy import)."""
+    """Get database instance (late binding for the deferred database proxy)."""
     from ... import db
 
     return db.database
@@ -38,6 +39,7 @@ class SyncResult:
     updated: int
     deleted: int
 
+    @override
     def __str__(self):
         return (
             f"Created: {self.created}, Updated: {self.updated}, Deleted: {self.deleted}"
@@ -45,7 +47,7 @@ class SyncResult:
 
 
 def replace_repositories(
-    repos_config: list, default_protocol: "Protocol | str"
+    repos_config: list[RepositoryConfig], default_protocol: "Protocol | str"
 ) -> SyncResult:
     """Persist the desired repos to the table, upserting and pruning the rest.
 
@@ -53,8 +55,8 @@ def replace_repositories(
     table match the desired set. Used by the config UI and ``config import``; the
     tracking check verifies repos lazily and skips ones that no longer exist.
     """
-    from ...consts import parse_repo_name
 
+    
     database = _get_database()
     configured_urls = set()
     created_count = 0
@@ -87,7 +89,9 @@ def replace_repositories(
                 created_count += 1
 
         deleted_count = (
-            Repository.delete().where(Repository.url.not_in(configured_urls)).execute()
+            Repository.delete().where(
+                Repository.url.not_in(configured_urls)  # ty: ignore[missing-argument,invalid-argument-type]  # peewee stubs type not_in as ClassVar[Callable[[Self, Any], Expression]]; ty treats Self as unbound instead of bound to the field instance
+            ).execute()
         )
 
     return SyncResult(
@@ -112,7 +116,7 @@ class RepositoryReport:
     truncated: bool
     original_diff_length: int
     analyzed_diff_length: int
-    releases: list | None = None
+    releases: list[dict[str, Any]] | None = None
 
     @property
     def content(self) -> str:
@@ -174,6 +178,7 @@ class RepositoryManager:
         Returns:
             List of enabled repositories
         """
+        
         database = _get_database()
         with database.connection_context():
             return list(Repository.select().where(Repository.enabled))
@@ -187,21 +192,19 @@ class RepositoryManager:
         Returns:
             Repository object or None
         """
+        
         database = _get_database()
-        try:
-            with database.connection_context():
-                return Repository.get(Repository.name == name)
-        except Repository.DoesNotExist:
-            return None
+        with database.connection_context():
+            return Repository.get_or_none(Repository.name == name)
 
     def _analyze_all_releases(
         self,
         repo_name: str,
         branch: str,
-        release_data: dict,
+        release_data: dict[str, Any],
         repo_obj=None,
         previous_release_commit: str | None = None,
-    ) -> list:
+    ) -> list[dict[str, Any]]:
         """Analyze all releases individually.
 
         Args:
@@ -374,7 +377,7 @@ class RepositoryManager:
 
                 latest = releases_list[0] if releases_list else None
                 commit_hash = latest.get("commit_hash") if latest else None
-                if commit_hash:
+                if latest and commit_hash:
                     repo_obj.update_releases(latest["tag_name"], commit_hash)
             except Exception as e:
                 self.logger.error(f"Failed to analyze releases: {e}")

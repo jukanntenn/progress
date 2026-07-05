@@ -21,11 +21,18 @@ from progress.db.models import (
 
 logger = logging.getLogger(__name__)
 
-database = None
+database: PooledSqliteDatabase | None = None
 UTC = ZoneInfo("UTC")
 
 
-def init_db(db_path: str):
+def _require_db() -> PooledSqliteDatabase:
+    """Return the initialized database, raising if init_db() was not called."""
+    if database is None:
+        raise RuntimeError("Database not initialized. Call init_db() first.")
+    return database
+
+
+def init_db(db_path: str) -> None:
     """Initialize database connection pool."""
     global database
 
@@ -91,31 +98,32 @@ def log_db_state() -> None:
     )
 
 
-def migrate_database():
+def migrate_database() -> None:
     """Migrate database schema to latest version."""
     from progress.db.migration_add_owner_monitoring import (
         apply as migrate_owner_monitoring,
     )
 
-    migrator = SqliteMigrator(database)
+    db = _require_db()
+    migrator = SqliteMigrator(db)
 
-    migrate_owner_monitoring(database)
+    migrate_owner_monitoring(db)
 
     def _table_exists(table_name: str) -> bool:
-        row = database.execute_sql(
+        row = db.execute_sql(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
             (table_name,),
         ).fetchone()
         return row is not None
 
     def _existing_columns(table_name: str) -> set[str]:
-        cursor = database.execute_sql(f"PRAGMA table_info({table_name})")
+        cursor = db.execute_sql(f"PRAGMA table_info({table_name})")
         return {row[1] for row in cursor.fetchall()}
 
     if _table_exists("rustrfc") and not _table_exists("rust_rfcs"):
-        database.execute_sql("ALTER TABLE rustrfc RENAME TO rust_rfcs")
+        db.execute_sql("ALTER TABLE rustrfc RENAME TO rust_rfcs")
 
-    cursor = database.execute_sql("PRAGMA table_info(reports)")
+    cursor = db.execute_sql("PRAGMA table_info(reports)")
     existing_columns = {row[1] for row in cursor.fetchall()}
 
     if "title" not in existing_columns:
@@ -138,12 +146,12 @@ def migrate_database():
                 CharField(default="repo_update"),
             )
         )
-        database.execute_sql(
+        db.execute_sql(
             "UPDATE reports SET report_type = 'repo_update' WHERE report_type IS NULL OR report_type = ''"
         )
         logger.info("Migration completed: 'report_type' column added")
 
-    cursor = database.execute_sql("PRAGMA table_info(reports)")
+    cursor = db.execute_sql("PRAGMA table_info(reports)")
     columns_info = cursor.fetchall()
     columns = {c[1] for c in columns_info}
     repo_column_info = next((c for c in columns_info if c[1] == "repo_id"), None)
@@ -154,7 +162,7 @@ def migrate_database():
         report_type_expr = (
             "report_type" if "report_type" in columns else "'repo_update'"
         )
-        database.execute_sql(
+        db.execute_sql(
             "CREATE TABLE reports_new ("
             "id INTEGER PRIMARY KEY,"
             "repo_id INTEGER NULL REFERENCES repositories(id) ON DELETE CASCADE,"
@@ -167,17 +175,17 @@ def migrate_database():
             "content TEXT,"
             "created_at VARCHAR NOT NULL)"
         )
-        database.execute_sql(
+        db.execute_sql(
             "INSERT INTO reports_new (id, repo_id, title, report_type, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at) "
             f"SELECT id, repo_id, {title_expr}, {report_type_expr}, commit_hash, previous_commit_hash, "
             "commit_count, markpost_url, content, created_at FROM reports"
         )
-        database.execute_sql("DROP TABLE reports")
-        database.execute_sql("ALTER TABLE reports_new RENAME TO reports")
+        db.execute_sql("DROP TABLE reports")
+        db.execute_sql("ALTER TABLE reports_new RENAME TO reports")
         logger.info("Migration completed: 'repo' column is now nullable")
 
-    cursor = database.execute_sql("PRAGMA table_info(repositories)")
+    cursor = db.execute_sql("PRAGMA table_info(repositories)")
     repo_existing_columns = {row[1] for row in cursor.fetchall()}
 
     if "last_release_tag" not in repo_existing_columns:
@@ -211,7 +219,7 @@ def migrate_database():
     for table in old_proposal_tables:
         if _table_exists(table):
             logger.info(f"Migrating: Dropping old proposal table '{table}'")
-            database.execute_sql(f"DROP TABLE IF EXISTS {table}")
+            db.execute_sql(f"DROP TABLE IF EXISTS {table}")
             logger.info(f"Migration completed: '{table}' dropped")
 
     if _table_exists("proposal_trackers"):
@@ -220,16 +228,16 @@ def migrate_database():
             logger.info(
                 "Migrating: Dropping old proposal_trackers table for new schema"
             )
-            database.execute_sql("DROP TABLE IF EXISTS proposal_trackers")
+            db.execute_sql("DROP TABLE IF EXISTS proposal_trackers")
             logger.info("Migration completed: old proposal_trackers dropped")
 
     if _table_exists("discovered_repositories"):
         logger.info("Migrating: Dropping deprecated 'discovered_repositories' table")
-        database.execute_sql("DROP TABLE IF EXISTS discovered_repositories")
+        db.execute_sql("DROP TABLE IF EXISTS discovered_repositories")
         logger.info("Migration completed: 'discovered_repositories' dropped")
 
 
-def close_db():
+def close_db() -> None:
     """Close database connection."""
     global database
     if database:
@@ -237,13 +245,14 @@ def close_db():
         logger.info("Database connection closed")
 
 
-def create_tables():
+def create_tables() -> None:
     """Create database tables and migrate schema."""
+    db = _require_db()
     from progress.contrib.changelog.models import ChangelogTracker
     from progress.contrib.proposal.models import Proposal, ProposalTrackerState
     from progress.contrib.repo.models import GitHubOwner
 
-    database.create_tables(
+    db.create_tables(
         [
             Repository,
             Report,
@@ -257,7 +266,7 @@ def create_tables():
 
     migrate_database()
 
-    database.create_tables(
+    db.create_tables(
         [
             ProposalTrackerState,
             Proposal,
@@ -290,5 +299,5 @@ def save_report(
         markpost_url=markpost_url or "",
         content=content,
     )
-    logger.info(f"Report saved: {report.id} (type={report_type})")
-    return report.id
+    logger.info(f"Report saved: {report.get_id()} (type={report_type})")
+    return report.get_id()

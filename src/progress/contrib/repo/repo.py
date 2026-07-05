@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from ...config import Config
 from ...consts import CMD_GH, GH_MAX_RETRIES
@@ -18,8 +18,12 @@ from ...git import (
     parse_protocol_from_url,
     resolve_repo_url,
     sanitize_repo_name,
+    parse_repo_name,
 )
-from ...utils import get_now, retry, run_command, sanitize
+from ...utils.functional import retry
+from ...utils.process import run_command
+from ...utils.sanitize import sanitize
+from ...utils.timezone import get_now
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +86,6 @@ class Repo:
     @property
     def slug(self) -> str:
         """Get repository slug (owner/repo)."""
-        from ...consts import parse_repo_name
-
         return parse_repo_name(self.model.url)
 
     @property
@@ -182,7 +184,7 @@ class Repo:
 
     def _get_first_check_diff(
         self, current_commit: str
-    ) -> tuple[str, str, int, list[str], bool]:
+    ) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff for first-time repository check.
 
         Args:
@@ -206,7 +208,7 @@ class Repo:
 
     def _get_range_diff(
         self, current_commit: str, lookback: int
-    ) -> tuple[str, str, int, list[str], bool]:
+    ) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff using old..new range when history is sufficient.
 
         Args:
@@ -236,7 +238,7 @@ class Repo:
 
     def _get_recent_diff(
         self, current_commit: str, max_count: int
-    ) -> tuple[str, str, int, list[str], bool]:
+    ) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff using recent commits when history is insufficient.
 
         Args:
@@ -260,7 +262,7 @@ class Repo:
 
     def _get_incremental_diff(
         self, current_commit: str, previous_commit: str
-    ) -> tuple[str, str, int, list[str], bool]:
+    ) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff for incremental check (existing repository).
 
         Args:
@@ -286,9 +288,9 @@ class Repo:
         Args:
             current_commit: Current HEAD commit hash
         """
-        from ...db import database
+        from ...db import _require_db
 
-        with database.atomic():
+        with _require_db().atomic():
             self.model.last_commit_hash = current_commit
             self.model.last_check_time = get_now(UTC)
             self.model.save()
@@ -300,20 +302,20 @@ class Repo:
             release_tag: Release tag name (e.g., "v5.0.0")
             commit_hash: Commit hash the release tag points to
         """
-        from ...db import database
+        from ...db import _require_db
 
-        with database.atomic():
+        with _require_db().atomic():
             self.model.last_release_tag = release_tag
             self.model.last_release_commit_hash = commit_hash
             self.model.last_release_check_time = get_now(UTC)
             self.model.save()
 
-    def check_releases(self) -> dict | None:
+    def check_releases(self) -> dict[str, Any] | None:
         """Check for new GitHub releases.
 
         Returns:
             Dict with list of release data, or None if no new releases:
-            - releases: list of dicts with tag_name, title, notes, published_at, commit_hash
+            - releases: list[Any] of dicts with tag_name, title, notes, published_at, commit_hash
             - is_first_check: True if this is the first release check
         """
         try:
@@ -341,8 +343,8 @@ class Repo:
 
         is_first_check = last_check_time is None
 
-        releases_to_process: list[dict] = []
-        releases_with_time: list[tuple[datetime, dict]] = []
+        releases_to_process: list[dict[str, Any]] = []
+        releases_with_time: list[tuple[datetime, dict[str, Any]]] = []
 
         for r in releases:
             published_at_str = r.get("publishedAt")

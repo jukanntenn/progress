@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from ...consts import (
@@ -37,7 +38,7 @@ class MarkdownReporter:
 
     def generate_aggregated_report(
         self,
-        reports: list,
+        reports: list[Any],
         total_commits: int,
         repo_statuses: dict[str, str],
         timezone: ZoneInfo = ZoneInfo("UTC"),
@@ -112,7 +113,7 @@ class MarkdownReporter:
         )
 
     def generate_discovered_repos_report(
-        self, repos: list[dict], timezone: ZoneInfo = ZoneInfo("UTC")
+        self, repos: list[dict[str, Any]], timezone: ZoneInfo = ZoneInfo("UTC")
     ) -> str:
         """Generate discovered repositories report.
 

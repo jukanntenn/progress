@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import git
 
@@ -13,13 +13,14 @@ from ..consts import (
     WORKSPACE_DIR_DEFAULT,
 )
 from ..errors import GitException
-from ..utils import retry, run_command
+from ..utils.functional import retry
+from ..utils.process import run_command
 from .url import parse_protocol_from_url
 
 logger = logging.getLogger(__name__)
 
 
-def _handle_git_retry(args: tuple, kwargs: dict, error: Exception, attempt: int):
+def _handle_git_retry(args: tuple[Any, ...], kwargs: dict[str, Any], error: Exception, attempt: int):
     client_instance = args[0]
     repo_path = kwargs.get("repo_path") or args[1]
     error_msg = str(error)
@@ -211,7 +212,7 @@ class GitClient:
             commits = list(repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
         else:
             commits = [repo.head.commit]
-        messages = [c.message for c in commits]
+        messages = [str(c.message) for c in commits]
         return messages
 
     def get_commit_count(

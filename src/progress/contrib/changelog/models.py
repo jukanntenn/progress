@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from peewee import BooleanField, CharField, DateTimeField
+from peewee import AutoField, BooleanField, CharField, DateTimeField
 from progress.db.models import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -11,6 +11,7 @@ UTC = ZoneInfo("UTC")
 
 
 class ChangelogTracker(BaseModel):
+    id = AutoField()
     name = CharField()
     url = CharField(unique=True)
     parser_type = CharField()
@@ -23,17 +24,12 @@ class ChangelogTracker(BaseModel):
     class Meta:
         table_name = "changelog_trackers"
 
-    def save(self, *args, **kwargs):
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)
-
 
 def create_tables():
     """Create database tables and migrate schema."""
-    from . import database
+    from ...db import _require_db
 
-    database.create_tables(
+    _require_db().create_tables(
         [
             ChangelogTracker,
         ],

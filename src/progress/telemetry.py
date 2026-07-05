@@ -40,11 +40,13 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SimpleSpanProcessor,
 )
-from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased, TraceIdRatioBased
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased, Sampler, TraceIdRatioBased
 
 from . import __version__ as PROGRESS_VERSION
 
 if TYPE_CHECKING:
+    from sentry_sdk._types import Event
+
     from .config import ObservabilityConfig
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,7 @@ class _ThreadSafeLineFile:
                 self._fp.close()
 
 
-def _build_sampler(rate: float):
+def _build_sampler(rate: float) -> Sampler:
     if rate >= 1.0:
         return ALWAYS_ON
     return ParentBased(TraceIdRatioBased(rate))
@@ -136,7 +138,7 @@ def _scrub_secret_values(value: Any) -> None:
             _scrub_secret_values(item)
 
 
-def _before_send(event: dict, _hint: dict) -> dict:
+def _before_send(event: Event, _hint: dict[str, Any]) -> Event:
     _scrub_secret_values(event)
     return event
 
@@ -162,7 +164,8 @@ def _setup_otel(
         traces_file = _ThreadSafeLineFile(export_dir / "traces.jsonl")
         _STATE.files.append(traces_file)
         exporter = ConsoleSpanExporter(
-            out=traces_file, formatter=lambda span: _compact_json(span.to_json())
+            out=traces_file,  # ty: ignore[invalid-argument-type]  # _ThreadSafeLineFile implements write+flush; OTel exporters never call read/seek
+            formatter=lambda span: _compact_json(span.to_json())
         )
         processor_cls = (
             SimpleSpanProcessor if component == "cli" else BatchSpanProcessor
@@ -180,7 +183,8 @@ def _setup_otel(
         export_interval = 5_000 if component == "cli" else 60_000
         reader = PeriodicExportingMetricReader(
             ConsoleMetricExporter(
-                out=metrics_file, formatter=lambda md: _compact_json(md.to_json())
+                out=metrics_file,  # ty: ignore[invalid-argument-type]  # _ThreadSafeLineFile implements write+flush; OTel exporters never call read/seek
+                formatter=lambda md: _compact_json(md.to_json())
             ),
             export_interval_millis=export_interval,
         )

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from ...git import GitHubClient
@@ -22,7 +23,7 @@ def _parse_github_datetime(value: str | datetime | None) -> datetime | None:
         return None
 
 
-def replace_owners(owners_config) -> dict:
+def replace_owners(owners_config) -> dict[str, int]:
     """Persist the desired owners to the table, upserting and pruning the rest.
 
     The ``enabled`` flag is preserved: a disabled owner is kept (and skipped at
@@ -59,14 +60,14 @@ class OwnerManager:
         self.github_client = GitHubClient(token=gh_token, proxy=proxy)
         self.logger = logger
 
-    def check_all(self) -> list[dict]:
-        new_repos: list[dict] = []
+    def check_all(self) -> list[dict[str, Any]]:
+        new_repos: list[dict[str, Any]] = []
         owners = GitHubOwner.select().where(GitHubOwner.enabled)
         for owner in owners:
             new_repos.extend(self._check_owner(owner))
         return new_repos
 
-    def _check_owner(self, owner: GitHubOwner) -> list[dict]:
+    def _check_owner(self, owner: GitHubOwner) -> list[dict[str, Any]]:
         try:
             repos = self.github_client.list_repos(
                 str(owner.name), limit=100, source=True
@@ -103,7 +104,7 @@ class OwnerManager:
             owner.save()
             return []
 
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []
         for r in candidates:
             processed = self._process_new_repo(owner, r)
             if processed:
@@ -114,7 +115,7 @@ class OwnerManager:
         owner.save()
         return results
 
-    def _process_new_repo(self, owner: GitHubOwner, repo_data: dict) -> dict | None:
+    def _process_new_repo(self, owner: GitHubOwner, repo_data: dict[str, Any]) -> dict[str, Any] | None:
         name_with_owner = repo_data.get("nameWithOwner")
         if not name_with_owner or "/" not in name_with_owner:
             return None

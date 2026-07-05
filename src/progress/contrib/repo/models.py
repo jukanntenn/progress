@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from peewee import (
+    AutoField,
     BooleanField,
     CharField,
     DateTimeField,
@@ -13,6 +14,7 @@ UTC = ZoneInfo("UTC")
 
 
 class GitHubOwner(BaseModel):
+    id = AutoField()
     owner_type = CharField()
     name = CharField()
     enabled = BooleanField(default=True)
@@ -24,8 +26,3 @@ class GitHubOwner(BaseModel):
     class Meta:
         table_name = "github_owners"
         indexes = ((("owner_type", "name"), True),)
-
-    def save(self, *args, **kwargs):
-        if self._pk is not None:
-            self.updated_at = datetime.now(UTC)
-        return super().save(*args, **kwargs)

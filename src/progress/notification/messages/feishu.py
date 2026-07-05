@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, override
 from collections.abc import Mapping
 
 from ...i18n import gettext as _
@@ -44,6 +44,7 @@ class FeishuMessage(Message):
         super().__init__(channel)
         logger.debug("FeishuMessage initialized")
 
+    @override
     def get_payload(self, context: FeishuContext) -> str:
         title_with_batch = add_batch_indicator(
             context.title, context.batch_index, context.total_batches
@@ -241,6 +242,7 @@ class FeishuProposalMessage(Message):
     def __init__(self, channel: FeishuChannel) -> None:
         super().__init__(channel)
 
+    @override
     def get_payload(self, context: FeishuProposalContext) -> str:
         elements: list[dict[str, Any]] = []
         filenames = context.filenames or []

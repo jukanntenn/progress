@@ -3,7 +3,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, override
 
 from progress.errors import ProposalParseError
 
@@ -148,6 +148,7 @@ def _matches_any_pattern(name: str, patterns: list[str]) -> bool:
 
 
 class EIPParser(ProposalParser):
+    @override
     def parse(self, file_path: str) -> ParsedProposal:
         text = _read_text(file_path)
         meta = _parse_yaml_frontmatter(text)
@@ -181,6 +182,7 @@ class EIPParser(ProposalParser):
             extra=extra,
         )
 
+    @override
     def extract_number(self, file_path: str) -> str:
         name = Path(file_path).name
         m = re.search(r"(?:eip|erc)-(\d+)\.md$", name, flags=re.IGNORECASE)
@@ -188,11 +190,13 @@ class EIPParser(ProposalParser):
             return ""
         return str(int(m.group(1)))
 
+    @override
     def matches_pattern(self, file_path: str, patterns: list[str]) -> bool:
         return _matches_any_pattern(Path(file_path).name, patterns)
 
 
 class PEPParser(ProposalParser):
+    @override
     def parse(self, file_path: str) -> ParsedProposal:
         text = _read_text(file_path)
         headers = _parse_rst_field_list(text)
@@ -226,6 +230,7 @@ class PEPParser(ProposalParser):
             extra=extra,
         )
 
+    @override
     def extract_number(self, file_path: str) -> str:
         name = Path(file_path).name
         m = re.search(r"pep-(\d+)\.rst$", name, flags=re.IGNORECASE)
@@ -233,11 +238,13 @@ class PEPParser(ProposalParser):
             return ""
         return str(int(m.group(1)))
 
+    @override
     def matches_pattern(self, file_path: str, patterns: list[str]) -> bool:
         return _matches_any_pattern(Path(file_path).name, patterns)
 
 
 class RFCParser(ProposalParser):
+    @override
     def parse(self, file_path: str) -> ParsedProposal:
         text = _read_text(file_path)
         number = self.extract_number(file_path)
@@ -263,6 +270,7 @@ class RFCParser(ProposalParser):
             extra={},
         )
 
+    @override
     def extract_number(self, file_path: str) -> str:
         name = Path(file_path).name
         m = re.match(r"^(\d+)", name)
@@ -270,11 +278,13 @@ class RFCParser(ProposalParser):
             return ""
         return str(int(m.group(1)))
 
+    @override
     def matches_pattern(self, file_path: str, patterns: list[str]) -> bool:
         return _matches_any_pattern(Path(file_path).name, patterns)
 
 
 class DEPParser(ProposalParser):
+    @override
     def parse(self, file_path: str) -> ParsedProposal:
         text = _read_text(file_path)
         name = Path(file_path).name
@@ -344,6 +354,7 @@ class DEPParser(ProposalParser):
             extra={},
         )
 
+    @override
     def extract_number(self, file_path: str) -> str:
         name = Path(file_path).stem
         m = re.search(r"(\d+)", name)
@@ -351,6 +362,7 @@ class DEPParser(ProposalParser):
             return ""
         return str(int(m.group(1)))
 
+    @override
     def matches_pattern(self, file_path: str, patterns: list[str]) -> bool:
         return _matches_any_pattern(Path(file_path).name, patterns)
 

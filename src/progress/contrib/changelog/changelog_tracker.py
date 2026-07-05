@@ -7,7 +7,7 @@ from typing import Literal
 from ...config import ChangelogTrackerConfig, Config
 from .models import ChangelogTracker
 from ...errors import ChangelogParseError
-from ...utils import get_now
+from ...utils.timezone import get_now
 from .changelog_parsers import (
     HTMLChineseVersionParser,
     MarkdownHeadingParser,

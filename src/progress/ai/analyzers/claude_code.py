@@ -4,16 +4,16 @@ from typing import override
 
 from ..runner import run_tool
 from ..types import ParserType, R
-from .base import Analyzer, noop
+from .base import Analyzer
 
 
 class ClaudeCodeAnalyzer(Analyzer):
     @override
-    def analyze(
+    def analyze[R](
         self,
         content: str,
         prompt: str = "",
-        parser: ParserType[R] = noop,
+        parser: ParserType[R] | None = None,
     ) -> R:
         stdout = run_tool("claude_code", prompt, content, config=self._config)
         return self.apply_parser(parser, stdout)

@@ -3,7 +3,7 @@
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from github import (
     BadCredentialsException,
@@ -51,7 +51,7 @@ class GitHubClient:
         exclude_drafts: bool = True,
         exclude_pre_releases: bool = True,
         limit: int = 100,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """List GitHub releases for a repository.
 
         Args:
@@ -115,7 +115,7 @@ class GitHubClient:
         owner: str,
         limit: int = 100,
         source: bool = True,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """List repositories for an owner.
 
         Args:

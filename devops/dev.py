@@ -54,10 +54,10 @@ def parse_args():
     return args
 
 
-def run(name, *args, **kwargs):
-    defaults = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}
+def run(name: str, *args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    defaults: dict[str, object] = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}
     defaults.update(kwargs)
-    return subprocess.run([name, *args], **defaults)
+    return subprocess.run([name, *args], **defaults)  # ty: ignore[no-matching-overload]  # mixed-type kwargs dict from PIPE (int) and text (bool)
 
 
 def wait_for(url, name, timeout=120):

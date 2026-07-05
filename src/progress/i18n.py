@@ -16,6 +16,8 @@ per-request language selection) can swap catalogs without rebuilding the cache.
 
 from __future__ import annotations
 
+import typing
+
 import gettext as gettext_module
 import logging
 import threading
@@ -68,7 +70,7 @@ def initialize(ui_language: str = "en") -> None:
     logger.info("Translation initialized: UI=%s", ui_language)
 
 
-def get_language() -> str:
+def get_language() -> str | None:
     """Return the currently active language code for the calling thread."""
     stack = _thread_stack()
     if stack:
@@ -185,17 +187,21 @@ class _LazyString:
     def _resolve(self) -> str:
         return self._func(*self._args, **self._kwargs)
 
+    @typing.override
     def __str__(self) -> str:
         return self._resolve()
 
+    @typing.override
     def __repr__(self) -> str:
         return repr(self._resolve())
 
+    @typing.override
     def __eq__(self, other) -> bool:
         if isinstance(other, _LazyString):
             return self._resolve() == other._resolve()
         return self._resolve() == other
 
+    @typing.override
     def __hash__(self) -> int:
         return hash(self._resolve())
 

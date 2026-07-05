@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from progress.errors import AnalysisException
 from progress.telemetry import get_tracer, record_analysis
-from progress.utils import retry
+from progress.utils.functional import retry
 
 if TYPE_CHECKING:
     from progress.config import AnalysisConfig

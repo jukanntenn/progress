@@ -13,7 +13,7 @@ from progress.ai import Analyzer
 from progress.errors import GitException, ProposalParseError
 from progress.git import GitClient, sanitize_repo_name
 from progress.telemetry import report_error
-from progress.utils import run_command
+from progress.utils.process import run_command
 
 from .analysis import run_analysis
 from .models import Proposal, ProposalTrackerState
@@ -153,7 +153,7 @@ class ProposalTracker:
                     "Proposal deleted: kind=%s number=%s %s -> %s",
                     kind.value,
                     r.number,
-                    r.old_status.value,
+                    r.old_status.value if r.old_status else "",
                     r.new_status.value,
                 )
                 reports.append(r)
@@ -589,7 +589,9 @@ class ProposalTracker:
             new_status = old_status
 
         config = KIND_CONFIGS[kind]
-        file_url = self._build_file_url(config, state.last_seen_commit, rel_path)
+        file_url = self._build_file_url(
+            config, state.last_seen_commit or "", rel_path
+        )
         return ProposalReport(
             kind=kind,
             number=number,

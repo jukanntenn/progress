@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from html import escape
-from typing import NamedTuple
+from typing import NamedTuple, override
 from collections.abc import Mapping
 
 from ...consts import TEMPLATE_EMAIL_NOTIFICATION
@@ -45,6 +45,7 @@ class EmailMessage(Message):
     def __init__(self, channel: EmailChannel) -> None:
         super().__init__(channel)
 
+    @override
     def get_payload(self, context: EmailContext) -> str:
         subject_with_batch = add_batch_indicator(
             context.title, context.batch_index, context.total_batches
@@ -121,6 +122,7 @@ class EmailProposalMessage(Message):
     def __init__(self, channel: EmailChannel) -> None:
         super().__init__(channel)
 
+    @override
     def get_payload(self, context: EmailProposalContext) -> str:
         lines: list[str] = [f"<h2>{escape(context.title)}</h2>", "<ul>"]
         for fname in context.filenames or []:

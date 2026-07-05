@@ -14,7 +14,7 @@ import json
 import logging
 from copy import deepcopy
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
@@ -43,7 +43,7 @@ class ConfigVersionConflict(ConfigException):
     """Raised when a config write is rejected because the version is stale."""
 
 
-def get_config_json_schema() -> dict:
+def get_config_json_schema() -> dict[str, Any]:
     """JSON Schema for the editable app config.
 
     Infra fields (data_dir/workspace_dir/observability) and table-backed lists
@@ -60,7 +60,7 @@ def get_config_json_schema() -> dict:
     return schema
 
 
-def _config_from_dict(data: dict) -> Config:
+def _config_from_dict(data: dict[str, Any]) -> Config:
     """Validate ``data`` and build a Config from the dict alone (no env/file)."""
 
     class _DictConfig(Config):
@@ -69,6 +69,7 @@ def _config_from_dict(data: dict) -> Config:
         )
 
         @classmethod
+        @override
         def settings_customise_sources(
             cls,
             settings_cls: type[BaseSettings],
@@ -90,7 +91,7 @@ def is_seeded() -> bool:
     return _load_row() is not None
 
 
-def load_app_config() -> tuple[dict, int] | None:
+def load_app_config() -> tuple[dict[str, Any], int] | None:
     """Return ``(data_dict, version)`` or ``None`` when not yet seeded."""
     row = _load_row()
     if row is None:
@@ -103,7 +104,7 @@ def load_app_config() -> tuple[dict, int] | None:
     return data, row.version
 
 
-def _strip_excluded(data: dict) -> dict:
+def _strip_excluded(data: dict[str, Any]) -> dict[str, Any]:
     """Drop keys that do not belong in the blob (infra + table-backed lists)."""
     return {k: v for k, v in data.items() if k not in EXCLUDED_FROM_BLOB}
 
@@ -129,7 +130,7 @@ def migrate_blob_schema() -> None:
     )
 
 
-def import_app_config(data: dict) -> int:
+def import_app_config(data: dict[str, Any]) -> int:
     """Replace the blob with ``data`` (explicit file -> DB action).
 
     Validates, then upserts the blob, bumping the version so concurrent UI
@@ -158,7 +159,7 @@ def import_app_config(data: dict) -> int:
     return new_version
 
 
-def seed_app_config_if_needed(seed_data: dict) -> bool:
+def seed_app_config_if_needed(seed_data: dict[str, Any]) -> bool:
     """One-shot seed of the blob from the file config.
 
     Returns True when a row was created, False when the blob was already seeded.
@@ -176,7 +177,7 @@ def seed_app_config_if_needed(seed_data: dict) -> bool:
     return True
 
 
-def build_runtime_config(blob_data: dict, infra: dict) -> Config:
+def build_runtime_config(blob_data: dict[str, Any], infra: dict[str, Any]) -> Config:
     """Assemble a runtime Config from the blob plus infra fields."""
     merged = _strip_excluded(blob_data)
     for field in INFRA_FIELDS:
@@ -209,7 +210,7 @@ def seed_lists_if_needed(file_cfg: Config) -> None:
 # --- schema-driven secret handling ----------------------------------------
 
 
-def _resolve_ref(schema: dict, root: dict) -> dict:
+def _resolve_ref(schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:
     ref = schema.get("$ref")
     if not ref:
         return schema
@@ -219,7 +220,7 @@ def _resolve_ref(schema: dict, root: dict) -> dict:
     return node
 
 
-def _branch_for_value(value: Any, item_schema: dict, root: dict) -> dict | None:
+def _branch_for_value(value: Any, item_schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any] | None:
     """Resolve the matching oneOf branch for a discriminated-union value."""
     discriminator = item_schema.get("discriminator")
     one_of = item_schema.get("oneOf") or item_schema.get("anyOf") or []
@@ -239,14 +240,14 @@ def _branch_for_value(value: Any, item_schema: dict, root: dict) -> dict | None:
     return None
 
 
-def _is_secret(field_schema: dict) -> bool:
+def _is_secret(field_schema: dict[str, Any]) -> bool:
     return (
         field_schema.get("writeOnly") is True
         or field_schema.get("format") == "password"
     )
 
 
-def _mask_secrets(value: Any, schema: dict, root: dict) -> Any:
+def _mask_secrets(value: Any, schema: dict[str, Any], root: dict[str, Any]) -> Any:
     schema = _resolve_ref(schema, root)
     if isinstance(value, dict) and (schema.get("oneOf") or schema.get("anyOf")):
         branch = _branch_for_value(value, schema, root)
@@ -263,13 +264,13 @@ def _mask_secrets(value: Any, schema: dict, root: dict) -> Any:
     return value
 
 
-def mask_secrets(data: dict) -> dict:
+def mask_secrets(data: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of ``data`` with every secret field replaced by the mask."""
     schema = get_config_json_schema()
     return _mask_secrets(data, schema, schema)
 
 
-def _merge_secret_placeholders(submitted: dict, stored: dict) -> dict:
+def _merge_secret_placeholders(submitted: dict[str, Any], stored: dict[str, Any]) -> dict[str, Any]:
     """Restore stored secret values where the submission kept the mask.
 
     Walks the submitted and stored trees in parallel (by object key / array
@@ -279,7 +280,7 @@ def _merge_secret_placeholders(submitted: dict, stored: dict) -> dict:
     """
     schema = get_config_json_schema()
 
-    def merge(sub: Any, sto: Any, node_schema: dict) -> Any:
+    def merge(sub: Any, sto: Any, node_schema: dict[str, Any]) -> Any:
         node_schema = _resolve_ref(node_schema, schema)
         if (
             node_schema.get("type") == "object"
@@ -319,7 +320,7 @@ def _format_validation_error(e: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def validate_config_dict(data: dict) -> None:
+def validate_config_dict(data: dict[str, Any]) -> None:
     """Validate a config dict; raises :class:`ConfigException` on failure."""
     try:
         _config_from_dict(data)
@@ -327,7 +328,7 @@ def validate_config_dict(data: dict) -> None:
         raise ConfigException(_format_validation_error(e)) from e
 
 
-def validate_app_config(data: dict) -> None:
+def validate_app_config(data: dict[str, Any]) -> None:
     """Validate ``data`` the way :func:`save_app_config` would.
 
     Masked secret placeholders (:data:`SECRET_MASK`) are merged back from
@@ -342,7 +343,7 @@ def validate_app_config(data: dict) -> None:
     validate_config_dict(merged)
 
 
-def save_app_config(data: dict, expected_version: int) -> tuple[dict, int]:
+def save_app_config(data: dict[str, Any], expected_version: int) -> tuple[dict[str, Any], int]:
     """Validate and persist ``data`` under optimistic locking.
 
     Returns ``(merged_data, new_version)``. Raises :class:`ConfigVersionConflict`

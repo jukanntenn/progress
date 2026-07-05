@@ -1,7 +1,8 @@
 import logging
 import logging.config
 
-from .utils import canonicalify, ensure_path
+from .utils.paths import canonicalify, ensure_path
+from typing import override
 
 _OTEL_FIELDS = ("otelTraceID", "otelSpanID", "otelTraceSampled", "otelServiceName")
 
@@ -15,12 +16,15 @@ class _OtelContextFilter(logging.Filter):
     observability is disabled).
     """
 
+    @override
     def filter(self, record: logging.LogRecord) -> bool:
         for attr in _OTEL_FIELDS:
             if not hasattr(record, attr):
                 setattr(record, attr, "")
         return True
 
+
+DEFAULT_LOGFILE = "data/progress.log"
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -46,7 +50,7 @@ LOGGING_CONFIG = {
             "level": logging.DEBUG,
             "formatter": "default",
             "filters": ["otel_context"],
-            "filename": "data/progress.log",
+            "filename": DEFAULT_LOGFILE,
             "maxBytes": 5 * 1024 * 1024,  # 5MB
             "backupCount": 100,
         },
@@ -61,9 +65,9 @@ LOGGING_CONFIG = {
 }
 
 
-def setup(logfile=None):
+def setup(logfile: str | None = None) -> None:
     if not logfile:
-        logfile = LOGGING_CONFIG["handlers"]["file"]["filename"]
+        logfile = DEFAULT_LOGFILE
 
     p = canonicalify(logfile)
     if len(p.parts) > 1:

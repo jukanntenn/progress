@@ -8,6 +8,7 @@ import requests
 from lxml import html
 
 from ...errors import ChangelogParseError
+from typing import override
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +80,7 @@ class ChangelogParser(ABC):
 class MarkdownHeadingParser(ChangelogParser):
     _heading_re = re.compile(r"^##\s+(.+?)\s*$")
 
+    @override
     def parse(self, content: str) -> list[VersionEntry]:
         lines = content.splitlines()
 
@@ -119,6 +121,7 @@ class MarkdownHeadingParser(ChangelogParser):
 class HTMLChineseVersionParser(ChangelogParser):
     _version_re = re.compile(r"uTools\s*v(\d+(?:\.\d+){1,3})", re.IGNORECASE)
 
+    @override
     def parse(self, content: str) -> list[VersionEntry]:
         try:
             root = html.fromstring(content)

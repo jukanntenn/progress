@@ -4,7 +4,7 @@ import logging
 import re
 from enum import Enum
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, override
 from zoneinfo import ZoneInfo, available_timezones
 
 from pydantic import (
@@ -365,6 +365,7 @@ class Config(BaseSettings):
         return v
 
     @classmethod
+    @override
     def settings_customise_sources(
         cls,
         settings_cls: type[BaseSettings],
@@ -385,7 +386,7 @@ class Config(BaseSettings):
         if not path.exists():
             raise ConfigException(f"Configuration file not found: {config_path}")
 
-        class _Config(cls):
+        class _Config(cls):  # ty: ignore[unsupported-base]  # dynamic pydantic subclass for TOML file binding; ty cannot resolve MRO for runtime-created base
             model_config = SettingsConfigDict(
                 toml_file=str(path),
                 env_prefix="PROGRESS_",

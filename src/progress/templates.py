@@ -67,7 +67,7 @@ def _build_environment() -> Environment:
         keep_trailing_newline=True,
     )
 
-    env.globals["_"] = _
+    env.globals["_"] = _  # ty: ignore[invalid-assignment]  # Jinja2 globals accepts arbitrary callables; ty infers a narrow union from default globals
     env.filters["escape_html"] = _escape_html
     env.filters["basename"] = _basename
 

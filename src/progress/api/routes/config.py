@@ -5,6 +5,7 @@ source of truth and these endpoints read/write it. Writes are guarded by
 optimistic locking (``version``) and secrets are masked in every GET response.
 """
 
+from typing import Any
 import pytz
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -28,17 +29,17 @@ router = APIRouter(prefix="/config", tags=["config"])
 
 
 class ConfigResponse(BaseModel):
-    data: dict
+    data: dict[str, Any]
     version: int
 
 
 class ConfigSaveRequest(BaseModel):
-    config: dict
+    config: dict[str, Any]
     version: int
 
 
 class ConfigValidateRequest(BaseModel):
-    config: dict
+    config: dict[str, Any]
 
 
 class ConfigValidateResponse(BaseModel):
