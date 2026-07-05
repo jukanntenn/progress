@@ -45,8 +45,10 @@ progress/
 ├── src/                   # Source code directory
 │   └── progress/          # Main package directory
 │       ├── __init__.py    # Package initialization
-│       ├── cli.py         # CLI entry point
+│       ├── cli.py         # CLI entry point (Click commands + check orchestration)
 │       ├── config.py      # Configuration management
+│       ├── bootstrap.py   # Component initialization and runtime config resolution
+│       ├── reporting.py   # Report generation pipeline (batching, titling, publishing)
 │       ├── consts.py      # Constants
 │       ├── db.py          # Database operations
 │       ├── enums.py       # Enum definitions
@@ -57,15 +59,14 @@ progress/
 │       ├── markpost.py    # Markpost functionality
 │       ├── models.py      # Peewee ORM models
 │       ├── ai/             # AI analysis (analyzers/factory)
-│       ├── notification/  # Notifications (channels/messages/factory)
-│       ├── notifier.py    # Notifications (legacy)
+│       ├── notification/  # Notifications (channels/messages/factory/dispatch)
 │       ├── proposal_parsers.py # Proposal parsing modules
 │       ├── proposal_tracking.py # Proposal tracking logic
 │       ├── repo.py        # Repository management
 │       ├── repository.py  # Extended repository operations
-│       ├── reporter.py    # Markdown report generator
+│       ├── contrib/repo/reporter.py # Markdown report generator
 │       ├── templates.py   # Central Jinja2 template engine
-│       ├── utils.py       # Utility functions
+│       ├── utils/         # Utility modules (timezone/paths/functional/sanitize/text/process)
 │       ├── api/           # Web API + static serving (FastAPI)
 │       └── web/           # Frontend (React + Vite)
 │       ├── templates/     # Jinja2 template files
