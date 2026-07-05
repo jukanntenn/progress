@@ -912,7 +912,6 @@ name = "progress"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "click" },
     { name = "fastapi", extra = ["standard"] },
     { name = "feedgen" },
     { name = "gitpython" },
@@ -934,12 +933,14 @@ dependencies = [
     { name = "requests" },
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "tomlkit" },
+    { name = "typer" },
     { name = "urllib3" },
 ]
 
 [package.optional-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "types-peewee" },
     { name = "watchdog" },
 ]
 test = [
@@ -955,7 +956,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=8.3.1" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.0" },
     { name = "feedgen", specifier = ">=0.9.0" },
     { name = "gitpython", specifier = ">=3.1.46" },
@@ -980,6 +980,8 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.5" },
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.60.0" },
     { name = "tomlkit", specifier = ">=0.13.0" },
+    { name = "typer", specifier = ">=0.26.0" },
+    { name = "types-peewee", marker = "extra == 'dev'", specifier = ">=3.18.0" },
     { name = "urllib3", specifier = ">=2.6.3" },
     { name = "watchdog", marker = "extra == 'dev'", specifier = ">=5.0.0" },
 ]
@@ -1483,6 +1485,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/67/a5/756f2e6bc81a7dd79aa3c625dd01b74cabc4516628cace2caaec09ca6ff2/typer-0.26.2.tar.gz", hash = "sha256:9b4f19e08fcc9427a822d1ef467b1fe76737a2f65c7926bdeba2337d73569b68", size = 198991, upload-time = "2026-05-27T10:41:39.166Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/a5/6ffd702beda8798b2b82ff70805ed4a66d963557e43a5d1823ab456251a4/typer-0.26.2-py3-none-any.whl", hash = "sha256:39beff72ffbb31978a5b545f677d57edb97c6f980f433b38556deb0af25f094d", size = 123123, upload-time = "2026-05-27T10:41:40.504Z" },
+]
+
+[[package]]
+name = "types-peewee"
+version = "4.0.8.20260630"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/bd/9b04449cd7662aeb8d48d7c8ec678ab5ed67fdf885ce9ba2494255616a8a/types_peewee-4.0.8.20260630.tar.gz", hash = "sha256:5ffbb336067fd5b4da0e2d77666d4adf269fa40e152d0497811b73bec5eb6d83", size = 24004, upload-time = "2026-06-30T06:00:00.42Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/e9/9656f4679e8dd923ea82348d363598fa3d6f42f06de34fa24a95e0e52575/types_peewee-4.0.8.20260630-py3-none-any.whl", hash = "sha256:bf8be4acfb328269b9bc25dc403ca361255a13baa4100b70a437dff732ae956f", size = 21673, upload-time = "2026-06-30T05:59:59.325Z" },
 ]
 
 [[package]]
