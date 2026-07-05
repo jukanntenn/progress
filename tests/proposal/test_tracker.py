@@ -305,7 +305,7 @@ class TestLanguagePropagation:
             clock=lambda: datetime.now(ZoneInfo("UTC")),
             language="zh",
         )
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = lambda config: repo_dir  # ty: ignore[invalid-assignment]
 
         tracker.check(ProposalKind.EIP)
 

@@ -8,7 +8,7 @@ from progress.db.models import Batch, Report
 try:
     from peewee import IntegrityError
 except ImportError:  # pragma: no cover
-    IntegrityError = Exception
+    IntegrityError = Exception  # ty: ignore[invalid-assignment]
 
 
 @pytest.fixture()
@@ -42,7 +42,7 @@ class TestBatchModel:
         )
 
         assert batch.id is not None
-        assert batch.report_id == aggregated_report.id
+        assert batch.report_id == aggregated_report.id  # ty: ignore[unresolved-attribute]
         assert batch.title == "Aggregated Report (1/2)"
         assert batch.markpost_url == "https://markpost.example.com/p-abc"
         assert batch.seq == 1

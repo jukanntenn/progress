@@ -18,6 +18,7 @@ from progress.notification.messages import (
     FeishuMessage,
     FeishuProposalMessage,
 )
+from progress.notification.channels import FeishuChannel
 
 
 def test_create_channel_returns_console_channel() -> None:
@@ -28,11 +29,11 @@ def test_create_channel_returns_console_channel() -> None:
 
 def test_create_channel_returns_feishu_channel() -> None:
     config = FeishuChannelConfig(
-        webhook_url="https://example.com/webhook",
+        webhook_url="https://example.com/webhook",  # ty: ignore[invalid-argument-type]
         timeout=30,
     )
     channel = create_channel(config)
-    assert channel.__class__.__name__ == "FeishuChannel"
+    assert isinstance(channel, FeishuChannel)
     assert channel._webhook_url == "https://example.com/webhook"
     assert channel._timeout == 30
 
@@ -52,18 +53,16 @@ def test_create_channel_returns_email_channel() -> None:
 
 def test_create_message_returns_console_message() -> None:
     config = ConsoleChannelConfig(enabled=True)
-    channel = create_channel(config)
-    message = create_message(config, channel)
+    message = create_message(config)
     assert isinstance(message, ConsoleMessage)
 
 
 def test_create_message_returns_feishu_message() -> None:
     config = FeishuChannelConfig(
-        webhook_url="https://example.com/webhook",
+        webhook_url="https://example.com/webhook",  # ty: ignore[invalid-argument-type]
         timeout=30,
     )
-    channel = create_channel(config)
-    message = create_message(config, channel)
+    message = create_message(config)
     assert isinstance(message, FeishuMessage)
 
 
@@ -76,25 +75,22 @@ def test_create_message_returns_email_message() -> None:
         from_addr="from@example.com",
         recipient=["to@example.com"],
     )
-    channel = create_channel(config)
-    message = create_message(config, channel)
+    message = create_message(config)
     assert isinstance(message, EmailMessage)
 
 
 def test_create_proposal_message_returns_console_proposal_message() -> None:
     config = ConsoleChannelConfig(enabled=True)
-    channel = create_channel(config)
-    message = create_proposal_message(config, channel)
+    message = create_proposal_message(config)
     assert isinstance(message, ConsoleProposalMessage)
 
 
 def test_create_proposal_message_returns_feishu_proposal_message() -> None:
     config = FeishuChannelConfig(
-        webhook_url="https://example.com/webhook",
+        webhook_url="https://example.com/webhook",  # ty: ignore[invalid-argument-type]
         timeout=30,
     )
-    channel = create_channel(config)
-    message = create_proposal_message(config, channel)
+    message = create_proposal_message(config)
     assert isinstance(message, FeishuProposalMessage)
 
 
@@ -107,6 +103,5 @@ def test_create_proposal_message_returns_email_proposal_message() -> None:
         from_addr="from@example.com",
         recipient=["to@example.com"],
     )
-    channel = create_channel(config)
-    message = create_proposal_message(config, channel)
+    message = create_proposal_message(config)
     assert isinstance(message, EmailProposalMessage)

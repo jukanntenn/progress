@@ -57,10 +57,10 @@ def test_before_send_scrubs_known_secret_keys():
         "tags": {"dsn": "http://key@host/1"},
     }
 
-    scrubbed = telemetry._before_send(event, {})
+    scrubbed = telemetry._before_send(event, {})  # ty: ignore[invalid-argument-type]
 
-    assert scrubbed["request"]["headers"]["authorization"] == telemetry._REDACTED
-    assert scrubbed["request"]["headers"]["x-github-token"] == telemetry._REDACTED
+    assert scrubbed["request"]["headers"]["authorization"] == telemetry._REDACTED  # ty: ignore[not-subscriptable]
+    assert scrubbed["request"]["headers"]["x-github-token"] == telemetry._REDACTED  # ty: ignore[not-subscriptable]
     assert scrubbed["extra"]["gh_token"] == telemetry._REDACTED
     assert scrubbed["extra"]["kept"] == "visible"
     assert scrubbed["tags"]["dsn"] == telemetry._REDACTED
@@ -107,8 +107,8 @@ def test_shutdown_clears_provider_references():
     # later disabled setup would flip is_enabled() back to True (found in
     # acceptance testing). Probes state directly to avoid the OTel global
     # provider "set once" constraint across tests.
-    telemetry._STATE.tracer_provider = object()
-    telemetry._STATE.meter_provider = object()
+    telemetry._STATE.tracer_provider = object()  # ty: ignore[invalid-assignment]
+    telemetry._STATE.meter_provider = object()  # ty: ignore[invalid-assignment]
     telemetry._STATE.enabled = True
 
     telemetry.shutdown_observability()

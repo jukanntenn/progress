@@ -48,7 +48,7 @@ def test_sync_creates_updates_and_deletes_trackers(db):
     trackers = [
         ChangelogTrackerConfig(
             name="A",
-            url="https://example.com/a",
+            url="https://example.com/a",  # ty: ignore[invalid-argument-type]
             parser_type="markdown_heading",
             enabled=True,
         )
@@ -61,7 +61,7 @@ def test_sync_creates_updates_and_deletes_trackers(db):
     trackers2 = [
         ChangelogTrackerConfig(
             name="A2",
-            url="https://example.com/a",
+            url="https://example.com/a",  # ty: ignore[invalid-argument-type]
             parser_type="markdown_heading",
             enabled=False,
         )
@@ -178,19 +178,19 @@ def test_check_all_runs_in_config_order_and_skips_disabled(db, monkeypatch):
     cfg.changelog_trackers = [
         ChangelogTrackerConfig(
             name="A",
-            url=url_a,
+            url=url_a,  # ty: ignore[invalid-argument-type]
             parser_type="markdown_heading",
             enabled=True,
         ),
         ChangelogTrackerConfig(
             name="B",
-            url=url_b,
+            url=url_b,  # ty: ignore[invalid-argument-type]
             parser_type="markdown_heading",
             enabled=True,
         ),
         ChangelogTrackerConfig(
             name="C",
-            url=url_c,
+            url=url_c,  # ty: ignore[invalid-argument-type]
             parser_type="markdown_heading",
             enabled=False,
         ),

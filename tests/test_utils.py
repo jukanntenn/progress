@@ -5,7 +5,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from progress.utils import retry, sanitize
+from progress.utils.functional import retry
+from progress.utils.sanitize import sanitize
 
 
 class TestSanitize:
@@ -111,7 +112,7 @@ class TestRetry:
         """Test max_delay caps the exponentially growing delay"""
         delays: list[int] = []
 
-        with patch("progress.utils.time.sleep", lambda d: delays.append(d)):
+        with patch("progress.utils.functional.time.sleep", lambda d: delays.append(d)):
 
             @retry(times=5, initial_delay=20, backoff="exponential", max_delay=60)
             def func():
@@ -126,7 +127,7 @@ class TestRetry:
         """Test default max_delay=None does not cap the growing delay"""
         delays: list[int] = []
 
-        with patch("progress.utils.time.sleep", lambda d: delays.append(d)):
+        with patch("progress.utils.functional.time.sleep", lambda d: delays.append(d)):
 
             @retry(times=3, initial_delay=1, backoff="exponential")
             def func():
@@ -220,7 +221,7 @@ class TestStripGitSuffix:
     )
     def test_strip_git_suffix(self, input_name, expected):
         """Test strip_git_suffix removes only .git suffix."""
-        from progress.utils import strip_git_suffix
+        from progress.utils.text import strip_git_suffix
 
         result = strip_git_suffix(input_name)
         assert result == expected, (
@@ -240,12 +241,12 @@ class TestCreateReportBatches:
     """Tests for create_report_batches size-based splitting."""
 
     def test_empty_returns_no_batches(self):
-        from progress.utils import create_report_batches
+        from progress.reporting import create_report_batches
 
         assert create_report_batches([], 1000) == []
 
     def test_groups_until_effective_limit_then_splits(self):
-        from progress.utils import create_report_batches
+        from progress.reporting import create_report_batches
 
         limit = 1000
         # Two reports that each fit alone but together exceed the 80% limit.
@@ -263,7 +264,7 @@ class TestCreateReportBatches:
         assert [b.reports[0].repo_name for b in batches] == ["a", "b"]
 
     def test_oversized_report_gets_own_batch(self):
-        from progress.utils import create_report_batches
+        from progress.reporting import create_report_batches
 
         # A single report exceeding the effective (80%) limit lands in its own
         # batch; the caller decides to stub or skip it during upload.
@@ -274,7 +275,7 @@ class TestCreateReportBatches:
         assert batches[0].reports[0].repo_name == "big"
 
     def test_many_small_reports_pack_into_one_batch(self):
-        from progress.utils import create_report_batches
+        from progress.reporting import create_report_batches
 
         reports = [_report(f"r{i}", "x" * 50) for i in range(5)]
         batches = create_report_batches(reports, 1000)

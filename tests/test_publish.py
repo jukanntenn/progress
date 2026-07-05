@@ -45,8 +45,8 @@ def make_client(urls, fail_indices=()):
 
     def upload(body, title=None):
         idx = state["n"]
-        state["n"] += 1
-        state["titles"].append(title)
+        state["n"] += 1  # ty: ignore[unsupported-operator]  # state dict has mixed value types
+        state["titles"].append(title)  # ty: ignore[unresolved-attribute]  # state dict has mixed value types
         if idx in fail_indices:
             raise RuntimeError("boom")
         return urls[idx]

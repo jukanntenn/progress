@@ -148,7 +148,7 @@ class TestDEPParser:
         data = DEPParser().parse(str(p))
         assert data.number == "1"
         assert data.raw_status == "Final"
-        assert "Purpose" in data.title
+        assert "Purpose" in data.title  # ty: ignore[unsupported-operator]
 
     def test_plain_rst_headers(self, tmp_path: Path):
         p = tmp_path / "0001-test.rst"

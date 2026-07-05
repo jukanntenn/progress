@@ -20,7 +20,7 @@ def test_console_channel_config_defaults() -> None:
 
 def test_feishu_channel_config_validation() -> None:
     config = FeishuChannelConfig(
-        webhook_url="https://example.com/webhook",
+        webhook_url="https://example.com/webhook",  # ty: ignore[invalid-argument-type]
         timeout=10,
     )
     assert config.type == "feishu"
@@ -30,7 +30,8 @@ def test_feishu_channel_config_validation() -> None:
 
 def test_feishu_channel_config_requires_url() -> None:
     with pytest.raises(ValidationError):
-        FeishuChannelConfig(timeout=10)
+        FeishuChannelConfig(timeout=10)  # ty: ignore[missing-argument]  # test expects ValidationError at runtime
+
 
 
 def test_email_channel_config_requires_host_and_recipient_when_enabled() -> None:
@@ -40,7 +41,7 @@ def test_email_channel_config_requires_host_and_recipient_when_enabled() -> None
 
 def test_notification_channel_discriminator() -> None:
     console = ConsoleChannelConfig()
-    feishu = FeishuChannelConfig(webhook_url="https://example.com")
+    feishu = FeishuChannelConfig(webhook_url="https://example.com")  # ty: ignore[invalid-argument-type]
     email = EmailChannelConfig(
         host="smtp.example.com",
         user="user",

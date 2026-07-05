@@ -605,7 +605,8 @@ def test_repository_config_protocol_defaults_to_https():
 def test_repository_config_protocol_rejects_invalid_string():
     """Test that protocol field rejects invalid string values."""
     with pytest.raises(ValueError) as exc_info:
-        RepositoryConfig(url="vitejs/vite", protocol="ftp")
+        RepositoryConfig(url="vitejs/vite", protocol="ftp",  # ty: ignore[invalid-argument-type]
+)
     assert "protocol" in str(exc_info.value).lower()
 
 

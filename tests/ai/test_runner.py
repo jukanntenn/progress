@@ -19,10 +19,10 @@ from progress.errors import AnalysisException
 def _config(**overrides) -> AnalysisConfig:
     defaults = {"timeout": 600, "retries": 3, "retry_delay": 5}
     defaults.update(overrides)
-    return AnalysisConfig(**defaults)
+    return AnalysisConfig(**defaults)  # ty: ignore[invalid-argument-type]  # test helper with mixed-type overrides dict
 
 
-def _ok(stdout: str = "out", stderr: str = "") -> subprocess.CompletedProcess:
+def _ok(stdout: str = "out", stderr: str = "") -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(
         args=[], returncode=0, stdout=stdout, stderr=stderr
     )
@@ -32,7 +32,8 @@ def _fail(
     returncode: int = 1,
     stdout: str = "",
     stderr: str = "error",
-) -> subprocess.CompletedProcess:
+
+) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(
         args=[], returncode=returncode, stdout=stdout, stderr=stderr
     )
@@ -172,7 +173,7 @@ class TestRunOnceClassification:
 
 
 class TestRetryBehavior:
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_retries_transient_then_succeeds(self, mock_run, mock_sleep):
         mock_run.side_effect = [
@@ -183,7 +184,7 @@ class TestRetryBehavior:
         assert mock_run.call_count == 2
         mock_sleep.assert_called_once_with(5)
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_exhausts_retries_on_persistent_transient(self, mock_run, mock_sleep):
         mock_run.return_value = _fail(returncode=1, stderr="rate limit")
@@ -192,7 +193,7 @@ class TestRetryBehavior:
         assert mock_run.call_count == 3
         assert mock_sleep.call_count == 2
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_timeout_retried_then_succeeds(self, mock_run, mock_sleep):
         mock_run.side_effect = [
@@ -205,7 +206,7 @@ class TestRetryBehavior:
         )
         assert mock_run.call_count == 2
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_permanent_failure_not_retried(self, mock_run, mock_sleep):
         mock_run.return_value = _fail(returncode=2, stderr="invalid api key")
@@ -214,7 +215,7 @@ class TestRetryBehavior:
         assert mock_run.call_count == 1
         mock_sleep.assert_not_called()
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_file_not_found_not_retried(self, mock_run, mock_sleep):
         mock_run.side_effect = FileNotFoundError("claude")
@@ -223,7 +224,7 @@ class TestRetryBehavior:
         assert mock_run.call_count == 1
         mock_sleep.assert_not_called()
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_retries_disabled_when_one(self, mock_run, mock_sleep):
         mock_run.return_value = _fail(returncode=1, stderr="rate limit")
@@ -232,7 +233,7 @@ class TestRetryBehavior:
         assert mock_run.call_count == 1
         mock_sleep.assert_not_called()
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_backoff_grows_exponentially(self, mock_run, mock_sleep):
         mock_run.return_value = _fail(returncode=1, stderr="overloaded")
@@ -241,7 +242,7 @@ class TestRetryBehavior:
         sleeps = [call.args[0] for call in mock_sleep.call_args_list]
         assert sleeps == [5, 10, 20]
 
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_backoff_capped_at_max_delay(self, mock_run, mock_sleep):
         mock_run.return_value = _fail(returncode=1, stderr="overloaded")
@@ -268,7 +269,7 @@ class TestStderrHandling:
 
 
 class TestExhaustionLogging:
-    @patch("progress.utils.time.sleep")
+    @patch("progress.utils.functional.time.sleep")
     @patch("progress.ai.runner.subprocess.run")
     def test_logs_error_with_provider_and_attempts(self, mock_run, mock_sleep, caplog):
         mock_run.return_value = _fail(returncode=1, stderr="rate limit exceeded")

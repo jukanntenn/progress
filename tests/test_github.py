@@ -309,10 +309,10 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),
     )
-    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)  # ty: ignore[invalid-argument-type]
 
     # Replace manager.git with FakeGitClient
-    manager.git = FakeGitClient()
+    manager.git = FakeGitClient()  # ty: ignore[invalid-assignment]
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
@@ -331,7 +331,7 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)
+        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.commit_count == 1
 
@@ -385,10 +385,10 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),
     )
-    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)  # ty: ignore[invalid-argument-type]
 
     # Replace manager.git with FakeGitClient
-    manager.git = FakeGitClient()
+    manager.git = FakeGitClient()  # ty: ignore[invalid-assignment]
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
@@ -407,7 +407,7 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)
+        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.previous_commit == "b" * 40
         assert report.current_commit == "n" * 40
@@ -462,10 +462,10 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
             gh_timeout=300, gh_token=None, proxy=None, protocol="https", git_timeout=300
         ),
     )
-    manager = RepositoryManager(FakeAnalyzer(), None, cfg)
+    manager = RepositoryManager(FakeAnalyzer(), None, cfg)  # ty: ignore[invalid-argument-type]
 
     # Replace manager.git with FakeGitClient
-    manager.git = FakeGitClient()
+    manager.git = FakeGitClient()  # ty: ignore[invalid-assignment]
 
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
@@ -484,7 +484,7 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)
+        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.previous_commit == "o" * 40
         assert report.current_commit == "n" * 40
@@ -519,7 +519,7 @@ class TestParseRepoName:
     )
     def test_parse_repo_name(self, input_url, expected):
         """Test parse_repo_name extracts owner/repo correctly."""
-        from progress.consts import parse_repo_name
+        from progress.git.url import parse_repo_name
 
         result = parse_repo_name(input_url)
         assert result == expected, (
@@ -528,7 +528,7 @@ class TestParseRepoName:
 
     def test_parse_repo_name_openlist_regression(self):
         """Regression test for OpenList -> OpenLis bug."""
-        from progress.consts import parse_repo_name
+        from progress.git.url import parse_repo_name
 
         # Test the specific case that was failing
         result = parse_repo_name("OpenListTeam/OpenList")

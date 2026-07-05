@@ -6,6 +6,7 @@ import pytest
 
 from progress.notification.base import Channel
 from progress.notification.messages.base import Message
+from typing import override
 
 
 def test_message_send_calls_channel() -> None:
@@ -15,6 +16,7 @@ def test_message_send_calls_channel() -> None:
         def __init__(self, channel: Channel) -> None:
             super().__init__(channel)
 
+        @override
         def get_payload(self, context: str) -> str:
             return f"payload:{context}"
 
@@ -33,6 +35,7 @@ def test_message_send_returns_false_on_error() -> None:
         def __init__(self, channel: Channel) -> None:
             super().__init__(channel)
 
+        @override
         def get_payload(self, context: str) -> str:
             return "test payload"
 
@@ -50,6 +53,7 @@ def test_message_send_raises_on_error_when_not_fail_silently() -> None:
         def __init__(self, channel: Channel) -> None:
             super().__init__(channel)
 
+        @override
         def get_payload(self, context: str) -> str:
             return "test payload"
 

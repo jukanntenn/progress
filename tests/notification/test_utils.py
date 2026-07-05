@@ -9,5 +9,5 @@ def test_discovered_repo_is_frozen() -> None:
     repo = DiscoveredRepo(name="owner/repo", url="https://github.com/owner/repo")
 
     with pytest.raises(Exception):
-        repo.name = "changed"
+        repo.name = "changed"  # ty: ignore[invalid-assignment]  # intentionally tests frozen dataclass immutability
 

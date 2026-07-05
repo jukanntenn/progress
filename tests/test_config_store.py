@@ -56,21 +56,21 @@ def db(tmp_path, monkeypatch):
 def test_seed_is_idempotent(db):
     assert seed_app_config_if_needed(SAMPLE) is True
     assert seed_app_config_if_needed(SAMPLE) is False
-    data, version = load_app_config()
+    data, version = load_app_config()  # ty: ignore[not-iterable]
     assert version == 1
     assert data["github"]["gh_token"] == "ghp_real_token"
 
 
 def test_seed_strips_infra(db):
     seed_app_config_if_needed({**SAMPLE, "data_dir": "/x", "workspace_dir": "/y"})
-    data, _ = load_app_config()
+    data, _ = load_app_config()  # ty: ignore[not-iterable]
     assert "data_dir" not in data
     assert "workspace_dir" not in data
 
 
 def test_mask_secrets(db):
     seed_app_config_if_needed(SAMPLE)
-    masked = mask_secrets(load_app_config()[0])
+    masked = mask_secrets(load_app_config()[0])  # ty: ignore[not-subscriptable]
     assert masked["github"]["gh_token"] == SECRET_MASK
     assert masked["notification"]["channels"][0]["webhook_url"] == SECRET_MASK
     assert masked["notification"]["channels"][1]["password"] == SECRET_MASK
@@ -102,7 +102,7 @@ def test_save_optimistic_lock_conflict(db):
 
 def test_save_preserves_masked_secrets(db):
     seed_app_config_if_needed(SAMPLE)
-    masked = mask_secrets(load_app_config()[0])
+    masked = mask_secrets(load_app_config()[0])  # ty: ignore[not-subscriptable]
     data, _ = save_app_config(masked, expected_version=1)
     assert data["github"]["gh_token"] == "ghp_real_token"
     assert data["notification"]["channels"][0]["webhook_url"] == "https://hook/secret"
@@ -117,7 +117,7 @@ def test_save_rejects_invalid(db):
 
 def test_build_runtime_config_merges_infra(db):
     seed_app_config_if_needed(SAMPLE)
-    data, _ = load_app_config()
+    data, _ = load_app_config()  # ty: ignore[not-iterable]
     cfg = build_runtime_config(data, {"data_dir": "/data", "workspace_dir": "/ws"})
     assert cfg.language == "en"
     assert cfg.data_dir == "/data"
@@ -162,7 +162,7 @@ def test_migrate_blob_schema_strips_inline_repos_and_owners(db):
 
     migrate_blob_schema()
 
-    data, _ = load_app_config()
+    data, _ = load_app_config()  # ty: ignore[not-iterable]
     assert "repos" not in data
     assert "owners" not in data
     assert data["language"] == "en"
@@ -175,7 +175,7 @@ def test_migrate_blob_schema_is_idempotent(db):
 
     test_migrate_blob_schema_strips_inline_repos_and_owners(db)
     migrate_blob_schema()
-    data, _ = load_app_config()
+    data, _ = load_app_config()  # ty: ignore[not-iterable]
     assert "repos" not in data
 
 
@@ -223,6 +223,6 @@ def test_import_overwrites_and_bumps_version(db):
     seed_app_config_if_needed(SAMPLE)
     version = import_app_config({"language": "ja", "github": {"gh_token": "ghp_new"}})
     assert version == 2
-    data, _ = load_app_config()
+    data, _ = load_app_config()  # ty: ignore[not-iterable]
     assert data["language"] == "ja"
     assert data["github"]["gh_token"] == "ghp_new"

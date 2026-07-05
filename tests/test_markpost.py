@@ -35,13 +35,13 @@ class TestUrlParsing:
         import pydantic
 
         with pytest.raises((ProgressException, pydantic.ValidationError)):
-            config = MarkpostConfig(url="not-a-url", timeout=30)
+            config = MarkpostConfig(url="not-a-url", timeout=30)  # ty: ignore[invalid-argument-type]
             MarkpostClient(config)
 
     def test_extract_missing_path(self):
         """Test URL without path raises exception."""
         with pytest.raises(ProgressException, match="missing path"):
-            config = MarkpostConfig(url="https://example.com", timeout=30)
+            config = MarkpostConfig(url="https://example.com", timeout=30)  # ty: ignore[invalid-argument-type]
             MarkpostClient(config)
 
 
@@ -50,7 +50,7 @@ class TestUrlMasking:
 
     def test_mask_url(self):
         """Test URL masking function."""
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
         masked = client._mask_url("https://example.com/p/sensitive-key")
         assert "sensitive-key" not in masked
@@ -58,7 +58,7 @@ class TestUrlMasking:
 
     def test_mask_short_key(self):
         """Test masking short keys."""
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
         masked = client._mask_url("https://example.com/p/ab")
         assert "ab" not in masked or "***" in masked
@@ -84,7 +84,7 @@ class TestUpload:
 
         monkeypatch.setattr(requests, "post", fake_post)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         url = client.upload("content", "title")
@@ -92,7 +92,7 @@ class TestUpload:
 
     def test_upload_empty_content(self):
         """Test upload with empty content raises exception."""
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ProgressException, match="Content cannot be empty"):
@@ -115,7 +115,7 @@ class TestUpload:
 
         monkeypatch.setattr(requests, "post", fake_post)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ProgressException, match="missing 'id'"):
@@ -137,7 +137,7 @@ class TestUpload:
 
         monkeypatch.setattr(requests, "post", fake_post)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ClientError, match="Client error 400"):
@@ -149,7 +149,7 @@ class TestUpload:
         """Test 5XX errors are retried (3 attempts total)."""
         call_count = []
 
-        monkeypatch.setattr("progress.utils.time.sleep", lambda _seconds: None)
+        monkeypatch.setattr("progress.utils.functional.time.sleep", lambda _seconds: None)
 
         class FakeResponse:
             status_code = 500
@@ -163,7 +163,7 @@ class TestUpload:
 
         monkeypatch.setattr(requests, "post", fake_post)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(requests.RequestException):
@@ -186,7 +186,7 @@ class TestGetStatus:
 
         monkeypatch.setattr(requests, "get", fake_get)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         assert client.get_status("abc123") is True
@@ -202,14 +202,14 @@ class TestGetStatus:
 
         monkeypatch.setattr(requests, "get", fake_get)
 
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         assert client.get_status("abc123") is False
 
     def test_get_status_empty_id(self):
         """Test get_status with empty post_id."""
-        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)
+        config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ProgressException, match="Post ID cannot be empty"):

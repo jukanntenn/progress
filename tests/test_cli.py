@@ -37,8 +37,8 @@ def test_prepare_discovered_repos_data():
     )
 
     for r in sorted_repos:
-        r.setdefault("readme_summary", None)
-        r.setdefault("readme_detail", None)
+        r.setdefault("readme_summary", None)  # ty: ignore[no-matching-overload]
+        r.setdefault("readme_detail", None)  # ty: ignore[no-matching-overload]
 
     for r in sorted_repos:
         created_at = r.get("created_at")
@@ -57,7 +57,7 @@ def test_prepare_discovered_repos_data():
 
         if "owner_name" not in r:
             name_with_owner = r.get("name_with_owner", "")
-            if "/" in name_with_owner:
+            if isinstance(name_with_owner, str) and "/" in name_with_owner:
                 r["owner_name"] = name_with_owner.split("/")[0]
             else:
                 r["owner_name"] = "Unknown"

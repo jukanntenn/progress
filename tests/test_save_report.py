@@ -100,7 +100,7 @@ class TestSaveReportNoStorageUpload:
         )
 
         report = Report.get_by_id(report_id)
-        assert report.repo_id == sample_repo.id
+        assert report.repo_id == sample_repo.id  # ty: ignore[unresolved-attribute]
         assert report.commit_hash == "aaa111"
         assert report.previous_commit_hash == "bbb222"
         assert report.commit_count == 7
@@ -291,8 +291,8 @@ class TestPreviousBugScenario:
             mock_get_storage.assert_not_called()
 
             all_reports = list(Report.select())
-            individual_reports = [r for r in all_reports if r.repo_id == sample_repo.id]
-            agg_reports = [r for r in all_reports if r.repo_id is None]
+            individual_reports = [r for r in all_reports if r.repo_id == sample_repo.id]  # ty: ignore[unresolved-attribute]
+            agg_reports = [r for r in all_reports if r.repo_id is None]  # ty: ignore[unresolved-attribute]
 
             assert len(individual_reports) == 5
             assert len(agg_reports) == 1

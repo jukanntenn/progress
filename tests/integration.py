@@ -272,6 +272,7 @@ class IntegrationTest:
     def verify_repo_update_report(self, expected_repos: list[str]) -> None:
         report = self.get_latest_report(self.reports_dir / "repo" / "update")
         _assert(report is not None, "No repo update report found")
+        assert report is not None
         content = report.read_text(encoding="utf-8")
         for repo in expected_repos:
             _assert(repo in content, f"Repo update report missing {repo}")
@@ -281,6 +282,7 @@ class IntegrationTest:
     def verify_new_repo_report(self, expected_repo: str) -> None:
         report = self.get_latest_report(self.reports_dir / "repo" / "new")
         _assert(report is not None, "No new repo report found")
+        assert report is not None
         content = report.read_text(encoding="utf-8")
         _assert(expected_repo in content, f"New repo report missing {expected_repo}")
         _assert("github.com" in content, "New repo report missing GitHub links")
@@ -288,6 +290,7 @@ class IntegrationTest:
     def verify_proposal_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "proposal")
         _assert(report is not None, "No proposal report found")
+        assert report is not None
         content = report.read_text(encoding="utf-8")
         content_lower = content.lower()
         _assert(
@@ -298,6 +301,7 @@ class IntegrationTest:
     def verify_changelog_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "changelog")
         _assert(report is not None, "No changelog report found")
+        assert report is not None
         content = report.read_text(encoding="utf-8")
         _assert(len(content) > 100, "Changelog report too short")
         has_version = any(c.isdigit() for c in content) and "." in content
@@ -306,6 +310,7 @@ class IntegrationTest:
     def verify_release_in_report(self) -> None:
         report = self.get_latest_report(self.reports_dir / "repo" / "update")
         _assert(report is not None, "No repo update report found")
+        assert report is not None
         content = report.read_text(encoding="utf-8")
         _assert("🚀" in content, "No release found in report (missing 🚀 marker)")
 
@@ -400,8 +405,8 @@ class IntegrationTest:
         for repo_name in expected_repos:
             repo = Repository.get_or_none(Repository.name == repo_name)
             _assert(repo is not None, f"Repository {repo_name} not found")
-            _assert(repo.url is not None, f"Repository {repo_name} missing url")
-            _assert(repo.branch is not None, f"Repository {repo_name} missing branch")
+            _assert(repo is not None and repo.url is not None, f"Repository {repo_name} missing url")
+            _assert(repo is not None and repo.branch is not None, f"Repository {repo_name} missing branch")
 
     def verify_reports(self) -> None:
         from progress.db.models import Report
@@ -414,26 +419,26 @@ class IntegrationTest:
         )
 
     def verify_proposal_trackers(self) -> None:
-        from progress.contrib.proposal.models import ProposalTracker
+        from progress.contrib.proposal import ProposalTracker
+        from progress.contrib.proposal.models import ProposalTrackerState
 
         pep_tracker = (
-            ProposalTracker.select()
-            .where(ProposalTracker.tracker_type == "pep")
+            ProposalTrackerState.select()
+            .where(ProposalTrackerState.kind == "pep")
             .first()
         )
         _assert(pep_tracker is not None, "PEP tracker not found")
         rust_tracker = (
-            ProposalTracker.select()
-            .where(ProposalTracker.tracker_type == "rust_rfc")
+            ProposalTrackerState.select()
+            .where(ProposalTrackerState.kind == "rust_rfc")
             .first()
         )
         _assert(rust_tracker is not None, "Rust RFC tracker not found")
 
     def verify_proposals(self) -> None:
-        from progress.contrib.proposal.models import PEP, RustRFC
+        from progress.contrib.proposal.models import Proposal
 
-        _assert(PEP.select().count() > 0, "No PEPs found")
-        _assert(RustRFC.select().count() > 0, "No Rust RFCs found")
+        _assert(Proposal.select().count() > 0, "No proposals found")
 
     def verify_owners(self) -> None:
         from progress.contrib.repo.models import GitHubOwner

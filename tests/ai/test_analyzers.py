@@ -25,7 +25,9 @@ class TestAnalyzerApplyParser:
 
     def test_apply_parser_with_parseable(self):
         class UpperParser:
-            def parse(self, s: str) -> str:
+            def __call__(self, s: str) -> str:
+                return s.upper()
+
                 return s.upper()
 
         result = Analyzer.apply_parser(UpperParser(), "hello")

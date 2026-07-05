@@ -221,7 +221,7 @@ class TestCheckReleasesBasic:
         )
         repo.model.last_release_tag = "v1.0.0"
         repo.model.last_release_commit_hash = "oldhash"
-        repo.model.last_release_check_time = "2024-01-01 00:00:00+00:00"
+        repo.model.last_release_check_time = "2024-01-01 00:00:00+00:00"  # ty: ignore[invalid-assignment]  # Peewee DateTimeField descriptor __set__
 
         mock_github_client.list_releases.return_value = [
             {
