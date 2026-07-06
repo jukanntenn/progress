@@ -1,14 +1,16 @@
 """Repository wrapper class for high-level repository operations."""
 
+import asyncio
 import logging
 import os
 import shutil
+from datetime import UTC
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ...config import Config
 from ...consts import CMD_GH, GH_MAX_RETRIES
-from ...db import UTC
+from ...db import database_connection
 from ...db.models import Repository
 from ...enums import Protocol
 from ...errors import GitException
@@ -20,8 +22,8 @@ from ...git import (
     sanitize_repo_name,
     parse_repo_name,
 )
-from ...utils.functional import retry
-from ...utils.process import run_command
+from ...utils.functional import aretry
+from ...utils.process import arun_command
 from ...utils.sanitize import sanitize
 from ...utils.timezone import get_now
 
@@ -129,48 +131,31 @@ class Repo:
 
         return protocol
 
-    def clone_or_update(self) -> Path:
-        """Clone repository for first time or pull updates.
-
-        This method completely replaces GitHubClient.clone_or_update() by migrating
-        the cloning logic into Repo, including protocol handling.
-
-        Returns:
-            Local repository path
-
-        Raises:
-            GitException: If clone/update fails
-        """
+    async def clone_or_update(self) -> Path:
+        """Clone repository for first time or pull updates."""
         if self.is_new:
             effective_protocol = self._get_effective_protocol(self.model.url)
             full_url, short_url = resolve_repo_url(self.model.url, effective_protocol)
             logger.info(f"Using URL: {full_url} (protocol: {effective_protocol})")
-            self._run_gh_clone_command(full_url, self.model.branch)
+            await self._run_gh_clone_command(full_url, self.model.branch)
         else:
-            self.git.fetch_and_reset(self.repo_path, self.model.branch)
+            await self.git.fetch_and_reset(self.repo_path, self.model.branch)
 
         return self.repo_path
 
-    def get_current_commit(self) -> str:
-        """Get current HEAD commit hash.
+    async def get_current_commit(self) -> str:
+        """Get current HEAD commit hash."""
+        return await self.git.get_current_commit(self.repo_path)
 
-        Returns:
-            Current commit hash
-        """
-        return self.git.get_current_commit(self.repo_path)
-
-    def get_diff(self) -> tuple[str, str, int, list[str], bool] | None:
+    async def get_diff(self) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff data for AI analysis.
 
         Returns:
             (diff_content, previous_commit, commit_count, commit_messages, is_range_check)
             Returns None if no new commits
-
-        Raises:
-            GitException: If git operations fail
         """
-        self.clone_or_update()
-        current_commit = self.get_current_commit()
+        await self.clone_or_update()
+        current_commit = await self.get_current_commit()
 
         if self.model.last_commit_hash == current_commit:
             return None
@@ -178,11 +163,11 @@ class Repo:
         previous_commit = self.model.last_commit_hash
 
         if not previous_commit:
-            return self._get_first_check_diff(current_commit)
+            return await self._get_first_check_diff(current_commit)
         else:
-            return self._get_incremental_diff(current_commit, previous_commit)
+            return await self._get_incremental_diff(current_commit, previous_commit)
 
-    def _get_first_check_diff(
+    async def _get_first_check_diff(
         self, current_commit: str
     ) -> tuple[str, str, int, list[str], bool] | None:
         """Get diff for first-time repository check.
@@ -194,7 +179,7 @@ class Repo:
             (diff, previous_commit, commit_count, commit_messages, is_range_check)
         """
         lookback_commits = self.config.analysis.first_run_lookback_commits
-        total_commits = self.git.get_total_commit_count(self.repo_path)
+        total_commits = await self.git.get_total_commit_count(self.repo_path)
 
         if total_commits == 0:
             return None
@@ -202,115 +187,78 @@ class Repo:
         effective_lookback = min(lookback_commits, total_commits)
 
         if total_commits > effective_lookback:
-            return self._get_range_diff(current_commit, effective_lookback)
+            return await self._get_range_diff(current_commit, effective_lookback)
         else:
-            return self._get_recent_diff(current_commit, effective_lookback)
+            return await self._get_recent_diff(current_commit, effective_lookback)
 
-    def _get_range_diff(
+    async def _get_range_diff(
         self, current_commit: str, lookback: int
     ) -> tuple[str, str, int, list[str], bool] | None:
-        """Get diff using old..new range when history is sufficient.
-
-        Args:
-            current_commit: Current HEAD commit
-            lookback: Number of commits to look back
-
-        Returns:
-            (diff, previous_commit, commit_count, commit_messages, is_range_check=True)
-        """
-        previous_commit = self.git.get_nth_commit_from_head(self.repo_path, lookback)
+        """Get diff using old..new range when history is sufficient."""
+        previous_commit = await self.git.get_nth_commit_from_head(self.repo_path, lookback)
 
         if not previous_commit:
-            previous_commit = self.git.get_previous_commit(self.repo_path)
+            previous_commit = await self.git.get_previous_commit(self.repo_path)
 
         if not previous_commit:
             return None
 
-        commit_messages = self.git.get_commit_messages(
+        commit_messages = await self.git.get_commit_messages(
             self.repo_path, previous_commit, current_commit
         )
-        commit_count = self.git.get_commit_count(
+        commit_count = await self.git.get_commit_count(
             self.repo_path, previous_commit, current_commit
         )
-        diff = self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
+        diff = await self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
 
         return diff, previous_commit, commit_count, commit_messages, True
 
-    def _get_recent_diff(
+    async def _get_recent_diff(
         self, current_commit: str, max_count: int
     ) -> tuple[str, str, int, list[str], bool] | None:
-        """Get diff using recent commits when history is insufficient.
-
-        Args:
-            current_commit: Current HEAD commit
-            max_count: Maximum number of commits to analyze
-
-        Returns:
-            (diff, previous_commit, commit_count, commit_messages, is_range_check=False)
-        """
-        recent_hashes = self.git.get_recent_commit_hashes(self.repo_path, max_count)
+        """Get diff using recent commits when history is insufficient."""
+        recent_hashes = await self.git.get_recent_commit_hashes(self.repo_path, max_count)
         previous_commit = recent_hashes[-1] if recent_hashes else None
 
         if not previous_commit:
             return None
 
-        commit_messages = self.git.get_recent_commit_messages(self.repo_path, max_count)
+        commit_messages = await self.git.get_recent_commit_messages(self.repo_path, max_count)
         commit_count = len(recent_hashes)
-        diff = self.git.get_recent_commit_patches(self.repo_path, max_count)
+        diff = await self.git.get_recent_commit_patches(self.repo_path, max_count)
 
         return diff, previous_commit, commit_count, commit_messages, False
 
-    def _get_incremental_diff(
+    async def _get_incremental_diff(
         self, current_commit: str, previous_commit: str
     ) -> tuple[str, str, int, list[str], bool] | None:
-        """Get diff for incremental check (existing repository).
-
-        Args:
-            current_commit: Current HEAD commit
-            previous_commit: Last analyzed commit
-
-        Returns:
-            (diff, previous_commit, commit_count, commit_messages, is_range_check=True)
-        """
-        commit_messages = self.git.get_commit_messages(
+        """Get diff for incremental check (existing repository)."""
+        commit_messages = await self.git.get_commit_messages(
             self.repo_path, previous_commit, current_commit
         )
-        commit_count = self.git.get_commit_count(
+        commit_count = await self.git.get_commit_count(
             self.repo_path, previous_commit, current_commit
         )
-        diff = self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
+        diff = await self.git.get_commit_diff(self.repo_path, previous_commit, current_commit)
 
         return diff, previous_commit, commit_count, commit_messages, True
 
-    def update(self, current_commit: str) -> None:
-        """Update repository model state after analysis.
-
-        Args:
-            current_commit: Current HEAD commit hash
-        """
-        from ...db import _require_db
-
-        with _require_db().atomic():
+    async def update(self, current_commit: str) -> None:
+        """Update repository model state after analysis."""
+        async with database_connection():
             self.model.last_commit_hash = current_commit
             self.model.last_check_time = get_now(UTC)
-            self.model.save()
+            await self.model.save()
 
-    def update_releases(self, release_tag: str, commit_hash: str) -> None:
-        """Update repository release tracking state after analysis.
-
-        Args:
-            release_tag: Release tag name (e.g., "v5.0.0")
-            commit_hash: Commit hash the release tag points to
-        """
-        from ...db import _require_db
-
-        with _require_db().atomic():
+    async def update_releases(self, release_tag: str, commit_hash: str) -> None:
+        """Update repository release tracking state after analysis."""
+        async with database_connection():
             self.model.last_release_tag = release_tag
             self.model.last_release_commit_hash = commit_hash
             self.model.last_release_check_time = get_now(UTC)
-            self.model.save()
+            await self.model.save()
 
-    def check_releases(self) -> dict[str, Any] | None:
+    async def check_releases(self) -> dict[str, Any] | None:
         """Check for new GitHub releases.
 
         Returns:
@@ -320,7 +268,7 @@ class Repo:
         """
         try:
             owner, repo_name = self.slug.split("/")
-            releases = self.github_client.list_releases(owner, repo_name)
+            releases = await self.github_client.list_releases(owner, repo_name)
         except GitException as e:
             logger.warning(f"Failed to check releases for {self.slug}: {e}")
             return None
@@ -373,7 +321,7 @@ class Repo:
         new_releases = []
         for r in releases_to_process:
             try:
-                commit_hash = self.github_client.get_release_commit(
+                commit_hash = await self.github_client.get_release_commit(
                     owner, repo_name, r["tagName"]
                 )
             except GitException as e:
@@ -381,7 +329,7 @@ class Repo:
                 commit_hash = None
 
             try:
-                notes = self.github_client.get_release_body(
+                notes = await self.github_client.get_release_body(
                     owner, repo_name, r["tagName"]
                 )
             except GitException as e:
@@ -400,43 +348,25 @@ class Repo:
 
         return {"releases": new_releases, "is_first_check": is_first_check}
 
-    def get_commit_messages(
+    async def get_commit_messages(
         self, old_commit: str | None, new_commit: str
     ) -> list[str]:
-        """Get commit messages between two commits.
+        """Get commit messages between two commits."""
+        return await self.git.get_commit_messages(self.repo_path, old_commit, new_commit)
 
-        Args:
-            old_commit: Old commit hash (None for single commit)
-            new_commit: New commit hash
-
-        Returns:
-            List of commit messages
-        """
-        return self.git.get_commit_messages(self.repo_path, old_commit, new_commit)
-
-    @retry(
+    @aretry(
         times=GH_MAX_RETRIES,
         initial_delay=3,
         backoff="exponential",
         exceptions=(GitException,),
     )
-    def _run_gh_clone_command(self, url: str, branch: str) -> None:
-        """Clone repository using gh repo clone.
-
-        This method is migrated from GitHubClient._run_gh_clone_command().
-
-        Args:
-            url: Repository URL
-            branch: Branch name
-
-        Raises:
-            GitException: If clone fails
-        """
+    async def _run_gh_clone_command(self, url: str, branch: str) -> None:
+        """Clone repository using gh repo clone."""
         repo_path = self.repo_path
 
         if repo_path.exists():
             logger.debug(f"Removing existing repository path: {repo_path}")
-            shutil.rmtree(repo_path)
+            await asyncio.to_thread(shutil.rmtree, repo_path)
 
         cmd = [
             CMD_GH,
@@ -451,7 +381,7 @@ class Repo:
             "--tags",
         ]
 
-        self._run_command(cmd)
+        await self._run_command(cmd)
 
     def _prepare_env(self, cmd: list[str]) -> dict[str, str] | None:
         """Prepare environment variables for gh command.
@@ -476,22 +406,10 @@ class Repo:
 
         return env
 
-    def _run_command(self, cmd: list[str]) -> str:
-        """Run command and return output.
-
-        This method is migrated from GitHubClient._run_command().
-
-        Args:
-            cmd: Command list
-
-        Returns:
-            Command output
-
-        Raises:
-            GitException: If command fails
-        """
+    async def _run_command(self, cmd: list[str]) -> str:
+        """Run command and return output."""
         env = self._prepare_env(cmd)
-        return run_command(
+        return await arun_command(
             cmd,
             timeout=self.config.github.gh_timeout,
             env=env,

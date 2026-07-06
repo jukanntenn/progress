@@ -24,5 +24,5 @@ class AutoStorage:
             logger.debug("Using file storage")
             self._storage = FileStorage("data/reports")
 
-    def save(self, title: str, bodies: list[str]) -> list[str]:
-        return self._storage.save(title, bodies)
+    async def save(self, title: str, bodies: list[str]) -> list[str]:
+        return await self._storage.save(title, bodies)

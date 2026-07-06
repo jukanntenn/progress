@@ -23,7 +23,7 @@ def _parse_github_datetime(value: str | datetime | None) -> datetime | None:
         return None
 
 
-def replace_owners(owners_config) -> dict[str, int]:
+async def replace_owners(owners_config) -> dict[str, int]:
     """Persist the desired owners to the table, upserting and pruning the rest.
 
     The ``enabled`` flag is preserved: a disabled owner is kept (and skipped at
@@ -34,21 +34,21 @@ def replace_owners(owners_config) -> dict[str, int]:
     updated = 0
     deleted = 0
 
-    existing = {(o.owner_type, o.name): o for o in GitHubOwner.select()}
+    existing = {(o.owner_type, o.name): o for o in await GitHubOwner.all()}
     for (owner_type, name), cfg in desired.items():
         enabled = getattr(cfg, "enabled", True)
         existing_owner = existing.get((owner_type, name))
         if existing_owner is None:
-            GitHubOwner.create(owner_type=owner_type, name=name, enabled=enabled)
+            await GitHubOwner.create(owner_type=owner_type, name=name, enabled=enabled)
             created += 1
         elif existing_owner.enabled != enabled:
             existing_owner.enabled = enabled
-            existing_owner.save()
+            await existing_owner.save()
             updated += 1
 
     for key, existing_owner in existing.items():
         if key not in desired:
-            existing_owner.delete_instance()
+            await existing_owner.delete()
             deleted += 1
 
     return {"created": created, "updated": updated, "deleted": deleted}
@@ -60,16 +60,16 @@ class OwnerManager:
         self.github_client = GitHubClient(token=gh_token, proxy=proxy)
         self.logger = logger
 
-    def check_all(self) -> list[dict[str, Any]]:
+    async def check_all(self) -> list[dict[str, Any]]:
         new_repos: list[dict[str, Any]] = []
-        owners = GitHubOwner.select().where(GitHubOwner.enabled)
+        owners = await GitHubOwner.filter(enabled=True)
         for owner in owners:
-            new_repos.extend(self._check_owner(owner))
+            new_repos.extend(await self._check_owner(owner))
         return new_repos
 
-    def _check_owner(self, owner: GitHubOwner) -> list[dict[str, Any]]:
+    async def _check_owner(self, owner: GitHubOwner) -> list[dict[str, Any]]:
         try:
-            repos = self.github_client.list_repos(
+            repos = await self.github_client.list_repos(
                 str(owner.name), limit=100, source=True
             )
         except Exception as e:
@@ -101,21 +101,21 @@ class OwnerManager:
         if not candidates:
             owner.last_check_time = datetime.now(UTC)
             owner.last_tracked_repo = newest_created_at
-            owner.save()
+            await owner.save()
             return []
 
         results: list[dict[str, Any]] = []
         for r in candidates:
-            processed = self._process_new_repo(owner, r)
+            processed = await self._process_new_repo(owner, r)
             if processed:
                 results.append(processed)
 
         owner.last_check_time = datetime.now(UTC)
         owner.last_tracked_repo = newest_created_at
-        owner.save()
+        await owner.save()
         return results
 
-    def _process_new_repo(self, owner: GitHubOwner, repo_data: dict[str, Any]) -> dict[str, Any] | None:
+    async def _process_new_repo(self, owner: GitHubOwner, repo_data: dict[str, Any]) -> dict[str, Any] | None:
         name_with_owner = repo_data.get("nameWithOwner")
         if not name_with_owner or "/" not in name_with_owner:
             return None
@@ -130,7 +130,7 @@ class OwnerManager:
         readme_was_truncated = False
 
         try:
-            readme_content = self.github_client.get_readme(slug_owner, repo_name)
+            readme_content = await self.github_client.get_readme(slug_owner, repo_name)
             has_readme = readme_content is not None
         except Exception as e:
             self.logger.warning(f"Failed to fetch README for {name_with_owner}: {e}")

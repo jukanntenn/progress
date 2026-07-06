@@ -1,8 +1,9 @@
 """Tests for the MarkPost publish helper (batching, stubs, Report/Batch rules)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import pytest_asyncio
 
 from progress.db import close_db, create_tables, init_db
 from progress.db.models import Batch, Report
@@ -16,20 +17,20 @@ from progress.publish import (
 )
 
 
-@pytest.fixture()
-def temp_db(tmp_path):
+@pytest_asyncio.fixture()
+async def temp_db(tmp_path):
     db_path = tmp_path / "test.db"
-    init_db(str(db_path))
-    create_tables()
+    await init_db(str(db_path))
+    await create_tables()
     try:
         yield str(db_path)
     finally:
-        close_db()
+        await close_db()
 
 
-@pytest.fixture()
-def report_row(temp_db):
-    return Report.create(
+@pytest_asyncio.fixture()
+async def report_row(temp_db):
+    return await Report.create(
         title="T", commit_hash="h", content="full body", markpost_url=""
     )
 
@@ -43,7 +44,7 @@ def make_client(urls, fail_indices=()):
     client = MagicMock()
     state = {"n": 0, "titles": []}
 
-    def upload(body, title=None):
+    async def upload(body, title=None):
         idx = state["n"]
         state["n"] += 1  # ty: ignore[unsupported-operator]  # state dict has mixed value types
         state["titles"].append(title)  # ty: ignore[unresolved-attribute]  # state dict has mixed value types
@@ -51,7 +52,7 @@ def make_client(urls, fail_indices=()):
             raise RuntimeError("boom")
         return urls[idx]
 
-    client.upload.side_effect = upload
+    client.upload = AsyncMock(side_effect=upload)
     client._titles = state["titles"]
     return client
 
@@ -88,35 +89,33 @@ def test_build_oversize_stub_contains_webui_link():
 # --------------------------------------------------------------------------- #
 
 
-def test_publish_report_single_body_sets_url_no_batch_rows(report_row):
+async def test_publish_report_single_body_sets_url_no_batch_rows(report_row):
     client = make_client(["https://mp/p/1"])
 
-    result = publish_report(
+    result = await publish_report(
         report_id=report_row.id, title="T", bodies=["body"], markpost_client=client
     )
 
     assert isinstance(result, PublishResult)
     assert result.batch_urls == ["https://mp/p/1"]
     assert result.markpost_url == "https://mp/p/1"
-    assert Report.get_by_id(report_row.id).markpost_url == "https://mp/p/1"
-    assert Batch.select().where(Batch.report == report_row.id).count() == 0
+    assert (await Report.get(id=report_row.id)).markpost_url == "https://mp/p/1"
+    assert await Batch.filter(report_id=report_row.id).count() == 0
     assert client._titles == ["T"]  # no "(n/m)" suffix for a single batch
 
 
-def test_publish_report_multiple_bodies_clears_url_and_creates_batch_rows(report_row):
+async def test_publish_report_multiple_bodies_clears_url_and_creates_batch_rows(report_row):
     client = make_client(["https://mp/p/1", "https://mp/p/2"])
 
-    result = publish_report(
+    result = await publish_report(
         report_id=report_row.id, title="T", bodies=["a", "b"], markpost_client=client
     )
 
     assert result.markpost_url == ""
     assert result.batch_urls == ["https://mp/p/1", "https://mp/p/2"]
-    assert Report.get_by_id(report_row.id).markpost_url == ""
+    assert (await Report.get(id=report_row.id)).markpost_url == ""
 
-    batches = list(
-        Batch.select().where(Batch.report == report_row.id).order_by(Batch.seq)
-    )
+    batches = await Batch.filter(report_id=report_row.id).order_by("seq")
     assert [b.seq for b in batches] == [1, 2]
     assert [b.markpost_url for b in batches] == ["https://mp/p/1", "https://mp/p/2"]
     # Clean title (no suffix) in the DB; suffix only in the uploaded post titles.
@@ -124,12 +123,12 @@ def test_publish_report_multiple_bodies_clears_url_and_creates_batch_rows(report
     assert client._titles == ["T (1/2)", "T (2/2)"]
 
 
-def test_publish_report_partial_failure_only_persists_successful(report_row):
+async def test_publish_report_partial_failure_only_persists_successful(report_row):
     client = make_client(
         ["https://mp/p/1", "https://mp/p/2", "https://mp/p/3"], fail_indices=(1,)
     )
 
-    result = publish_report(
+    result = await publish_report(
         report_id=report_row.id,
         title="T",
         bodies=["a", "b", "c"],
@@ -138,36 +137,34 @@ def test_publish_report_partial_failure_only_persists_successful(report_row):
 
     assert result.batch_urls == ["https://mp/p/1", "https://mp/p/3"]
     assert result.markpost_url == ""  # multi-batch rule still applies
-    batches = list(
-        Batch.select().where(Batch.report == report_row.id).order_by(Batch.seq)
-    )
+    batches = await Batch.filter(report_id=report_row.id).order_by("seq")
     assert [b.markpost_url for b in batches] == ["https://mp/p/1", "https://mp/p/3"]
 
 
-def test_publish_report_all_fail_leaves_empty_url(report_row):
+async def test_publish_report_all_fail_leaves_empty_url(report_row):
     client = make_client(["https://mp/p/1", "https://mp/p/2"], fail_indices=(0, 1))
 
-    result = publish_report(
+    result = await publish_report(
         report_id=report_row.id, title="T", bodies=["a", "b"], markpost_client=client
     )
 
     assert result.batch_urls == []
     assert result.markpost_url == ""
-    assert Report.get_by_id(report_row.id).markpost_url == ""
-    assert Batch.select().where(Batch.report == report_row.id).count() == 0
+    assert (await Report.get(id=report_row.id)).markpost_url == ""
+    assert await Batch.filter(report_id=report_row.id).count() == 0
 
 
-def test_publish_report_disabled_client_is_noop(report_row):
-    result = publish_report(
+async def test_publish_report_disabled_client_is_noop(report_row):
+    result = await publish_report(
         report_id=report_row.id, title="T", bodies=["a"], markpost_client=None
     )
     assert result.markpost_url == ""
     assert result.batch_urls == []
 
 
-def test_publish_report_empty_bodies_is_noop(report_row):
+async def test_publish_report_empty_bodies_is_noop(report_row):
     client = make_client([])
-    result = publish_report(
+    result = await publish_report(
         report_id=report_row.id, title="T", bodies=[], markpost_client=client
     )
     assert result.batch_urls == []
@@ -179,10 +176,10 @@ def test_publish_report_empty_bodies_is_noop(report_row):
 # --------------------------------------------------------------------------- #
 
 
-def test_publish_monolithic_uploads_full_body_when_under_limit(report_row):
+async def test_publish_monolithic_uploads_full_body_when_under_limit(report_row):
     client = make_client(["https://mp/p/full"])
 
-    url = publish_monolithic(
+    url = await publish_monolithic(
         report_id=report_row.id,
         title="T",
         body="small",
@@ -192,17 +189,17 @@ def test_publish_monolithic_uploads_full_body_when_under_limit(report_row):
     )
 
     assert url == "https://mp/p/full"
-    assert Report.get_by_id(report_row.id).markpost_url == "https://mp/p/full"
+    assert (await Report.get(id=report_row.id)).markpost_url == "https://mp/p/full"
     # Full body uploaded, and the DB content is untouched.
     assert client.upload.call_args.args[0] == "small"
-    assert Report.get_by_id(report_row.id).content == "full body"
+    assert (await Report.get(id=report_row.id)).content == "full body"
 
 
-def test_publish_monolithic_stubs_when_over_limit_with_base_url(report_row):
+async def test_publish_monolithic_stubs_when_over_limit_with_base_url(report_row):
     big = "x" * 100
     client = make_client(["https://mp/p/stub"])
 
-    url = publish_monolithic(
+    url = await publish_monolithic(
         report_id=report_row.id,
         title="T",
         body=big,
@@ -217,10 +214,10 @@ def test_publish_monolithic_stubs_when_over_limit_with_base_url(report_row):
     assert big not in uploaded  # the oversized body itself was not uploaded
 
 
-def test_publish_monolithic_skips_when_over_limit_without_base_url(report_row):
+async def test_publish_monolithic_skips_when_over_limit_without_base_url(report_row):
     client = make_client(["https://mp/p/stub"])
 
-    url = publish_monolithic(
+    url = await publish_monolithic(
         report_id=report_row.id,
         title="T",
         body="x" * 100,
@@ -231,11 +228,11 @@ def test_publish_monolithic_skips_when_over_limit_without_base_url(report_row):
 
     assert url == ""
     client.upload.assert_not_called()
-    assert Report.get_by_id(report_row.id).markpost_url == ""
+    assert (await Report.get(id=report_row.id)).markpost_url == ""
 
 
-def test_publish_monolithic_disabled_client_returns_empty(report_row):
-    url = publish_monolithic(
+async def test_publish_monolithic_disabled_client_returns_empty(report_row):
+    url = await publish_monolithic(
         report_id=report_row.id,
         title="T",
         body="small",

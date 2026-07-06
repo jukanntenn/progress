@@ -1,9 +1,16 @@
-"""GitHub API client using PyGithub."""
+"""GitHub API client using PyGithub.
 
+PyGithub is a synchronous, ``requests``-based client with no async
+alternative. Every API call runs off the event loop via
+``asyncio.to_thread``; the ``_*_sync`` helpers contain the original PyGithub
+logic unchanged.
+"""
+
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from github import (
     BadCredentialsException,
@@ -21,12 +28,6 @@ class GitHubClient:
     """GitHub API client using PyGithub."""
 
     def __init__(self, token: str | None = None, proxy: str | None = None):
-        """Initialize GitHub client.
-
-        Args:
-            token: GitHub personal access token (optional)
-            proxy: Proxy URL for API requests (optional)
-        """
         if proxy:
             self._configure_proxy(proxy)
         self.github = Github(token)
@@ -44,7 +45,7 @@ class GitHubClient:
             os.environ["ALL_PROXY"] = proxy
             os.environ["all_proxy"] = proxy
 
-    def list_releases(
+    def _list_releases_sync(
         self,
         owner: str,
         repo: str,
@@ -52,21 +53,6 @@ class GitHubClient:
         exclude_pre_releases: bool = True,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        """List GitHub releases for a repository.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            exclude_drafts: Whether to exclude draft releases
-            exclude_pre_releases: Whether to exclude pre-releases
-            limit: Maximum number of releases to fetch
-
-        Returns:
-            List of release dicts with keys: tagName, name, publishedAt
-
-        Raises:
-            GitException: If API call fails (except not found)
-        """
         try:
             repo_obj = self.github.get_repo(f"{owner}/{repo}")
             releases = repo_obj.get_releases()
@@ -110,26 +96,29 @@ class GitHubClient:
                 f"Failed to list releases for {owner}/{repo}: {e}"
             ) from e
 
-    def list_repos(
+    async def list_releases(
+        self,
+        owner: str,
+        repo: str,
+        exclude_drafts: bool = True,
+        exclude_pre_releases: bool = True,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(
+            self._list_releases_sync,
+            owner,
+            repo,
+            exclude_drafts,
+            exclude_pre_releases,
+            limit,
+        )
+
+    def _list_repos_sync(
         self,
         owner: str,
         limit: int = 100,
         source: bool = True,
     ) -> list[dict[str, Any]]:
-        """List repositories for an owner.
-
-        Args:
-            owner: Repository owner (user or organization)
-            limit: Maximum number of repositories to fetch
-            source: Whether to filter for source repositories only
-
-        Returns:
-            List of repository dicts with keys: nameWithOwner, description, createdAt, updatedAt
-            Returns empty list if owner not found
-
-        Raises:
-            GitException: If API call fails (except not found)
-        """
         try:
             user = self.github.get_user(owner)
             repos = user.get_repos()
@@ -183,20 +172,15 @@ class GitHubClient:
             logger.error(f"Failed to list repositories for {owner}: {e}")
             raise GitException(f"Failed to list repositories for {owner}: {e}") from e
 
-    def get_release_commit(self, owner: str, repo: str, tag_name: str) -> str:
-        """Get commit hash for a release tag.
+    async def list_repos(
+        self,
+        owner: str,
+        limit: int = 100,
+        source: bool = True,
+    ) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self._list_repos_sync, owner, limit, source)
 
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            tag_name: Release tag name
-
-        Returns:
-            Commit hash string
-
-        Raises:
-            GitException: If release not found or API error
-        """
+    def _get_release_commit_sync(self, owner: str, repo: str, tag_name: str) -> str:
         try:
             repo_obj = self.github.get_repo(f"{owner}/{repo}")
             releases = repo_obj.get_releases()
@@ -235,20 +219,10 @@ class GitHubClient:
                 f"Failed to get release commit for {owner}/{repo}:{tag_name}: {e}"
             ) from e
 
-    def get_release_body(self, owner: str, repo: str, tag_name: str) -> str:
-        """Get release notes/body.
+    async def get_release_commit(self, owner: str, repo: str, tag_name: str) -> str:
+        return await asyncio.to_thread(self._get_release_commit_sync, owner, repo, tag_name)
 
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            tag_name: Release tag name
-
-        Returns:
-            Release body string, or empty string if body is None
-
-        Raises:
-            GitException: If release not found or API error
-        """
+    def _get_release_body_sync(self, owner: str, repo: str, tag_name: str) -> str:
         try:
             repo_obj = self.github.get_repo(f"{owner}/{repo}")
             releases = repo_obj.get_releases()
@@ -283,19 +257,10 @@ class GitHubClient:
                 f"Failed to get release body for {owner}/{repo}:{tag_name}: {e}"
             ) from e
 
-    def get_readme(self, owner: str, repo: str) -> str | None:
-        """Get README content.
+    async def get_release_body(self, owner: str, repo: str, tag_name: str) -> str:
+        return await asyncio.to_thread(self._get_release_body_sync, owner, repo, tag_name)
 
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            Decoded README content string, or None if not found
-
-        Raises:
-            GitException: If API error (except not found)
-        """
+    def _get_readme_sync(self, owner: str, repo: str) -> str | None:
         try:
             repo_obj = self.github.get_repo(f"{owner}/{repo}")
             readme_content = repo_obj.get_readme()
@@ -315,6 +280,9 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Failed to get README for {owner}/{repo}: {e}")
             raise GitException(f"Failed to get README for {owner}/{repo}: {e}") from e
+
+    async def get_readme(self, owner: str, repo: str) -> str | None:
+        return await asyncio.to_thread(self._get_readme_sync, owner, repo)
 
 
 __all__ = ["GitHubClient"]

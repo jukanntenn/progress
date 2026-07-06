@@ -1,8 +1,8 @@
+import asyncio
 import fnmatch
 import logging
 import shutil
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -13,7 +13,7 @@ from progress.ai import Analyzer
 from progress.errors import GitException, ProposalParseError
 from progress.git import GitClient, sanitize_repo_name
 from progress.telemetry import report_error
-from progress.utils.process import run_command
+from progress.utils.process import arun_command
 
 from .analysis import run_analysis
 from .models import Proposal, ProposalTrackerState
@@ -59,20 +59,20 @@ class ProposalTracker:
         self.clock = clock
         self.language = language
 
-    def check(self, kind: ProposalKind) -> list[ProposalReport]:
+    async def check(self, kind: ProposalKind) -> list[ProposalReport]:
         config = KIND_CONFIGS[kind]
-        state = self._get_or_create_state(kind)
+        state = await self._get_or_create_state(kind)
         parser = get_parser(kind)
 
         logger.info("Proposal check started: kind=%s", kind.value)
         start = time.monotonic()
 
         try:
-            repo_path = self._clone_or_update(config)
+            repo_path = await self._clone_or_update(config)
         except GitException as e:
             report_error(e, kind=kind.value, stage="clone")
             raise
-        current_commit = self.git.get_current_commit(repo_path)
+        current_commit = await self.git.get_current_commit(repo_path)
         logger.info(
             "Proposal repo ready: kind=%s commit=%s",
             kind.value,
@@ -80,17 +80,17 @@ class ProposalTracker:
         )
 
         if state.last_seen_commit is None:
-            return self._initial_check(
+            return await self._initial_check(
                 kind, config, state, parser, repo_path, current_commit
             )
 
         if current_commit == state.last_seen_commit:
             logger.info("No new commits: kind=%s", kind.value)
             state.last_check_time = self.clock()
-            state.save()
+            await state.save()
             return []
 
-        changed_files = self.git.get_changed_file_statuses(
+        changed_files = await self.git.get_changed_file_statuses(
             repo_path, state.last_seen_commit, current_commit
         )
         filtered = self._filter_files(config, changed_files)
@@ -116,7 +116,7 @@ class ProposalTracker:
         for change_type, rel_path in filtered:
             if change_type.startswith("D"):
                 continue
-            r = self._handle_changed(
+            r = await self._handle_changed(
                 kind,
                 config,
                 state,
@@ -147,7 +147,7 @@ class ProposalTracker:
                     number,
                 )
                 continue
-            r = self._handle_deleted(kind, state, parser, rel_path, current_commit)
+            r = await self._handle_deleted(kind, state, parser, rel_path, current_commit)
             if r:
                 logger.info(
                     "Proposal deleted: kind=%s number=%s %s -> %s",
@@ -160,7 +160,7 @@ class ProposalTracker:
 
         state.last_seen_commit = current_commit
         state.last_check_time = self.clock()
-        state.save()
+        await state.save()
 
         duration = time.monotonic() - start
         logger.info(
@@ -171,7 +171,7 @@ class ProposalTracker:
         )
         return reports
 
-    def check_all(
+    async def check_all(
         self,
         kinds: list[ProposalKind],
         concurrency: int = 1,
@@ -183,38 +183,42 @@ class ProposalTracker:
             reports: list[ProposalReport] = []
             for kind in kinds:
                 try:
-                    reports.extend(self.check(kind))
+                    reports.extend(await self.check(kind))
                 except Exception as e:
                     logger.warning(
                         "Proposal tracker check failed for %s: %s", kind.value, e
                     )
             return reports
 
+        async def _check_kind(kind: ProposalKind) -> list[ProposalReport]:
+            try:
+                return await self.check(kind)
+            except Exception as e:
+                logger.warning(
+                    "Proposal tracker check failed for %s: %s", kind.value, e
+                )
+                return []
+
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _check_bounded(kind: ProposalKind) -> list[ProposalReport]:
+            async with semaphore:
+                return await _check_kind(kind)
+
+        results = await asyncio.gather(*(_check_bounded(k) for k in kinds))
         all_reports: list[ProposalReport] = []
-        with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            futures = {executor.submit(self.check, kind): kind for kind in kinds}
-            for future in as_completed(futures):
-                kind = futures[future]
-                try:
-                    all_reports.extend(future.result())
-                except Exception as e:
-                    logger.warning(
-                        "Proposal tracker check failed for %s: %s", kind.value, e
-                    )
+        for r in results:
+            all_reports.extend(r)
         return all_reports
 
-    def _get_or_create_state(self, kind: ProposalKind) -> ProposalTrackerState:
-        state = (
-            ProposalTrackerState.select()
-            .where(ProposalTrackerState.kind == kind.value)
-            .first()
-        )
+    async def _get_or_create_state(self, kind: ProposalKind) -> ProposalTrackerState:
+        state = await ProposalTrackerState.get_or_none(kind=kind.value)
         if state is None:
-            state = ProposalTrackerState.create(kind=kind.value)
+            state = await ProposalTrackerState.create(kind=kind.value)
             logger.info("Created tracker state: kind=%s", kind.value)
         return state
 
-    def _clone_or_update(self, config: KindConfig) -> Path:
+    async def _clone_or_update(self, config: KindConfig) -> Path:
         repo_slug = config.repo_url.removesuffix(".git")
         if repo_slug.startswith("https://github.com/"):
             repo_slug = repo_slug[len("https://github.com/") :]
@@ -224,18 +228,18 @@ class ProposalTracker:
         local_dir.parent.mkdir(parents=True, exist_ok=True)
 
         if local_dir.exists() and (local_dir / ".git").exists():
-            if self._try_fetch_and_verify(config, local_dir):
+            if await self._try_fetch_and_verify(config, local_dir):
                 return local_dir
             logger.warning(
                 "Proposal repo HEAD unusable, re-cloning: %s", config.repo_url
             )
-            shutil.rmtree(local_dir, ignore_errors=True)
+            await asyncio.to_thread(shutil.rmtree, local_dir, ignore_errors=True)
 
         try:
             if local_dir.exists():
-                shutil.rmtree(local_dir, ignore_errors=True)
+                await asyncio.to_thread(shutil.rmtree, local_dir, ignore_errors=True)
 
-            run_command(
+            await arun_command(
                 [
                     "git",
                     "clone",
@@ -254,21 +258,11 @@ class ProposalTracker:
         except Exception as e:
             raise GitException(str(e)) from e
 
-    def _try_fetch_and_verify(self, config: KindConfig, local_dir: Path) -> bool:
-        """Fetch updates on an existing clone and verify its HEAD is readable.
-
-        ``fetch_and_reset`` succeeds even when the on-disk HEAD has been rewritten
-        to GitPython's ``refs/heads/.invalid`` placeholder (used to mark refs
-        incompatible with older clients); the breakage only surfaces on the next
-        ``get_current_commit`` read, which raises ``ValueError``. Re-reading here
-        lets the caller detect that state and re-clone instead of failing every
-        run. Assumes upstream repos are append-only; a force-pushed history would
-        leave ``state.last_seen_commit`` unreachable on re-clone (pre-existing
-        failure mode, not introduced here).
-        """
+    async def _try_fetch_and_verify(self, config: KindConfig, local_dir: Path) -> bool:
+        """Fetch updates on an existing clone and verify its HEAD is readable."""
         try:
-            self.git.fetch_and_reset(local_dir, config.branch)
-            self.git.get_current_commit(local_dir)
+            await self.git.fetch_and_reset(local_dir, config.branch)
+            await self.git.get_current_commit(local_dir)
             return True
         except ValueError:
             return False
@@ -312,32 +306,30 @@ class ProposalTracker:
                 moved.add(num)
         return moved
 
-    def _upsert_proposal(
+    async def _upsert_proposal(
         self,
         state: ProposalTrackerState,
         parsed,
         new_status: ProposalStatus,
     ) -> None:
-        existing = (
-            Proposal.select()
-            .where((Proposal.tracker == state) & (Proposal.number == parsed.number))
-            .first()
+        existing = await Proposal.get_or_none(
+            tracker_id=state.id, number=parsed.number
         )
         if existing:
             existing.title = parsed.title
             existing.raw_status = parsed.raw_status
             existing.status = new_status.value
-            existing.save()
+            await existing.save()
         else:
-            Proposal.create(
-                tracker=state,
+            await Proposal.create(
+                tracker_id=state.id,
                 number=parsed.number,
                 title=parsed.title,
                 raw_status=parsed.raw_status,
                 status=new_status.value,
             )
 
-    def _initial_check(
+    async def _initial_check(
         self,
         kind: ProposalKind,
         config: KindConfig,
@@ -356,7 +348,7 @@ class ProposalTracker:
             )
             state.last_seen_commit = current_commit
             state.last_check_time = self.clock()
-            state.save()
+            await state.save()
             return []
 
         matches: list[Path] = []
@@ -374,7 +366,7 @@ class ProposalTracker:
             )
             state.last_seen_commit = current_commit
             state.last_check_time = self.clock()
-            state.save()
+            await state.save()
             return []
 
         latest_path: Path | None = None
@@ -395,9 +387,9 @@ class ProposalTracker:
 
             parsed_count += 1
             new_status = normalize(kind, parsed.raw_status)
-            self._upsert_proposal(state, parsed, new_status)
+            await self._upsert_proposal(state, parsed, new_status)
 
-            created_str = self.git.get_file_creation_date(repo_path, rel_path)
+            created_str = await self.git.get_file_creation_date(repo_path, rel_path)
             cmp = _EPOCH
             if created_str:
                 try:
@@ -424,7 +416,7 @@ class ProposalTracker:
         if latest_path is None:
             state.last_seen_commit = current_commit
             state.last_check_time = self.clock()
-            state.save()
+            await state.save()
             return []
 
         latest_rel_path = str(latest_path.relative_to(repo_path))
@@ -438,11 +430,11 @@ class ProposalTracker:
             )
             state.last_seen_commit = current_commit
             state.last_check_time = self.clock()
-            state.save()
+            await state.save()
             return []
 
         new_status = normalize(kind, parsed.raw_status)
-        summary, detail = run_analysis(
+        summary, detail = await run_analysis(
             self.analyzer,
             "proposal_new_prompt.j2",
             kind,
@@ -470,7 +462,7 @@ class ProposalTracker:
 
         state.last_seen_commit = current_commit
         state.last_check_time = self.clock()
-        state.save()
+        await state.save()
 
         logger.info(
             "Initial check completed: kind=%s total=%d verification=%s duration=%.1fs",
@@ -481,7 +473,7 @@ class ProposalTracker:
         )
         return [report]
 
-    def _handle_changed(
+    async def _handle_changed(
         self,
         kind: ProposalKind,
         config: KindConfig,
@@ -501,20 +493,18 @@ class ProposalTracker:
 
         new_status = normalize(kind, parsed.raw_status)
 
-        existing = (
-            Proposal.select()
-            .where((Proposal.tracker == state) & (Proposal.number == parsed.number))
-            .first()
+        existing = await Proposal.get_or_none(
+            tracker_id=state.id, number=parsed.number
         )
         old_status = ProposalStatus(existing.status) if existing else None
 
         template = get_analysis_template(old_status, new_status)
 
         if old_status is not None and old_status == new_status:
-            diff_text = self.git.get_file_diff(
+            diff_text = await self.git.get_file_diff(
                 repo_path, old_commit, new_commit, rel_path
             )
-            summary, detail = run_analysis(
+            summary, detail = await run_analysis(
                 self.analyzer,
                 template,
                 kind,
@@ -526,7 +516,7 @@ class ProposalTracker:
                 language=self.language,
             )
         else:
-            summary, detail = run_analysis(
+            summary, detail = await run_analysis(
                 self.analyzer,
                 template,
                 kind,
@@ -538,7 +528,7 @@ class ProposalTracker:
                 language=self.language,
             )
 
-        self._upsert_proposal(state, parsed, new_status)
+        await self._upsert_proposal(state, parsed, new_status)
 
         file_url = self._build_file_url(config, new_commit, rel_path)
         return ProposalReport(
@@ -554,7 +544,7 @@ class ProposalTracker:
             analysis_detail=detail or None,
         )
 
-    def _handle_deleted(
+    async def _handle_deleted(
         self,
         kind: ProposalKind,
         state: ProposalTrackerState,
@@ -566,11 +556,7 @@ class ProposalTracker:
         if not number:
             return None
 
-        existing = (
-            Proposal.select()
-            .where((Proposal.tracker == state) & (Proposal.number == number))
-            .first()
-        )
+        existing = await Proposal.get_or_none(tracker_id=state.id, number=number)
         if not existing:
             logger.debug(
                 "Ignoring delete for unknown proposal: kind=%s path=%s",
@@ -583,7 +569,7 @@ class ProposalTracker:
 
         if old_status not in TERMINAL_STATUSES:
             existing.status = ProposalStatus.WITHDRAWN.value
-            existing.save()
+            await existing.save()
             new_status = ProposalStatus.WITHDRAWN
         else:
             new_status = old_status

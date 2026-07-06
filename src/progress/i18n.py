@@ -20,8 +20,8 @@ import typing
 
 import gettext as gettext_module
 import logging
-import threading
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from pathlib import Path
 from typing import Iterator
 
@@ -37,16 +37,20 @@ _translations: dict[str | None, gettext_module.NullTranslations] = {}
 # Active language for the "global" scope (set by :func:`initialize`).
 _ui_language: str = "en"
 
-# Per-thread override stack. Each thread resolves its active language against
-# the top of its own stack, falling back to ``_ui_language``.
-_thread_local = threading.local()
+# Per-context override stack. Under asyncio each task (and each thread, since
+# contextvars also isolate threads) resolves its active language against the
+# top of its own stack, falling back to ``_ui_language``. This replaces the
+# prior ``threading.local`` which leaked state between coroutines on one thread.
+_override_stack: ContextVar[list[str | None]] = ContextVar(
+    "progress_i18n_override_stack", default=[]
+)
 
 
-def _thread_stack() -> list[str | None]:
-    stack = getattr(_thread_local, "override_stack", None)
-    if stack is None:
+def _stack() -> list[str | None]:
+    stack = _override_stack.get()
+    if not isinstance(stack, list):
         stack = []
-        _thread_local.override_stack = stack
+        _override_stack.set(stack)
     return stack
 
 
@@ -55,7 +59,7 @@ def initialize(ui_language: str = "en") -> None:
 
     This must be called once at application startup before using any
     translation functions. Subsequent calls update the active language and
-    invalidate any per-thread override state.
+    invalidate any per-context override state.
 
     Args:
         ui_language: Language code for UI/reports/notifications.
@@ -63,16 +67,14 @@ def initialize(ui_language: str = "en") -> None:
     global _ui_language
 
     _ui_language = ui_language
-    # Drop any cached NullTranslations for a language that may now resolve
-    # differently after the active language changed.
-    _thread_local.__dict__.pop("override_stack", None)
+    _override_stack.set([])
 
     logger.info("Translation initialized: UI=%s", ui_language)
 
 
 def get_language() -> str | None:
-    """Return the currently active language code for the calling thread."""
-    stack = _thread_stack()
+    """Return the currently active language code for the calling context."""
+    stack = _stack()
     if stack:
         return stack[-1]
     return _ui_language
@@ -152,21 +154,19 @@ def ngettext(singular: str, plural: str, count: int) -> str:
 
 @contextmanager
 def override(language: str | None) -> Iterator[None]:
-    """Temporarily activate ``language`` for the calling thread.
+    """Temporarily activate ``language`` for the calling context.
 
     Restores the previous active language on exit. Usable as
     ``with override("zh-hans"): ...``. Passing ``None`` forces the fallback
     (untranslated) catalog.
-
-    Args:
-        language: Language code to activate, or ``None`` for fallback.
     """
-    stack = _thread_stack()
+    stack = list(_stack())
     stack.append(language)
+    token: Token[list[str | None]] = _override_stack.set(stack)
     try:
         yield
     finally:
-        stack.pop()
+        _override_stack.reset(token)
 
 
 class _LazyString:

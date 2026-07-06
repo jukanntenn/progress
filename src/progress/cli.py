@@ -1,8 +1,10 @@
 """CLI entry point: Typer command definitions and check orchestration."""
 
+import asyncio
 import logging
 import typing
 from contextvars import Token
+from functools import wraps
 from pathlib import Path
 
 import typer
@@ -47,6 +49,22 @@ def _fail(message: str) -> typing.NoReturn:
     raise typer.Exit(code=1)
 
 
+def _run_async(coro):
+    """Run an async coroutine to completion under a single event loop.
+
+    Mirrors feeber's ``_handle_run_errors``: typer command callbacks stay
+    synchronous (typer does not natively await), and each invokes exactly one
+    ``asyncio.run`` spanning the whole command so DB init, queries and shutdown
+    share one loop and one tortoise-orm context.
+    """
+
+    @wraps(coro)
+    def wrapper(*args, **kwargs):
+        return asyncio.run(coro(*args, **kwargs))
+
+    return wrapper
+
+
 app = typer.Typer(
     invoke_without_command=True,
     help="Progress Tracker - GitHub code change tracking tool.",
@@ -69,7 +87,7 @@ def main_callback(
     setup_log()
 
     if ctx.invoked_subcommand is None:
-        _run_check_command(config)
+        _run_async(_run_check_command)(config)
 
 
 @app.command(name="check")
@@ -83,10 +101,10 @@ def check(
 ) -> None:
     """Run repository checks and generate reports."""
     config: str = ctx.obj["config_path"]
-    _run_check_command(config, trackers_only=trackers_only)
+    _run_async(_run_check_command)(config, trackers_only=trackers_only)
 
 
-def _run_check_command(config: str, trackers_only: bool = False) -> None:
+async def _run_check_command(config: str, trackers_only: bool = False) -> None:
     """Run the main check command logic."""
     root_span: Span | None = None
     otel_token: Token[Context] | None = None
@@ -98,7 +116,7 @@ def _run_check_command(config: str, trackers_only: bool = False) -> None:
         initialize(ui_language=cfg.language)
 
         cfg, markpost_client, repo_manager, proposal_tracker, reporter = (
-            initialize_components(cfg, config)
+            await initialize_components(cfg, config)
         )
 
         root_span = get_tracer().start_span(
@@ -109,15 +127,15 @@ def _run_check_command(config: str, trackers_only: bool = False) -> None:
             otel_trace.set_span_in_context(root_span)
         )
 
-        _run_changelog_check(cfg, markpost_client)
+        await _run_changelog_check(cfg, markpost_client)
 
         if not trackers_only:
-            _run_repo_check(
+            await _run_repo_check(
                 cfg, repo_manager, reporter, markpost_client, root_span
             )
 
-        _run_proposal_check(cfg, markpost_client, repo_manager, proposal_tracker)
-        _run_owner_check(cfg, markpost_client, repo_manager)
+        await _run_proposal_check(cfg, markpost_client, repo_manager, proposal_tracker)
+        await _run_owner_check(cfg, markpost_client, repo_manager)
 
         logger.info(_("All repository checks completed"))
 
@@ -143,18 +161,18 @@ def _run_check_command(config: str, trackers_only: bool = False) -> None:
         if root_span is not None:
             root_span.end()
         shutdown_observability()
-        close_db()
+        await close_db()
 
 
-def _run_changelog_check(
+async def _run_changelog_check(
     cfg: Config, markpost_client: MarkpostClient | None
 ) -> None:
     try:
         changelog_manager = ChangelogTrackerManager.from_config(cfg)
-        changelog_sync = changelog_manager.sync(cfg.changelog_trackers)
+        changelog_sync = await changelog_manager.sync(cfg.changelog_trackers)
         logger.info(f"Changelog tracker sync completed: {changelog_sync}")
 
-        changelog_result = changelog_manager.check_all()
+        changelog_result = await changelog_manager.check_all()
         for r in changelog_result.results:
             extra: list[str] = []
             if r.latest_version:
@@ -170,7 +188,7 @@ def _run_changelog_check(
             if r.status == "success" and r.new_entries
         ]
         if updates:
-            send_changelog_update_notification(
+            await send_changelog_update_notification(
                 cfg,
                 cfg.notification,
                 markpost_client,
@@ -182,24 +200,24 @@ def _run_changelog_check(
         logger.warning(f"Changelog tracking startup check failed: {e}")
 
 
-def _run_repo_check(
+async def _run_repo_check(
     cfg: Config,
     repo_manager: RepositoryManager,
     reporter: MarkdownReporter,
     markpost_client: MarkpostClient | None,
     root_span: Span | None,
 ) -> None:
-    repos = repo_manager.list_enabled()
+    repos = await repo_manager.list_enabled()
     if root_span is not None:
         root_span.set_attribute("progress.repo_count", len(repos))
     logger.info(f"Starting to check {len(repos)} repositories")
 
-    check_result = repo_manager.check_all(
+    check_result = await repo_manager.check_all(
         repos, concurrency=cfg.analysis.concurrency
     )
 
     if check_result.reports:
-        process_reports(
+        await process_reports(
             cfg,
             check_result,
             reporter,
@@ -216,7 +234,7 @@ def _run_repo_check(
         )
 
 
-def _run_proposal_check(
+async def _run_proposal_check(
     cfg: Config,
     markpost_client: MarkpostClient | None,
     repo_manager: RepositoryManager,
@@ -226,7 +244,7 @@ def _run_proposal_check(
         from .contrib.proposal.status import should_notify
 
         kinds = [ProposalKind(k) for k in cfg.proposal_trackers]
-        proposal_reports = proposal_tracker.check_all(
+        proposal_reports = await proposal_tracker.check_all(
             kinds,
             concurrency=cfg.analysis.concurrency,
         )
@@ -234,7 +252,7 @@ def _run_proposal_check(
             r for r in proposal_reports if should_notify(r.old_status, r.new_status)
         ]
         if notifiable:
-            send_proposal_notification(
+            await send_proposal_notification(
                 cfg,
                 cfg.notification,
                 markpost_client,
@@ -248,14 +266,14 @@ def _run_proposal_check(
         logger.info("No proposal trackers configured")
 
 
-def _run_owner_check(
+async def _run_owner_check(
     cfg: Config,
     markpost_client: MarkpostClient | None,
     repo_manager: RepositoryManager,
 ) -> None:
     owner_manager = OwnerManager(cfg.github.gh_token, cfg.github.proxy)
 
-    new_repos = owner_manager.check_all()
+    new_repos = await owner_manager.check_all()
     if new_repos:
         for repo_info in new_repos:
             if not repo_info.get("has_readme") or not repo_info.get(
@@ -274,7 +292,7 @@ def _run_owner_check(
 
                 from .contrib.repo.analysis import analyze_readme
 
-                summary, detail = analyze_readme(
+                summary, detail = await analyze_readme(
                     repo_manager.analyzer,
                     repo_name,
                     description,
@@ -290,7 +308,7 @@ def _run_owner_check(
                 repo_info["readme_summary"] = "README analysis unavailable"
                 repo_info["readme_detail"] = "README analysis failed or timed out."
 
-        send_entity_notification(
+        await send_entity_notification(
             cfg,
             cfg.notification,
             markpost_client,
@@ -305,19 +323,23 @@ def _run_owner_check(
 @app.command(name="track-proposals")
 def track_proposals(ctx: typer.Context) -> None:
     config: str = ctx.obj["config_path"]
+    _run_async(_track_proposals)(config)
+
+
+async def _track_proposals(config: str) -> None:
     try:
         cfg = Config.load_from_file(config)
         initialize(ui_language=cfg.language)
 
         cfg, markpost_client, repo_manager, proposal_tracker, _ = (
-            initialize_components(cfg, config)
+            await initialize_components(cfg, config)
         )
 
         if cfg.proposal_trackers:
             from .contrib.proposal.status import should_notify
 
             kinds = [ProposalKind(k) for k in cfg.proposal_trackers]
-            proposal_reports = proposal_tracker.check_all(
+            proposal_reports = await proposal_tracker.check_all(
                 kinds,
                 concurrency=cfg.analysis.concurrency,
             )
@@ -325,7 +347,7 @@ def track_proposals(ctx: typer.Context) -> None:
                 r for r in proposal_reports if should_notify(r.old_status, r.new_status)
             ]
             if notifiable:
-                send_proposal_notification(
+                await send_proposal_notification(
                     cfg,
                     cfg.notification,
                     markpost_client,
@@ -336,7 +358,7 @@ def track_proposals(ctx: typer.Context) -> None:
         else:
             logger.info("No proposal trackers configured")
     finally:
-        close_db()
+        await close_db()
 
 
 @config_app.command(name="import")
@@ -350,25 +372,29 @@ def config_import(
 ) -> None:
     """Import the config file into the DB blob (file -> DB)."""
     config: str = ctx.obj["config_path"]
+    _run_async(_config_import)(config, force=force)
+
+
+async def _config_import(config: str, *, force: bool) -> None:
     try:
         file_cfg = Config.load_from_file(config)
         db_path = resolve_db_path(file_cfg.data_dir, config)
-        init_db(db_path)
-        create_tables()
+        await init_db(db_path)
+        await create_tables()
 
         from .config_store import import_app_config, is_seeded
         from .contrib.repo.owner import replace_owners
         from .contrib.repo.repository import replace_repositories
 
-        if is_seeded() and not force:
+        if await is_seeded() and not force:
             _fail(
                 "DB config already seeded. Re-run with --force to overwrite."
             )
-        version = import_app_config(file_cfg.model_dump(mode="json"))
-        repo_result = replace_repositories(
+        version = await import_app_config(file_cfg.model_dump(mode="json"))
+        repo_result = await replace_repositories(
             file_cfg.repos, file_cfg.github.protocol
         )
-        owner_result = replace_owners(file_cfg.owners)
+        owner_result = await replace_owners(file_cfg.owners)
         typer.echo(
             f"Imported configuration into DB (version {version}). "
             f"Repos: {repo_result}. Owners: created={owner_result['created']}, "
@@ -379,7 +405,7 @@ def config_import(
     except Exception as e:
         _fail(str(e))
     finally:
-        close_db()
+        await close_db()
 
 
 @config_app.command(name="export")
@@ -393,18 +419,21 @@ def config_export(
     ),
 ) -> None:
     """Export the DB config blob to a TOML file (DB -> file)."""
+    _run_async(_config_export)(ctx.obj["config_path"], output=output)
+
+
+async def _config_export(config: str, *, output: str | None) -> None:
     import tomlkit
 
-    config: str = ctx.obj["config_path"]
     try:
         file_cfg = Config.load_from_file(config)
         db_path = resolve_db_path(file_cfg.data_dir, config)
-        init_db(db_path)
-        create_tables()
+        await init_db(db_path)
+        await create_tables()
 
         from .config_store import INFRA_FIELDS, load_app_config
 
-        loaded = load_app_config()
+        loaded = await load_app_config()
         if loaded is None:
             _fail("DB config has not been seeded.")
         data = dict(loaded[0])
@@ -431,7 +460,7 @@ def config_export(
     except Exception as e:
         _fail(str(e))
     finally:
-        close_db()
+        await close_db()
 
 
 cli = app

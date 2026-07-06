@@ -44,7 +44,7 @@ class _NotificationData(typing.TypedDict, total=False):
     more_count: int
 
 
-def send_notification(
+async def send_notification(
     notification_config: NotificationConfig,
     *,
     is_proposal: bool = False,
@@ -65,7 +65,7 @@ def send_notification(
         else:
             message = create_message(channel_config)
             context = _build_notification_context(channel_config.type, **data)
-        if not message.send(context, fail_silently=True):
+        if not await message.send(context, fail_silently=True):
             failures += 1
         else:
             record_notification_sent(channel=channel_config.type)
@@ -168,7 +168,7 @@ def _build_proposal_context(
     )
 
 
-def send_entity_notification(
+async def send_entity_notification(
     config: Config,
     notification_config: NotificationConfig,
     markpost_client: MarkpostClient | None,
@@ -213,7 +213,7 @@ def send_entity_notification(
     report_content = reporter.generate_discovered_repos_report(sorted_repos, timezone)
 
     try:
-        title, summary = generate_title_and_summary(
+        title, summary = await generate_title_and_summary(
             analyzer, report_content, config.analysis.language
         )
     except Exception as e:
@@ -224,14 +224,14 @@ def send_entity_notification(
         )
         summary = f"Discovered {len(new_repos)} new repositories"
 
-    report_id = save_report(
+    report_id = await save_report(
         config=config,
         title=title,
         content=report_content,
         report_type="repo_new",
         commit_count=len(new_repos),
     )
-    markpost_url = publish_monolithic_report(
+    markpost_url = await publish_monolithic_report(
         report_id=report_id,
         title=title,
         body=report_content,
@@ -252,7 +252,7 @@ def send_entity_notification(
         for r in sorted_repos
     ]
 
-    send_notification(
+    await send_notification(
         notification_config,
         title=title,
         summary=summary or f"Discovered {len(new_repos)} new repositories",
@@ -263,7 +263,7 @@ def send_entity_notification(
     )
 
 
-def send_proposal_notification(
+async def send_proposal_notification(
     config: Config,
     notification_config: NotificationConfig,
     markpost_client: MarkpostClient | None,
@@ -289,7 +289,7 @@ def send_proposal_notification(
     )
 
     try:
-        title, summary = generate_title_and_summary(
+        title, summary = await generate_title_and_summary(
             analyzer, report_content, config.analysis.language
         )
     except Exception as e:
@@ -297,14 +297,14 @@ def send_proposal_notification(
         title = "Proposal Updates"
         summary = ""
 
-    report_id = save_report(
+    report_id = await save_report(
         config=config,
         title=title,
         content=report_content,
         report_type="proposal",
         commit_count=len(reports),
     )
-    markpost_url = publish_monolithic_report(
+    markpost_url = await publish_monolithic_report(
         report_id=report_id,
         title=title,
         body=report_content,
@@ -314,7 +314,7 @@ def send_proposal_notification(
 
     filenames = [PurePath(r.file_path).name for r in reports][:5]
     more_count = max(0, len(reports) - len(filenames))
-    send_notification(
+    await send_notification(
         notification_config,
         is_proposal=True,
         title=title,
@@ -326,7 +326,7 @@ def send_proposal_notification(
     )
 
 
-def send_changelog_update_notification(
+async def send_changelog_update_notification(
     config: Config,
     notification_config: NotificationConfig,
     markpost_client: MarkpostClient | None,
@@ -345,14 +345,14 @@ def send_changelog_update_notification(
     title = f"Changelog Updates - {now.strftime('%Y-%m-%d %H:%M')}"
 
     total_new_versions = sum(len(u.new_entries) for u in updates)
-    report_id = save_report(
+    report_id = await save_report(
         config=config,
         title=title,
         content=report_content,
         report_type="changelog",
         commit_count=total_new_versions,
     )
-    markpost_url = publish_monolithic_report(
+    markpost_url = await publish_monolithic_report(
         report_id=report_id,
         title=title,
         body=report_content,
@@ -373,7 +373,7 @@ def send_changelog_update_notification(
         for u in updates
     ]
 
-    send_notification(
+    await send_notification(
         notification_config,
         title=title,
         summary=summary,

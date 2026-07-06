@@ -88,3 +88,69 @@ def test_render_real_repository_report_template():
 
     assert "test/repo" in output
     assert "feat: x" in output
+
+
+def _render_proposal_prompt(template_name: str = "proposal_new_prompt.j2") -> str:
+    return render(
+        template_name,
+        kind="eip",
+        number="8243",
+        title="Source-side batch attestation",
+        old_status="",
+        new_status="Draft",
+        language="en",
+    )
+
+
+class TestProposalPromptAutonomousOutput:
+    """The proposal prompt must force autonomous JSON-only output.
+
+    Regression guard for PROGRESS-5 / EIP-8243, where Claude asked for
+    file-write permission ("我准备将分析结果写入 /app/output.json…是否允许写入？")
+    instead of emitting JSON, so there was nothing for the parser or
+    json_repair to recover. The prompt now forbids that behavior explicitly.
+    """
+
+    def test_requires_json_only_output(self):
+        output = _render_proposal_prompt()
+
+        assert "ONLY a valid JSON object" in output
+        assert "no markdown, no code fences" in output
+
+    def test_includes_explicit_json_structure_example(self):
+        output = _render_proposal_prompt()
+
+        assert '"summary"' in output
+        assert '"detail"' in output
+        assert "Required JSON structure" in output
+
+    def test_forbids_interactive_behavior(self):
+        output = _render_proposal_prompt()
+
+        lowered = output.lower()
+        assert "non-interactive" in lowered
+        assert "ask questions" in lowered
+        assert "request permission" in lowered
+
+    def test_forbids_file_writes(self):
+        output = _render_proposal_prompt()
+
+        lowered = output.lower()
+        assert "do not write" in lowered
+        assert "output.json" in lowered
+        assert "stdout" in lowered
+
+    def test_constraints_apply_to_all_proposal_prompt_variants(self):
+        variants = [
+            "proposal_new_prompt.j2",
+            "proposal_accepted_prompt.j2",
+            "proposal_rejected_prompt.j2",
+            "proposal_withdrawn_prompt.j2",
+            "proposal_status_change_prompt.j2",
+            "proposal_content_modified_prompt.j2",
+        ]
+        for name in variants:
+            rendered = _render_proposal_prompt(name)
+            assert "ONLY a valid JSON object" in rendered, name
+            assert "non-interactive" in rendered.lower(), name
+            assert "do not write" in rendered.lower(), name

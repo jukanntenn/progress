@@ -1,5 +1,7 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiohttp
 import pytest
-import requests
 
 from progress.contrib.changelog.changelog_parsers import (
     HTMLChineseVersionParser,
@@ -57,40 +59,40 @@ def test_html_chinese_version_parser_parses_utools_style_versions():
     assert "Fix: A" in entries[0].description
 
 
-def test_fetch_wraps_request_errors_as_changelog_parse_error(monkeypatch):
+async def test_fetch_wraps_request_errors_as_changelog_parse_error():
     import progress.contrib.changelog.changelog_parsers as cp
 
-    def fake_get(*args, **kwargs):
-        raise requests.RequestException("boom")
+    with patch("progress.contrib.changelog.changelog_parsers.aiohttp.ClientSession") as mock_session_cls:
+        session = MagicMock()
+        session.get.side_effect = aiohttp.ClientError("boom")
 
-    monkeypatch.setattr(cp.requests, "get", fake_get)
+        mock_session_cls.return_value.__aenter__.return_value = session
 
-    parser = MarkdownHeadingParser()
-    with pytest.raises(ChangelogParseError, match="Failed to fetch changelog"):
-        parser.fetch("https://example.com/changelog")
+        parser = MarkdownHeadingParser()
+        with pytest.raises(ChangelogParseError, match="Failed to fetch changelog"):
+            await parser.fetch("https://example.com/changelog")
 
 
-def test_fetch_decodes_utf8_when_response_encoding_is_latin1(monkeypatch):
+async def test_fetch_decodes_utf8_when_response_encoding_is_latin1():
     import progress.contrib.changelog.changelog_parsers as cp
 
-    class FakeResponse:
-        def __init__(self, content: bytes):
-            self.content = content
-            self.encoding = "ISO-8859-1"
-            self.apparent_encoding = "utf-8"
+    payload = "uTools v7.5.1 【优化】主搜索框 UI 优化".encode()
 
-        def raise_for_status(self):
-            return None
+    with patch("progress.contrib.changelog.changelog_parsers.aiohttp.ClientSession") as mock_session_cls:
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.read = AsyncMock(return_value=payload)
+        resp.charset = "iso-8859-1"
 
-    def fake_get(*args, **kwargs):
-        payload = "uTools v7.5.1 【优化】主搜索框 UI 优化".encode()
-        return FakeResponse(payload)
+        session = MagicMock()
+        session.get.return_value.__aenter__.return_value = resp
+        session.get.return_value.__aexit__.return_value = None
 
-    monkeypatch.setattr(cp.requests, "get", fake_get)
+        mock_session_cls.return_value.__aenter__.return_value = session
 
-    parser = HTMLChineseVersionParser()
-    text = parser.fetch("https://example.com/changelog")
-    assert "【优化】" in text
+        parser = HTMLChineseVersionParser()
+        text = await parser.fetch("https://example.com/changelog")
+        assert "【优化】" in text
 
 
 def test_markdown_heading_parser_raises_on_missing_versions():
@@ -103,3 +105,4 @@ def test_html_parser_raises_on_missing_versions():
     parser = HTMLChineseVersionParser()
     with pytest.raises(ChangelogParseError, match="No version patterns"):
         parser.parse("<html><body><p>no versions</p></body></html>")
+

@@ -55,9 +55,9 @@ class ChangelogTrackerManager:
     def from_config(cls, cfg: Config) -> ChangelogTrackerManager:
         return cls(cfg=cfg)
 
-    def sync(self, trackers: list[ChangelogTrackerConfig]) -> dict[str, int]:
+    async def sync(self, trackers: list[ChangelogTrackerConfig]) -> dict[str, int]:
         desired_urls = {str(t.url) for t in trackers}
-        existing = list(ChangelogTracker.select())
+        existing = await ChangelogTracker.all()
 
         created = 0
         updated = 0
@@ -65,11 +65,9 @@ class ChangelogTrackerManager:
 
         for t in trackers:
             url = str(t.url)
-            tracker = (
-                ChangelogTracker.select().where(ChangelogTracker.url == url).first()
-            )
+            tracker = await ChangelogTracker.get_or_none(url=url)
             if tracker is None:
-                ChangelogTracker.create(
+                await ChangelogTracker.create(
                     name=t.name,
                     url=url,
                     parser_type=t.parser_type,
@@ -91,12 +89,12 @@ class ChangelogTrackerManager:
                 tracker.enabled = t.enabled
                 changed = True
             if changed:
-                tracker.save()
+                await tracker.save()
                 updated += 1
 
         for tr in existing:
             if tr.url not in desired_urls:
-                tr.delete_instance()
+                await tr.delete()
                 deleted += 1
 
         return {
@@ -106,7 +104,7 @@ class ChangelogTrackerManager:
             "total": len(trackers),
         }
 
-    def check(self, tracker: ChangelogTracker) -> ChangelogCheckResult:
+    async def check(self, tracker: ChangelogTracker) -> ChangelogCheckResult:
         if not tracker.enabled:
             return ChangelogCheckResult(
                 name=tracker.name,
@@ -118,7 +116,7 @@ class ChangelogTrackerManager:
         now = get_now(self._cfg.get_timezone())
         try:
             parser = self._build_parser(tracker.parser_type)
-            content = parser.fetch(tracker.url)
+            content = await parser.fetch(tracker.url)
             entries = parser.parse(content)
             if not entries:
                 raise ChangelogParseError("No version entries found")
@@ -130,7 +128,7 @@ class ChangelogTrackerManager:
 
             if not new_entries:
                 tracker.last_check_time = now
-                tracker.save()
+                await tracker.save()
                 return ChangelogCheckResult(
                     name=tracker.name,
                     url=tracker.url,
@@ -141,7 +139,7 @@ class ChangelogTrackerManager:
 
             tracker.last_seen_version = new_entries[0].version
             tracker.last_check_time = now
-            tracker.save()
+            await tracker.save()
             return ChangelogCheckResult(
                 name=tracker.name,
                 url=tracker.url,
@@ -154,7 +152,7 @@ class ChangelogTrackerManager:
         except Exception as e:
             logger.warning(f"Changelog check failed for {tracker.name}: {e}")
             tracker.last_check_time = now
-            tracker.save()
+            await tracker.save()
             return ChangelogCheckResult(
                 name=tracker.name,
                 url=tracker.url,
@@ -163,15 +161,11 @@ class ChangelogTrackerManager:
                 error=str(e),
             )
 
-    def check_all(self) -> ChangelogCheckAllResult:
+    async def check_all(self) -> ChangelogCheckAllResult:
         results: list[ChangelogCheckResult] = []
 
         for cfg_tracker in self._cfg.changelog_trackers:
-            tracker = (
-                ChangelogTracker.select()
-                .where(ChangelogTracker.url == str(cfg_tracker.url))
-                .first()
-            )
+            tracker = await ChangelogTracker.get_or_none(url=str(cfg_tracker.url))
             if tracker is None:
                 results.append(
                     ChangelogCheckResult(
@@ -184,7 +178,7 @@ class ChangelogTrackerManager:
                 )
                 continue
 
-            results.append(self.check(tracker))
+            results.append(await self.check(tracker))
 
         return ChangelogCheckAllResult(results=results)
 

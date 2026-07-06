@@ -8,23 +8,23 @@ from progress.db import close_db, create_tables, init_db
 
 
 @pytest.fixture()
-def temp_db(tmp_path):
+async def temp_db(tmp_path):
     db_path = tmp_path / "progress_test.db"
-    init_db(str(db_path))
-    create_tables()
+    await init_db(str(db_path))
+    await create_tables()
     try:
         yield
     finally:
-        close_db()
+        await close_db()
 
 
-def test_owner_manager_check_owner_first_check_returns_most_recent(
+async def test_owner_manager_check_owner_first_check_returns_most_recent(
     temp_db, monkeypatch
 ):
     manager = OwnerManager(gh_token=None)
-    owner = GitHubOwner.create(owner_type="organization", name="acme", enabled=True)
+    owner = await GitHubOwner.create(owner_type="organization", name="acme", enabled=True)
 
-    def fake_repo_list(owner_name, limit=100, source=True):
+    async def fake_repo_list(owner_name, limit=100, source=True):
         assert owner_name == "acme"
         return [
             {
@@ -41,30 +41,30 @@ def test_owner_manager_check_owner_first_check_returns_most_recent(
             },
         ]
 
-    def fake_get_readme(owner_name, repo_name):
+    async def fake_get_readme(owner_name, repo_name):
         return "# Hello"
 
     monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
     monkeypatch.setattr(manager.github_client, "get_readme", fake_get_readme)
 
-    new_repos = manager._check_owner(owner)
+    new_repos = await manager._check_owner(owner)
     assert len(new_repos) == 1
     assert new_repos[0]["repo_name"] == "new"
 
-    owner_refreshed = GitHubOwner.get_by_id(owner.id)
+    owner_refreshed = await GitHubOwner.get(id=owner.id)
     assert owner_refreshed.last_tracked_repo is not None
 
 
-def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
+async def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
     manager = OwnerManager(gh_token=None)
-    owner = GitHubOwner.create(
+    owner = await GitHubOwner.create(
         owner_type="user",
         name="alice",
         enabled=True,
         last_tracked_repo=datetime.fromisoformat("2024-01-15T00:00:00+00:00"),
     )
 
-    def fake_repo_list(owner_name, limit=100, source=True):
+    async def fake_repo_list(owner_name, limit=100, source=True):
         return [
             {
                 "nameWithOwner": "alice/older",
@@ -80,11 +80,12 @@ def test_owner_manager_check_owner_subsequent_only_newer(temp_db, monkeypatch):
             },
         ]
 
-    monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
-    monkeypatch.setattr(
-        manager.github_client, "get_readme", lambda *args, **kwargs: None
-    )
+    async def fake_get_readme(*args, **kwargs):
+        return None
 
-    new_repos = manager._check_owner(owner)
+    monkeypatch.setattr(manager.github_client, "list_repos", fake_repo_list)
+    monkeypatch.setattr(manager.github_client, "get_readme", fake_get_readme)
+
+    new_repos = await manager._check_owner(owner)
     assert len(new_repos) == 1
     assert new_repos[0]["repo_name"] == "newer"

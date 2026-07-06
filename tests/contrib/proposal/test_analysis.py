@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from progress.contrib.proposal.analysis import run_analysis
 from progress.contrib.proposal.types import ProposalKind
 
 
 def _mock_analyzer(side_effect=None):
-    analyzer = Mock()
+    analyzer = AsyncMock()
     analyzer.provider = "claude_code"
     if side_effect:
         analyzer.analyze.side_effect = side_effect
@@ -16,10 +16,10 @@ def _mock_analyzer(side_effect=None):
     return analyzer
 
 
-def test_run_analysis_returns_result_on_success():
+async def test_run_analysis_returns_result_on_success():
     analyzer = _mock_analyzer()
 
-    summary, detail = run_analysis(
+    summary, detail = await run_analysis(
         analyzer,
         "proposal_new_prompt.j2",
         ProposalKind.EIP,
@@ -33,7 +33,7 @@ def test_run_analysis_returns_result_on_success():
     assert (summary, detail) == ("summary", "detail")
 
 
-def test_run_analysis_reports_error_and_parse_metric_on_failure(monkeypatch):
+async def test_run_analysis_reports_error_and_parse_metric_on_failure(monkeypatch):
     analyzer = _mock_analyzer(side_effect=ValueError("bad json"))
     reported = []
     counted = []
@@ -46,7 +46,7 @@ def test_run_analysis_reports_error_and_parse_metric_on_failure(monkeypatch):
         lambda **kw: counted.append(kw),
     )
 
-    summary, detail = run_analysis(
+    summary, detail = await run_analysis(
         analyzer,
         "proposal_new_prompt.j2",
         ProposalKind.EIP,

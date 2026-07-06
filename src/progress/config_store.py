@@ -83,17 +83,17 @@ def _config_from_dict(data: dict[str, Any]) -> Config:
     return _DictConfig(**data)
 
 
-def _load_row() -> AppConfig | None:
-    return AppConfig.get_or_none(AppConfig.id == APP_CONFIG_ID)
+async def _load_row() -> AppConfig | None:
+    return await AppConfig.get_or_none(id=APP_CONFIG_ID)
 
 
-def is_seeded() -> bool:
-    return _load_row() is not None
+async def is_seeded() -> bool:
+    return (await _load_row()) is not None
 
 
-def load_app_config() -> tuple[dict[str, Any], int] | None:
+async def load_app_config() -> tuple[dict[str, Any], int] | None:
     """Return ``(data_dict, version)`` or ``None`` when not yet seeded."""
-    row = _load_row()
+    row = await _load_row()
     if row is None:
         return None
     try:
@@ -109,13 +109,13 @@ def _strip_excluded(data: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in data.items() if k not in EXCLUDED_FROM_BLOB}
 
 
-def migrate_blob_schema() -> None:
+async def migrate_blob_schema() -> None:
     """One-time migration of an existing blob to the current schema version.
 
     P1 blobs stored ``repos``/``owners`` inline; P2 moves them to their tables,
     so any inline copies are stripped here. Idempotent.
     """
-    row = _load_row()
+    row = await _load_row()
     if row is None or row.schema_version >= CURRENT_SCHEMA_VERSION:
         return
     data = json.loads(row.data) if row.data else {}
@@ -123,14 +123,14 @@ def migrate_blob_schema() -> None:
     row.data = json.dumps(data)
     row.schema_version = CURRENT_SCHEMA_VERSION
     row.updated_at = datetime.now(UTC)
-    row.save()
+    await row.save()
     logger.info(
         "Migrated app config blob to schema version %d (stripped inline repos/owners)",
         CURRENT_SCHEMA_VERSION,
     )
 
 
-def import_app_config(data: dict[str, Any]) -> int:
+async def import_app_config(data: dict[str, Any]) -> int:
     """Replace the blob with ``data`` (explicit file -> DB action).
 
     Validates, then upserts the blob, bumping the version so concurrent UI
@@ -138,9 +138,9 @@ def import_app_config(data: dict[str, Any]) -> int:
     """
     payload = _strip_excluded(data)
     validate_config_dict(payload)
-    row = _load_row()
+    row = await _load_row()
     if row is None:
-        AppConfig.create(
+        await AppConfig.create(
             id=APP_CONFIG_ID,
             data=json.dumps(payload),
             version=1,
@@ -149,25 +149,25 @@ def import_app_config(data: dict[str, Any]) -> int:
         logger.info("Imported application config (new blob, version 1)")
         return 1
     new_version = row.version + 1
-    AppConfig.update(
+    await AppConfig.filter(id=APP_CONFIG_ID).update(
         data=json.dumps(payload),
         version=new_version,
         schema_version=CURRENT_SCHEMA_VERSION,
         updated_at=datetime.now(UTC),
-    ).where(AppConfig.id == APP_CONFIG_ID).execute()
+    )
     logger.info("Imported application config (overwrote blob, version %d)", new_version)
     return new_version
 
 
-def seed_app_config_if_needed(seed_data: dict[str, Any]) -> bool:
+async def seed_app_config_if_needed(seed_data: dict[str, Any]) -> bool:
     """One-shot seed of the blob from the file config.
 
     Returns True when a row was created, False when the blob was already seeded.
     """
-    if _load_row() is not None:
+    if (await _load_row()) is not None:
         return False
     seed = _strip_excluded(seed_data)
-    AppConfig.create(
+    await AppConfig.create(
         id=APP_CONFIG_ID,
         data=json.dumps(seed),
         version=1,
@@ -186,7 +186,7 @@ def build_runtime_config(blob_data: dict[str, Any], infra: dict[str, Any]) -> Co
     return _config_from_dict(merged)
 
 
-def seed_lists_if_needed(file_cfg: Config) -> None:
+async def seed_lists_if_needed(file_cfg: Config) -> None:
     """One-shot import of file repos/owners into their tables (fresh deploy).
 
     ``repos`` and ``owners`` live in the ``repositories``/``github_owners``
@@ -199,11 +199,11 @@ def seed_lists_if_needed(file_cfg: Config) -> None:
     from .contrib.repo.repository import replace_repositories
     from .db.models import Repository
 
-    if file_cfg.repos and Repository.select().count() == 0:
-        result = replace_repositories(file_cfg.repos, file_cfg.github.protocol)
+    if file_cfg.repos and await Repository.all().count() == 0:
+        result = await replace_repositories(file_cfg.repos, file_cfg.github.protocol)
         logger.info("Seeded repositories from file: %s", result)
-    if file_cfg.owners and GitHubOwner.select().count() == 0:
-        result = replace_owners(file_cfg.owners)
+    if file_cfg.owners and await GitHubOwner.all().count() == 0:
+        result = await replace_owners(file_cfg.owners)
         logger.info("Seeded owners from file: %s", result)
 
 
@@ -328,7 +328,7 @@ def validate_config_dict(data: dict[str, Any]) -> None:
         raise ConfigException(_format_validation_error(e)) from e
 
 
-def validate_app_config(data: dict[str, Any]) -> None:
+async def validate_app_config(data: dict[str, Any]) -> None:
     """Validate ``data`` the way :func:`save_app_config` would.
 
     Masked secret placeholders (:data:`SECRET_MASK`) are merged back from
@@ -337,40 +337,36 @@ def validate_app_config(data: dict[str, Any]) -> None:
     secrets back on save, so its pre-save validation must match. Raises
     :class:`ConfigException` on failure.
     """
-    stored = load_app_config()
+    stored = await load_app_config()
     stored_data = stored[0] if stored is not None else {}
     merged = _merge_secret_placeholders(_strip_excluded(data), stored_data)
     validate_config_dict(merged)
 
 
-def save_app_config(data: dict[str, Any], expected_version: int) -> tuple[dict[str, Any], int]:
+async def save_app_config(data: dict[str, Any], expected_version: int) -> tuple[dict[str, Any], int]:
     """Validate and persist ``data`` under optimistic locking.
 
     Returns ``(merged_data, new_version)``. Raises :class:`ConfigVersionConflict`
     on a stale version, or :class:`ConfigException` on validation failure.
     """
-    row = _load_row()
+    row = await _load_row()
     if row is None:
         raise ConfigException("Application config has not been seeded")
     stored = json.loads(row.data) if row.data else {}
     merged = _merge_secret_placeholders(_strip_excluded(data), stored)
     validate_config_dict(merged)
 
-    updated = (
-        AppConfig.update(
-            data=json.dumps(merged),
-            version=expected_version + 1,
-            schema_version=CURRENT_SCHEMA_VERSION,
-            updated_at=datetime.now(UTC),
-        )
-        .where(
-            AppConfig.id == APP_CONFIG_ID,
-            AppConfig.version == expected_version,
-        )
-        .execute()
+    updated = await AppConfig.filter(
+        id=APP_CONFIG_ID,
+        version=expected_version,
+    ).update(
+        data=json.dumps(merged),
+        version=expected_version + 1,
+        schema_version=CURRENT_SCHEMA_VERSION,
+        updated_at=datetime.now(UTC),
     )
     if updated == 0:
-        current = _load_row()
+        current = await _load_row()
         current_version = current.version if current else None
         raise ConfigVersionConflict(
             f"Config was modified by another writer "

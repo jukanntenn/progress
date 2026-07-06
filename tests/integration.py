@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess
@@ -399,57 +400,50 @@ class IntegrationTest:
                 + (f"\nstderr:\n{result.stderr.strip()}" if result.stderr else "")
             )
 
-    def verify_repositories(self, expected_repos: list[str]) -> None:
+    async def verify_repositories(self, expected_repos: list[str]) -> None:
         from progress.db.models import Repository
 
         for repo_name in expected_repos:
-            repo = Repository.get_or_none(Repository.name == repo_name)
+            repo = await Repository.get_or_none(name=repo_name)
             _assert(repo is not None, f"Repository {repo_name} not found")
             _assert(repo is not None and repo.url is not None, f"Repository {repo_name} missing url")
             _assert(repo is not None and repo.branch is not None, f"Repository {repo_name} missing branch")
 
-    def verify_reports(self) -> None:
+    async def verify_reports(self) -> None:
         from progress.db.models import Report
 
-        aggregated = Report.select().where(Report.repo.is_null(True)).first()
+        aggregated = await Report.filter(repo_id__isnull=True).first()
         _assert(aggregated is not None, "Aggregated report not found")
+        assert aggregated is not None
         _assert(
-            aggregated.content and len(aggregated.content) > 0,
+            aggregated.content is not None and len(aggregated.content) > 0,
             "Aggregated report empty",
         )
 
-    def verify_proposal_trackers(self) -> None:
-        from progress.contrib.proposal import ProposalTracker
+    async def verify_proposal_trackers(self) -> None:
         from progress.contrib.proposal.models import ProposalTrackerState
 
-        pep_tracker = (
-            ProposalTrackerState.select()
-            .where(ProposalTrackerState.kind == "pep")
-            .first()
-        )
+        pep_tracker = await ProposalTrackerState.filter(kind="pep").first()
         _assert(pep_tracker is not None, "PEP tracker not found")
-        rust_tracker = (
-            ProposalTrackerState.select()
-            .where(ProposalTrackerState.kind == "rust_rfc")
-            .first()
-        )
+        rust_tracker = await ProposalTrackerState.filter(kind="rust_rfc").first()
         _assert(rust_tracker is not None, "Rust RFC tracker not found")
 
-    def verify_proposals(self) -> None:
+    async def verify_proposals(self) -> None:
         from progress.contrib.proposal.models import Proposal
 
-        _assert(Proposal.select().count() > 0, "No proposals found")
+        _assert(await Proposal.all().count() > 0, "No proposals found")
 
-    def verify_owners(self) -> None:
+    async def verify_owners(self) -> None:
         from progress.contrib.repo.models import GitHubOwner
 
-        _assert(GitHubOwner.select().count() >= 2, "Expected >= 2 owners")
+        _assert(await GitHubOwner.all().count() >= 2, "Expected >= 2 owners")
 
-    def verify_changelog_trackers(self) -> None:
+    async def verify_changelog_trackers(self) -> None:
         from progress.contrib.changelog.models import ChangelogTracker
 
         _assert(
-            ChangelogTracker.select().count() >= 2, "Expected >= 2 changelog trackers"
+            await ChangelogTracker.all().count() >= 2,
+            "Expected >= 2 changelog trackers",
         )
 
     def evolve_repos(
@@ -528,33 +522,35 @@ class IntegrationTest:
             self.console.info(f"Deleting {r.slug}...")
             self.gh.delete_repo(r.owner, r.name)
 
-    def verify_first_run(self, repo_main: CreatedRepo) -> None:
+    async def verify_first_run(self, repo_main: CreatedRepo) -> None:
         from progress.db import close_db, create_tables, init_db
 
-        init_db(str(self.database_path))
-        create_tables()
+        await init_db(str(self.database_path))
+        await create_tables()
         try:
-            self.verify_repositories([repo_main.slug, "sergi0g/cup"])
-            self.verify_reports()
-            self.verify_proposal_trackers()
-            self.verify_proposals()
-            self.verify_owners()
-            self.verify_changelog_trackers()
+            await self.verify_repositories([repo_main.slug, "sergi0g/cup"])
+            await self.verify_reports()
+            await self.verify_proposal_trackers()
+            await self.verify_proposals()
+            await self.verify_owners()
+            await self.verify_changelog_trackers()
         finally:
-            close_db()
+            await close_db()
         self.verify_repo_update_report([repo_main.slug])
         self.verify_release_in_report()
         self.verify_proposal_report()
         self.verify_changelog_report()
 
-    def verify_second_run(self, repo_main: CreatedRepo, repo_new: CreatedRepo) -> None:
+    async def verify_second_run(
+        self, repo_main: CreatedRepo, repo_new: CreatedRepo
+    ) -> None:
         from progress.db import close_db
 
         try:
-            self.verify_repositories([repo_main.slug, "sergi0g/cup"])
-            self.verify_reports()
+            await self.verify_repositories([repo_main.slug, "sergi0g/cup"])
+            await self.verify_reports()
         finally:
-            close_db()
+            await close_db()
         self.verify_repo_update_report([repo_main.slug])
         self.verify_release_in_report()
         self.verify_new_repo_report(repo_new.slug)
@@ -579,7 +575,7 @@ class IntegrationTest:
             )
 
             self.console.step(4, 7, "Verifying first run")
-            self.verify_first_run(repo_main)
+            asyncio.run(self.verify_first_run(repo_main))
 
             self.console.step(5, 7, "Evolving repositories")
             repo_new = self.evolve_repos(repo_main, repo_proposals)
@@ -592,7 +588,7 @@ class IntegrationTest:
             )
 
             self.console.step(7, 7, "Verifying second run")
-            self.verify_second_run(repo_main, repo_new)
+            asyncio.run(self.verify_second_run(repo_main, repo_new))
 
             self.console.success("All integration checks passed")
             return 0

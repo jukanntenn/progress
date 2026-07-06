@@ -1,39 +1,44 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
+"""ProposalTrackerState and Proposal models (tables: proposal_trackers, proposals)."""
 
-from peewee import (
-    CharField,
-    DateTimeField,
-    ForeignKeyField,
-)
+from tortoise import fields
 
-from progress.db.models import BaseModel
-
-UTC = ZoneInfo("UTC")
+from progress.db.models.base import BaseModel
+from progress.utils.timezone import now_utc
 
 
 class ProposalTrackerState(BaseModel):
-    kind = CharField(unique=True)
-    last_seen_commit = CharField(null=True)
-    last_check_time = DateTimeField(null=True)
-    created_at = DateTimeField(default=lambda: datetime.now(UTC))
-    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+    """Per-tracker checkpoint state for proposal discovery."""
+
+    id: int = fields.IntField(primary_key=True)  # ty: ignore[invalid-assignment]
+    kind: str = fields.CharField(max_length=255, unique=True)  # ty: ignore[invalid-assignment]
+    last_seen_commit: str | None = fields.CharField(max_length=255, null=True)  # ty: ignore[invalid-assignment]
+    last_check_time = fields.DatetimeField(null=True, default=None)
+    created_at = fields.DatetimeField(default=now_utc)
+    updated_at = fields.DatetimeField(default=now_utc)
 
     class Meta:
-        table_name = "proposal_trackers"
+        table = "proposal_trackers"
 
 
 class Proposal(BaseModel):
-    tracker = ForeignKeyField(
-        ProposalTrackerState, backref="proposals", on_delete="CASCADE"
+    """A tracked proposal (RFC/EIP/etc.) and its status."""
+
+    id: int = fields.IntField(primary_key=True)  # ty: ignore[invalid-assignment]
+    tracker: fields.ForeignKeyRelation[ProposalTrackerState] = fields.ForeignKeyField(
+        ProposalTrackerState,
+        related_name="proposals",
+        on_delete=fields.CASCADE,
     )
-    number = CharField()
-    title = CharField(null=True)
-    raw_status = CharField(default="")
-    status = CharField()
-    created_at = DateTimeField(default=lambda: datetime.now(UTC))
-    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+    number: str = fields.CharField(max_length=255)  # ty: ignore[invalid-assignment]
+    title: str | None = fields.CharField(max_length=255, null=True)  # ty: ignore[invalid-assignment]
+    raw_status: str = fields.CharField(max_length=255, default="")  # ty: ignore[invalid-assignment]
+    status: str = fields.CharField(max_length=255)  # ty: ignore[invalid-assignment]
+    created_at = fields.DatetimeField(default=now_utc)
+    updated_at = fields.DatetimeField(default=now_utc)
 
     class Meta:
-        table_name = "proposals"
-        indexes = ((("tracker_id", "number"), True),)
+        table = "proposals"
+        unique_together = (("tracker_id", "number"),)
+
+
+__all__ = ["Proposal", "ProposalTrackerState"]

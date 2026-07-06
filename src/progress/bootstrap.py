@@ -15,14 +15,14 @@ from .utils.timezone import get_now
 logger = logging.getLogger(__name__)
 
 
-def initialize_components(cfg, config_path: str | None = None):
+async def initialize_components(cfg, config_path: str | None = None):
     """Initialize all application components and return runtime objects."""
     db_path = resolve_db_path(cfg.data_dir, config_path)
-    init_db(db_path)
-    create_tables()
-    log_db_state()
+    await init_db(db_path)
+    await create_tables()
+    await log_db_state()
 
-    cfg = resolve_runtime_config(cfg)
+    cfg = await resolve_runtime_config(cfg)
 
     markpost_client = None
     if cfg.markpost.enabled and cfg.markpost.url:
@@ -44,7 +44,7 @@ def initialize_components(cfg, config_path: str | None = None):
     return cfg, markpost_client, repo_manager, proposal_tracker, reporter
 
 
-def resolve_runtime_config(file_cfg: Config) -> Config:
+async def resolve_runtime_config(file_cfg: Config) -> Config:
     """Seed the DB config blob from the file config, then build the runtime config.
 
     The file is a one-time seed + infra provider; after the first run the blob
@@ -59,10 +59,10 @@ def resolve_runtime_config(file_cfg: Config) -> Config:
         seed_lists_if_needed,
     )
 
-    seed_app_config_if_needed(file_cfg.model_dump(mode="json"))
-    migrate_blob_schema()
-    seed_lists_if_needed(file_cfg)
-    loaded = load_app_config()
+    await seed_app_config_if_needed(file_cfg.model_dump(mode="json"))
+    await migrate_blob_schema()
+    await seed_lists_if_needed(file_cfg)
+    loaded = await load_app_config()
     if loaded is None:
         return file_cfg
     blob_data, _ = loaded

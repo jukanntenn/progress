@@ -19,9 +19,9 @@ class Message(ABC):
     def get_channel(self) -> Channel:
         return self._channel
 
-    def send(self, context: Any, fail_silently: bool = True) -> bool:
+    async def send(self, context: Any, fail_silently: bool = True) -> bool:
         try:
-            self.get_channel().send(self.get_payload(context))
+            await self.get_channel().send(self.get_payload(context))
             return True
         except Exception as e:
             logger.warning("Channel failed: %s", e)

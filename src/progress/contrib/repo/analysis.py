@@ -47,7 +47,7 @@ def _extract_json(output: str) -> str:
     raise AnalysisException("Could not extract JSON from Claude output")
 
 
-def analyze_diff(
+async def analyze_diff(
     analyzer: Analyzer,
     repo_name: str,
     branch: str,
@@ -82,7 +82,7 @@ def analyze_diff(
 
     logger.info("Analyzing code changes for %s...", repo_name)
     try:
-        summary, detail = analyzer.analyze(
+        summary, detail = await analyzer.analyze(
             content=diff, prompt=prompt, parser=AnalysisResultParser()
         )
     except Exception as e:
@@ -96,7 +96,7 @@ def analyze_diff(
     return summary, detail, truncated, original_length, len(diff)
 
 
-def analyze_releases(
+async def analyze_releases(
     analyzer: Analyzer,
     repo_name: str,
     branch: str,
@@ -115,10 +115,10 @@ def analyze_releases(
     )
 
     logger.info("Analyzing releases for %s...", repo_name)
-    return analyzer.analyze(content=prompt, parser=AnalysisResultParser())
+    return await analyzer.analyze(content=prompt, parser=AnalysisResultParser())
 
 
-def analyze_readme(
+async def analyze_readme(
     analyzer: Analyzer,
     repo_name: str,
     description: str | None,
@@ -134,4 +134,4 @@ def analyze_readme(
     )
 
     logger.info("Analyzing README for %s...", repo_name)
-    return analyzer.analyze(content=prompt, parser=AnalysisResultParser())
+    return await analyzer.analyze(content=prompt, parser=AnalysisResultParser())

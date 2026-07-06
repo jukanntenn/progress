@@ -51,15 +51,16 @@ def format_datetime(dt, timezone) -> str:
 
 
 @router.get("", response_model=PaginatedReportsResponse)
-def list_reports(page: int = 1, timezone_str: str = "UTC"):
+async def list_reports(page: int = 1, timezone_str: str = "UTC"):
     timezone = pytz.timezone(timezone_str)
 
     if page < 1:
         page = 1
 
-    query = Report.select().where(Report.repo.is_null()).order_by(Report.created_at.desc())
-    total = query.count()
-    reports = list(query.paginate(page, PAGE_SIZE))
+    query = Report.filter(repo_id__isnull=True).order_by("-created_at")
+    total = await query.count()
+    # Preserve peewee's 1-indexed .paginate(page, size) semantics.
+    reports = await query.offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
 
     report_list = [
         ReportResponse(
@@ -84,11 +85,11 @@ def list_reports(page: int = 1, timezone_str: str = "UTC"):
 
 
 @router.get("/{report_id}", response_model=ReportDetailResponse)
-def get_report(report_id: int, timezone_str: str = "UTC"):
+async def get_report(report_id: int, timezone_str: str = "UTC"):
     timezone = pytz.timezone(timezone_str)
 
-    report = Report.get_or_none(Report.id == report_id)
-    if report is None or report.repo is not None:
+    report = await Report.get_or_none(id=report_id)
+    if report is None or report.repo_id is not None:  # ty: ignore[unresolved-attribute]  # tortoise exposes repo_id as the raw FK column; not in the model stubs
         raise HTTPException(status_code=404, detail="Report not found")
 
     return ReportDetailResponse(

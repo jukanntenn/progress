@@ -1,5 +1,7 @@
 """Tests for the DB-backed config API routes."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,7 +26,6 @@ concurrency = 2
     monkeypatch.setenv("CONFIG_FILE", str(config_file))
     monkeypatch.setenv("PROGRESS_DB_PATH", str(tmp_path / "progress.db"))
 
-    from progress import db as db_module
     from progress.api import create_app
     from progress.db import close_db
 
@@ -32,9 +33,7 @@ concurrency = 2
     with TestClient(app) as client:
         yield client
 
-    close_db()
-    if db_module.database is not None:
-        db_module.database.close_all()
+    asyncio.run(close_db())
 
 
 def test_get_config_returns_data_and_version(client: TestClient):

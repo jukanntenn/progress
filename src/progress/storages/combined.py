@@ -16,7 +16,7 @@ class CombinedStorage:
         self._primary = primary
         self._db = DBStorage()
 
-    def save(self, title: str, bodies: list[str]) -> list[str]:
+    async def save(self, title: str, bodies: list[str]) -> list[str]:
         logger.debug("Saving to combined storage (primary + database)")
-        self._db.save(title, bodies)
-        return self._primary.save(title, bodies)
+        await self._db.save(title, bodies)
+        return await self._primary.save(title, bodies)

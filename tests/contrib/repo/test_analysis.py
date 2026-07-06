@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -96,6 +96,7 @@ class TestAnalysisResultParser:
 
 def _make_analyzer(return_value=None, side_effect=None):
     analyzer = MagicMock()
+    analyzer.analyze = AsyncMock()
     if side_effect:
         analyzer.analyze.side_effect = side_effect
     else:
@@ -104,9 +105,9 @@ def _make_analyzer(return_value=None, side_effect=None):
 
 
 class TestAnalyzeDiff:
-    def test_calls_analyzer_with_parser(self):
+    async def test_calls_analyzer_with_parser(self):
         analyzer = _make_analyzer()
-        analyze_diff(
+        await analyze_diff(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -115,14 +116,14 @@ class TestAnalyzeDiff:
             max_diff_length=10000,
             language="en",
         )
-        analyzer.analyze.assert_called_once()
+        analyzer.analyze.assert_awaited_once()
         call_kwargs = analyzer.analyze.call_args
         assert call_kwargs.kwargs["parser"] is not None
         assert isinstance(call_kwargs.kwargs["parser"], AnalysisResultParser)
 
-    def test_truncates_long_diff(self):
+    async def test_truncates_long_diff(self):
         analyzer = _make_analyzer(return_value=("s", "d"))
-        summary, detail, truncated, orig_len, analyzed_len = analyze_diff(
+        summary, detail, truncated, orig_len, analyzed_len = await analyze_diff(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -135,9 +136,9 @@ class TestAnalyzeDiff:
         assert orig_len == 100
         assert analyzed_len == 50
 
-    def test_no_truncation_when_short(self):
+    async def test_no_truncation_when_short(self):
         analyzer = _make_analyzer(return_value=("s", "d"))
-        _, _, truncated, orig_len, analyzed_len = analyze_diff(
+        _, _, truncated, orig_len, analyzed_len = await analyze_diff(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -149,9 +150,9 @@ class TestAnalyzeDiff:
         assert truncated is False
         assert orig_len == analyzed_len
 
-    def test_fallback_on_analysis_failure(self):
+    async def test_fallback_on_analysis_failure(self):
         analyzer = _make_analyzer(side_effect=Exception("timeout"))
-        summary, detail, _, _, _ = analyze_diff(
+        summary, detail, _, _, _ = await analyze_diff(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -163,7 +164,7 @@ class TestAnalyzeDiff:
         assert summary != ""
         assert detail != ""
 
-    def test_failure_reports_error_and_parse_metric(self, monkeypatch):
+    async def test_failure_reports_error_and_parse_metric(self, monkeypatch):
         analyzer = _make_analyzer(side_effect=ValueError("bad json"))
         reported = []
         counted = []
@@ -176,7 +177,7 @@ class TestAnalyzeDiff:
             lambda **kw: counted.append(kw),
         )
 
-        analyze_diff(
+        await analyze_diff(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -206,9 +207,9 @@ def _make_release_data():
 
 
 class TestAnalyzeReleases:
-    def test_calls_analyzer(self):
+    async def test_calls_analyzer(self):
         analyzer = _make_analyzer(return_value=("s", "d"))
-        result = analyze_releases(
+        result = await analyze_releases(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -216,11 +217,11 @@ class TestAnalyzeReleases:
             language="en",
         )
         assert result == ("s", "d")
-        analyzer.analyze.assert_called_once()
+        analyzer.analyze.assert_awaited_once()
 
-    def test_uses_parser(self):
+    async def test_uses_parser(self):
         analyzer = _make_analyzer()
-        analyze_releases(
+        await analyze_releases(
             analyzer,
             repo_name="owner/repo",
             branch="main",
@@ -232,9 +233,9 @@ class TestAnalyzeReleases:
 
 
 class TestAnalyzeReadme:
-    def test_calls_analyzer(self):
+    async def test_calls_analyzer(self):
         analyzer = _make_analyzer(return_value=("s", "d"))
-        result = analyze_readme(
+        result = await analyze_readme(
             analyzer,
             repo_name="owner/repo",
             description="A project",
@@ -242,11 +243,11 @@ class TestAnalyzeReadme:
             language="en",
         )
         assert result == ("s", "d")
-        analyzer.analyze.assert_called_once()
+        analyzer.analyze.assert_awaited_once()
 
-    def test_uses_parser(self):
+    async def test_uses_parser(self):
         analyzer = _make_analyzer()
-        analyze_readme(
+        await analyze_readme(
             analyzer,
             repo_name="owner/repo",
             description=None,

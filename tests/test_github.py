@@ -61,7 +61,7 @@ def test_git_client_initialization():
     assert client.workspace_dir.name == "test_workspace"
 
 
-def test_git_client_get_current_commit_with_gitpython(monkeypatch):
+async def test_git_client_get_current_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     mock_repo = SimpleNamespace(
@@ -73,11 +73,11 @@ def test_git_client_get_current_commit_with_gitpython(monkeypatch):
 
     monkeypatch.setattr("git.Repo", fake_repo_open)
     client = GitClient("/tmp/test_workspace")
-    commit = client.get_current_commit(Path("/tmp/test_workspace/test_repo"))
+    commit = await client.get_current_commit(Path("/tmp/test_workspace/test_repo"))
     assert commit == "abc123def456"
 
 
-def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
+async def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     mock_commit = SimpleNamespace(hexsha="def456")
@@ -88,10 +88,10 @@ def test_git_client_get_previous_commit_with_gitpython(monkeypatch):
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    assert client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) == "def456"
+    assert await client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) == "def456"
 
 
-def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
+async def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     mock_repo = SimpleNamespace(
@@ -99,10 +99,10 @@ def test_git_client_get_previous_commit_no_parent_with_gitpython(monkeypatch):
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    assert client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) is None
+    assert await client.get_previous_commit(Path("/tmp/test_workspace/test_repo")) is None
 
 
-def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
+async def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     mock_commit1 = SimpleNamespace(message="First commit\n\nDetails here")
@@ -120,7 +120,7 @@ def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    messages = client.get_commit_messages(
+    messages = await client.get_commit_messages(
         Path("/tmp/test_workspace"), "old123", "abc123"
     )
     assert len(messages) == 2
@@ -128,7 +128,7 @@ def test_git_client_get_commit_messages_with_gitpython(monkeypatch):
     assert messages[1] == "First commit\n\nDetails here"
 
 
-def test_git_client_get_commit_count_with_gitpython(monkeypatch):
+async def test_git_client_get_commit_count_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     def mock_commit_fn(sha):
@@ -143,11 +143,11 @@ def test_git_client_get_commit_count_with_gitpython(monkeypatch):
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    count = client.get_commit_count(Path("/tmp/test_workspace"), "old123", "abc123")
+    count = await client.get_commit_count(Path("/tmp/test_workspace"), "old123", "abc123")
     assert count == 5
 
 
-def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
+async def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     mock_repo = SimpleNamespace(
@@ -155,11 +155,11 @@ def test_git_client_get_commit_count_no_old_commit_with_gitpython(monkeypatch):
     )
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    count = client.get_commit_count(Path("/tmp/test_workspace"), None, "abc123")
+    count = await client.get_commit_count(Path("/tmp/test_workspace"), None, "abc123")
     assert count == 1
 
 
-def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
+async def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
     from types import SimpleNamespace
 
     expected_diff = "@@ file1.py @@\n+new line\n-old line"
@@ -180,13 +180,13 @@ def test_git_client_get_commit_diff_with_gitpython(monkeypatch):
     mock_repo.diff = fake_repo_diff
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
     client = GitClient("/tmp/test_workspace")
-    diff = client.get_commit_diff(Path("/tmp/test_workspace"), None, "abc123")
+    diff = await client.get_commit_diff(Path("/tmp/test_workspace"), None, "abc123")
     assert diff == expected_diff
 
 
-def test_git_client_fetch_and_reset_with_gitpython(monkeypatch, tmp_path):
+async def test_git_client_fetch_and_reset_with_gitpython(monkeypatch, tmp_path):
     from types import SimpleNamespace
-    from unittest.mock import Mock
+    from unittest.mock import AsyncMock, Mock
 
     mock_remote = Mock()
     mock_head = SimpleNamespace(reset=Mock())
@@ -196,9 +196,9 @@ def test_git_client_fetch_and_reset_with_gitpython(monkeypatch, tmp_path):
     monkeypatch.setattr("git.Repo", lambda p: mock_repo)
 
     client = GitClient(str(tmp_path))
-    monkeypatch.setattr(client, "_cleanup_git_locks", Mock())
+    monkeypatch.setattr(client, "_cleanup_git_locks", AsyncMock())
 
-    client.fetch_and_reset(tmp_path / "test_repo", "main")
+    await client.fetch_and_reset(tmp_path / "test_repo", "main")
     mock_remote.fetch.assert_called_once()
     mock_head.reset.assert_called_once()
 
@@ -239,7 +239,7 @@ def test_resolve_repo_url_invalid_format():
         resolve_repo_url("invalid-url-format", "https")
 
 
-def test_git_client_recent_commit_helpers(monkeypatch):
+async def test_git_client_recent_commit_helpers(monkeypatch):
     """Test: GitClient recent commit helper parsing"""
     client = GitClient("/tmp/test_workspace")
 
@@ -254,44 +254,43 @@ def test_git_client_recent_commit_helpers(monkeypatch):
             return "diff --git a/a b/a\n"
         raise AssertionError(f"Unexpected args: {args}")
 
-    monkeypatch.setattr("progress.git.client._run_git_command", fake_run_git_command)
+    monkeypatch.setattr("progress.git.client._run_git_command_sync", fake_run_git_command)
     repo_path = Path("/tmp/repo")
 
-    assert client.get_total_commit_count(repo_path) == 4
-    assert client.get_recent_commit_hashes(repo_path, 3) == ["h1", "h2", "h3"]
-    assert client.get_recent_commit_messages(repo_path, 2) == ["m1", "m2"]
-    assert client.get_recent_commit_patches(repo_path, 2) == "diff --git a/a b/a\n"
+    assert await client.get_total_commit_count(repo_path) == 4
+    assert await client.get_recent_commit_hashes(repo_path, 3) == ["h1", "h2", "h3"]
+    assert await client.get_recent_commit_messages(repo_path, 2) == ["m1", "m2"]
+    assert await client.get_recent_commit_patches(repo_path, 2) == "diff --git a/a b/a\n"
 
 
-def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
+async def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
     """Test: First check works when repo has 1 commit"""
 
     class FakeGitClient:
         workspace_dir = Path("/tmp")
 
-        def get_current_commit(self, repo_path):
+        async def get_current_commit(self, repo_path):
             return "c" * 40
 
-        def get_total_commit_count(self, repo_path):
+        async def get_total_commit_count(self, repo_path):
             return 1
 
-        def get_recent_commit_hashes(self, repo_path, max_count):
+        async def get_recent_commit_hashes(self, repo_path, max_count):
             assert max_count == 1
             return ["c" * 40]
 
-        def get_recent_commit_messages(self, repo_path, max_count):
+        async def get_recent_commit_messages(self, repo_path, max_count):
             assert max_count == 1
             return ["m"]
 
-        def get_recent_commit_patches(self, repo_path, max_count):
+        async def get_recent_commit_patches(self, repo_path, max_count):
             assert max_count == 1
             return "diff"
 
     class FakeAnalyzer:
-        def analyze_diff(self, repo_name, branch, diff, commit_messages):
-            assert diff == "diff"
-            assert commit_messages == ["m"]
-            return ("report", "detail", False, 4, 4)
+        async def analyze(self, content, prompt, parser):
+            assert content == "diff"
+            return ("report", "detail")
 
     repo = SimpleNamespace(
         id=1,
@@ -317,13 +316,13 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
 
-        def fake_clone_or_update(self):
+        async def fake_clone_or_update(self):
             pass
 
-        def fake_check_releases(self):
+        async def fake_check_releases(self):
             return None
 
-        def fake_update(self, current_commit):
+        async def fake_update(self, current_commit):
             pass
 
         m.setattr(
@@ -331,43 +330,42 @@ def test_repository_manager_first_check_total_commits_le_1(monkeypatch):
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
+        report = await manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.commit_count == 1
 
 
-def test_repository_manager_first_check_uses_range_when_history_sufficient(monkeypatch):
+async def test_repository_manager_first_check_uses_range_when_history_sufficient(monkeypatch):
     """Test: First check uses old..new range when total commits > lookback"""
 
     class FakeGitClient:
         workspace_dir = Path("/tmp")
 
-        def get_current_commit(self, repo_path):
+        async def get_current_commit(self, repo_path):
             return "n" * 40
 
-        def get_total_commit_count(self, repo_path):
+        async def get_total_commit_count(self, repo_path):
             return 10
 
-        def get_nth_commit_from_head(self, repo_path, n):
+        async def get_nth_commit_from_head(self, repo_path, n):
             assert n == 3
             return "b" * 40
 
-        def get_commit_messages(self, repo_path, old_commit, new_commit):
+        async def get_commit_messages(self, repo_path, old_commit, new_commit):
             assert old_commit == "b" * 40
             assert new_commit == "n" * 40
             return ["m"]
 
-        def get_commit_count(self, repo_path, old_commit, new_commit):
+        async def get_commit_count(self, repo_path, old_commit, new_commit):
             return 3
 
-        def get_commit_diff(self, repo_path, old_commit, new_commit):
+        async def get_commit_diff(self, repo_path, old_commit, new_commit):
             return "diff"
 
     class FakeAnalyzer:
-        def analyze_diff(self, repo_name, branch, diff, commit_messages):
-            assert diff == "diff"
-            assert commit_messages == ["m"]
-            return ("report", "detail", False, 4, 4)
+        async def analyze(self, content, prompt, parser):
+            assert content == "diff"
+            return ("report", "detail")
 
     repo = SimpleNamespace(
         id=1,
@@ -393,13 +391,13 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
 
-        def fake_clone_or_update(self):
+        async def fake_clone_or_update(self):
             pass
 
-        def fake_check_releases(self):
+        async def fake_check_releases(self):
             return None
 
-        def fake_update(self, current_commit):
+        async def fake_update(self, current_commit):
             pass
 
         m.setattr(
@@ -407,14 +405,14 @@ def test_repository_manager_first_check_uses_range_when_history_sufficient(monke
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
+        report = await manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.previous_commit == "b" * 40
         assert report.current_commit == "n" * 40
         assert report.commit_count == 3
 
 
-def test_repository_manager_first_check_uses_recent_commits_when_history_insufficient(
+async def test_repository_manager_first_check_uses_recent_commits_when_history_insufficient(
     monkeypatch,
 ):
     """Test: First check analyzes all existing commits when total <= lookback"""
@@ -422,29 +420,28 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
     class FakeGitClient:
         workspace_dir = Path("/tmp")
 
-        def get_current_commit(self, repo_path):
+        async def get_current_commit(self, repo_path):
             return "n" * 40
 
-        def get_total_commit_count(self, repo_path):
+        async def get_total_commit_count(self, repo_path):
             return 2
 
-        def get_recent_commit_hashes(self, repo_path, max_count):
+        async def get_recent_commit_hashes(self, repo_path, max_count):
             assert max_count == 2
             return ["n" * 40, "o" * 40]
 
-        def get_recent_commit_messages(self, repo_path, max_count):
+        async def get_recent_commit_messages(self, repo_path, max_count):
             assert max_count == 2
             return ["m1", "m2"]
 
-        def get_recent_commit_patches(self, repo_path, max_count):
+        async def get_recent_commit_patches(self, repo_path, max_count):
             assert max_count == 2
             return "patches"
 
     class FakeAnalyzer:
-        def analyze_diff(self, repo_name, branch, diff, commit_messages):
-            assert diff == "patches"
-            assert commit_messages == ["m1", "m2"]
-            return ("report", "detail", False, 7, 7)
+        async def analyze(self, content, prompt, parser):
+            assert content == "patches"
+            return ("report", "detail")
 
     repo = SimpleNamespace(
         id=1,
@@ -470,13 +467,13 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
     # Mock Repo.clone_or_update to avoid actually running gh command
     with monkeypatch.context() as m:
 
-        def fake_clone_or_update(self):
+        async def fake_clone_or_update(self):
             pass
 
-        def fake_check_releases(self):
+        async def fake_check_releases(self):
             return None
 
-        def fake_update(self, current_commit):
+        async def fake_update(self, current_commit):
             pass
 
         m.setattr(
@@ -484,7 +481,7 @@ def test_repository_manager_first_check_uses_recent_commits_when_history_insuffi
         )
         m.setattr("progress.contrib.repo.repo.Repo.check_releases", fake_check_releases)
         m.setattr("progress.contrib.repo.repo.Repo.update", fake_update)
-        report = manager.check(repo)  # ty: ignore[invalid-argument-type]
+        report = await manager.check(repo)  # ty: ignore[invalid-argument-type]
         assert report is not None
         assert report.previous_commit == "o" * 40
         assert report.current_commit == "n" * 40

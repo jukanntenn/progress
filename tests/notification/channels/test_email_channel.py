@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import smtplib
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiosmtplib
 import pytest
 
 from progress.errors import ExternalServiceException
 from progress.notification.channels.email import EmailChannel
 
 
-def test_email_channel_send_success_with_starttls() -> None:
+async def test_email_channel_send_success_with_starttls() -> None:
     channel = EmailChannel(
         host="smtp.example.com",
         port=587,
@@ -22,20 +22,27 @@ def test_email_channel_send_success_with_starttls() -> None:
     )
     payload = "Subject: Test\n\n<html>Body</html>"
 
-    with patch("smtplib.SMTP") as mock_smtp:
+    with patch("progress.notification.channels.email.aiosmtplib.SMTP") as mock_smtp:
         server = MagicMock()
+        server.connect = AsyncMock()
+        server.login = AsyncMock()
+        server.sendmail = AsyncMock()
+        server.close = MagicMock()
+        server.quit = AsyncMock()
         mock_smtp.return_value = server
 
-        channel.send(payload)
+        await channel.send(payload)
 
-        mock_smtp.assert_called_once_with("smtp.example.com", 587)
-        server.starttls.assert_called_once()
-        server.login.assert_called_once_with("user@example.com", "pass")
-        server.sendmail.assert_called_once()
-        server.quit.assert_called_once()
+        mock_smtp.assert_called_once_with(
+            hostname="smtp.example.com", port=587, use_tls=False, start_tls=True
+        )
+        server.connect.assert_awaited_once()
+        server.login.assert_awaited_once_with("user@example.com", "pass")
+        server.sendmail.assert_awaited_once()
+        server.quit.assert_awaited_once()
 
 
-def test_email_channel_send_success_with_ssl() -> None:
+async def test_email_channel_send_success_with_ssl() -> None:
     channel = EmailChannel(
         host="smtp.example.com",
         port=465,
@@ -48,17 +55,23 @@ def test_email_channel_send_success_with_ssl() -> None:
     )
     payload = "Subject: Test\n\n<html>Body</html>"
 
-    with patch("smtplib.SMTP_SSL") as mock_smtp_ssl:
+    with patch("progress.notification.channels.email.aiosmtplib.SMTP") as mock_smtp:
         server = MagicMock()
-        mock_smtp_ssl.return_value = server
+        server.connect = AsyncMock()
+        server.login = AsyncMock()
+        server.sendmail = AsyncMock()
+        server.close = MagicMock()
+        server.quit = AsyncMock()
+        mock_smtp.return_value = server
 
-        channel.send(payload)
+        await channel.send(payload)
 
-        mock_smtp_ssl.assert_called_once_with("smtp.example.com", 465)
-        server.starttls.assert_not_called()
+        mock_smtp.assert_called_once_with(
+            hostname="smtp.example.com", port=465, use_tls=True, start_tls=False
+        )
 
 
-def test_email_channel_send_raises_on_smtp_error() -> None:
+async def test_email_channel_send_raises_on_smtp_error() -> None:
     channel = EmailChannel(
         host="smtp.example.com",
         port=587,
@@ -71,10 +84,14 @@ def test_email_channel_send_raises_on_smtp_error() -> None:
     )
     payload = "Subject: Test\n\n<html>Body</html>"
 
-    with patch("smtplib.SMTP") as mock_smtp:
+    with patch("progress.notification.channels.email.aiosmtplib.SMTP") as mock_smtp:
         server = MagicMock()
+        server.connect = AsyncMock()
+        server.login = AsyncMock()
+        server.sendmail = AsyncMock(side_effect=aiosmtplib.SMTPException("SMTP error"))
+        server.close = MagicMock()
+        server.quit = AsyncMock()
         mock_smtp.return_value = server
-        server.sendmail.side_effect = smtplib.SMTPException("SMTP error")
 
         with pytest.raises(ExternalServiceException, match="Email notification failed"):
-            channel.send(payload)
+            await channel.send(payload)

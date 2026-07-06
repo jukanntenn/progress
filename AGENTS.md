@@ -45,29 +45,32 @@ progress/
 ├── src/                   # Source code directory
 │   └── progress/          # Main package directory
 │       ├── __init__.py    # Package initialization
-│       ├── cli.py         # CLI entry point (Click commands + check orchestration)
+│       ├── cli.py         # CLI entry point (Typer commands + async check orchestration)
 │       ├── config.py      # Configuration management
-│       ├── bootstrap.py   # Component initialization and runtime config resolution
+│       ├── bootstrap.py   # Component initialization and runtime config resolution (async)
 │       ├── reporting.py   # Report generation pipeline (batching, titling, publishing)
+│       ├── publish.py     # MarkPost publishing + Report/Batch persistence (async)
+│       ├── config_store.py # DB-backed config blob store (async, optimistic-locked)
 │       ├── consts.py      # Constants
-│       ├── db.py          # Database operations
+│       ├── db/            # tortoise-orm init/close/migrations + models package
+│       │   ├── __init__.py # async init_db/close_db/database_connection/migrate_database/save_report
+│       │   └── models/    # tortoise models (base/repository/report/batch/app_config)
 │       ├── enums.py       # Enum definitions
 │       ├── errors.py      # Custom errors
-│       ├── github.py      # GitHub CLI interactions
-│       ├── i18n.py        # Internationalization
+│       ├── git/           # Git clients (GitClient + GitHubClient, async via asyncio.to_thread)
+│       ├── i18n.py        # Internationalization (contextvars-based)
 │       ├── log.py         # Logging
-│       ├── markpost.py    # Markpost functionality
-│       ├── models.py      # Peewee ORM models
-│       ├── ai/             # AI analysis (analyzers/factory)
-│       ├── notification/  # Notifications (channels/messages/factory/dispatch)
-│       ├── proposal_parsers.py # Proposal parsing modules
-│       ├── proposal_tracking.py # Proposal tracking logic
-│       ├── repo.py        # Repository management
-│       ├── repository.py  # Extended repository operations
-│       ├── contrib/repo/reporter.py # Markdown report generator
+│       ├── telemetry.py   # OpenTelemetry + Bugsink observability
 │       ├── templates.py   # Central Jinja2 template engine
-│       ├── utils/         # Utility modules (timezone/paths/functional/sanitize/text/process)
-│       ├── api/           # Web API + static serving (FastAPI)
+│       ├── ai/             # AI analysis (async runner + analyzers/factory)
+│       ├── notification/  # Notifications (async channels/messages/factory/dispatch)
+│       ├── contrib/       # Optional subsystems
+│       │   ├── repo/      # Repository tracking (manager, Repo wrapper, owner monitor, analysis, models)
+│       │   ├── changelog/ # Changelog tracking (tracker, parsers, models)
+│       │   └── proposal/  # Proposal tracking (tracker, analysis, parser, status, models)
+│       ├── storages/      # Report storage backends (async: db/file/markpost/combined/auto)
+│       ├── utils/         # Utility modules (timezone/paths/functional/sanitize/text/process + markpost client)
+│       ├── api/           # Web API + static serving (FastAPI, async routes)
 │       └── web/           # Frontend (React + Vite)
 │       ├── templates/     # Jinja2 template files
 │       │   ├── report_base.j2            # Shared macros (footer/status icons)
@@ -124,16 +127,21 @@ progress/
 ## Tech Stack
 
 - Programming Language: Python 3.12+
+- Concurrency: asyncio (the whole runtime is async; CLI entry uses asyncio.run)
 - Package and Project Manager: uv 0.9+
-- CLI Framework: Click 8.3+
-- Web Framework: FastAPI 0.115+
+- CLI Framework: Typer 0.26+
+- Web Framework: FastAPI 0.115+ (async routes + lifespan)
+- ORM: tortoise-orm 1.1.7+ (async; aiosqlite driver, SQLite backend)
+- Async HTTP: aiohttp 3.12+ (replaces direct `requests` usage)
+- Async SMTP: aiosmtplib 3.0+
+- Async file I/O: aiofiles 24.1+
 - Frontend: React 18 + TypeScript + Vite 5 + Tailwind CSS
 - Frontend Package Manager: pnpm
 - RSS Generation: feedgen
 - Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)
 - Containerized development and deployment: Docker
-- Git Operations: GitPython 3.1.46+
-- GitHub API: PyGithub 2.8.1+
+- Git Operations: GitPython 3.1.46+ (sync; bridged to async via asyncio.to_thread)
+- GitHub API: PyGithub 2.8.1+ (sync; bridged to async via asyncio.to_thread)
 - GitHub CLI: GitHub CLI (gh) - only for initial repository clone
 - AI Assistant: Claude Code
 

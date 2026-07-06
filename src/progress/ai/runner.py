@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-import subprocess
 import time
 from typing import TYPE_CHECKING
 
 from progress.errors import AnalysisException
 from progress.telemetry import get_tracer, record_analysis
-from progress.utils.functional import retry
+from progress.utils.functional import aretry
 
 if TYPE_CHECKING:
     from progress.config import AnalysisConfig
@@ -64,7 +64,7 @@ class TransientAnalysisError(AnalysisException):
         self.stderr_preview = stderr_preview
 
 
-def run_tool(
+async def run_tool(
     provider: str,
     prompt: str,
     content: str,
@@ -78,7 +78,7 @@ def run_tool(
     executable = base_args[0]
     command = [*base_args, prompt]
 
-    run_with_retry = retry(
+    run_with_retry = aretry(
         times=config.retries,
         initial_delay=config.retry_delay,
         backoff="exponential",
@@ -95,7 +95,7 @@ def run_tool(
             "ai.call",
             attributes={"ai.provider": provider, "ai.executable": executable},
         ):
-            stdout = run_with_retry(command, executable, content, config.timeout)
+            stdout = await run_with_retry(command, executable, content, config.timeout)
         ok = True
         return stdout
     except TransientAnalysisError as e:
@@ -117,7 +117,7 @@ def run_tool(
         )
 
 
-def _run_once(
+async def _run_once(
     command: list[str],
     executable: str,
     content: str,
@@ -125,20 +125,12 @@ def _run_once(
 ) -> str:
     logger.debug("Executing AI tool: %s", executable)
     try:
-        completed = subprocess.run(
-            command,
-            input=content if content else None,
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
+        proc = await asyncio.create_subprocess_exec(
+            *command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-    except subprocess.TimeoutExpired as e:
-        raise TransientAnalysisError(
-            f"AI tool '{executable}' timed out after {timeout}s",
-            returncode=None,
-            stderr_preview=str(e)[:_STDERR_PREVIEW_LIMIT],
-        ) from e
     except FileNotFoundError as e:
         raise AnalysisException(
             f"AI tool '{executable}' not found; ensure it is installed and on PATH"
@@ -148,9 +140,26 @@ def _run_once(
             f"AI tool '{executable}' could not be started: {e}"
         ) from e
 
-    stdout = completed.stdout or ""
-    stderr = completed.stderr or ""
-    returncode = int(completed.returncode)
+    try:
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+            proc.communicate(content.encode("utf-8") if content else None),
+            timeout=timeout,
+        )
+    except TimeoutError as e:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        await proc.wait()
+        raise TransientAnalysisError(
+            f"AI tool '{executable}' timed out after {timeout}s",
+            returncode=None,
+            stderr_preview=str(e)[:_STDERR_PREVIEW_LIMIT],
+        ) from e
+
+    stdout = (stdout_bytes or b"").decode("utf-8", errors="replace")
+    stderr = (stderr_bytes or b"").decode("utf-8", errors="replace")
+    returncode = int(proc.returncode or 0)
 
     if returncode == 0:
         return stdout

@@ -1,32 +1,28 @@
 """Markpost client module for publishing content."""
 
 import logging
-from typing import NoReturn, Optional
+from typing import NoReturn
 from urllib.parse import urlparse
 
-import requests
+import aiohttp
 
 from progress.config import MarkpostConfig
 from progress.errors import ClientError, ProgressException
-from progress.utils.functional import retry
+from progress.utils.functional import aretry
 from progress.utils.sanitize import sanitize
 
 logger = logging.getLogger(__name__)
 
 
-def _handle_request_exception(
-    exception: requests.RequestException, operation: str
+def _handle_client_exception(
+    exception: aiohttp.ClientResponseError | Exception, operation: str
 ) -> NoReturn:
-    """Handle RequestException by logging and raising ProgressException.
-
-    Args:
-        exception: The RequestException from requests library
-        operation: Description of the operation being performed (e.g., "upload to Markpost")
-
-    Raises:
-        ProgressException: Always raises with formatted error message
-    """
-    status_code = getattr(exception.response, "status_code", "N/A")
+    """Handle aiohttp client exception by logging and raising ProgressException."""
+    status_code = (
+        getattr(exception, "status", None)
+        if isinstance(exception, aiohttp.ClientResponseError)
+        else "N/A"
+    )
     logger.error(f"Failed to {operation}: status_code={status_code}")
     raise ProgressException(
         f"Failed to {operation} (status: {status_code})"
@@ -78,23 +74,23 @@ class MarkpostClient:
     @staticmethod
     def _check_http_status(_args, _kwargs, error, _attempt):
         status_code = (
-            getattr(error.response, "status_code", None)
-            if hasattr(error, "response")
+            getattr(error, "status", None)
+            if isinstance(error, aiohttp.ClientResponseError)
             else None
         )
         if status_code and 400 <= status_code < 500:
             raise ClientError(f"Client error {status_code}: not retrying") from error
 
-    @retry(
+    @aretry(
         times=3,
         initial_delay=5,
         backoff="exponential",
-        exceptions=(requests.RequestException,),
+        exceptions=(aiohttp.ClientError,),
         on_retry=lambda args, kwargs, error, attempt: MarkpostClient._check_http_status(
             args, kwargs, error, attempt
         ),
     )
-    def upload(self, content: str, title: str | None = None) -> str:
+    async def upload(self, content: str, title: str | None = None) -> str:
         """Upload content to Markpost and return the published URL.
 
         Args:
@@ -106,13 +102,6 @@ class MarkpostClient:
 
         Raises:
             ProgressException: If upload fails due to network or server error
-
-        Example:
-            >>> config = MarkpostConfig(url="https://markpost.example.com/p/key")
-            >>> client = MarkpostClient(config)
-            >>> url = client.upload("Hello World", title="My Post")
-            >>> print(url)
-            https://markpost.example.com/p/xyz789
         """
         if not content:
             raise ProgressException("Content cannot be empty")
@@ -121,10 +110,17 @@ class MarkpostClient:
         payload = {"title": title or "", "body": content}
 
         logger.info(f"Uploading content to Markpost: {self._mask_url(url)}")
-        response = requests.post(url, json=payload, timeout=self.timeout)
-        response.raise_for_status()
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        # NOTE: do NOT catch aiohttp.ClientError here — it must propagate to the
+        # @aretry decorator (mirroring the prior requests.RequestException flow,
+        # where raise_for_status()'s HTTPError reached @retry and 5xx was retried
+        # while 4xx was short-circuited via _check_http_status). Conversion to
+        # ProgressException happens in get_status() (no retry path) only.
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=payload) as response:
+                response.raise_for_status()
+                result = await response.json()
 
-        result = response.json()
         post_id = result.get("id")
 
         if not post_id:
@@ -135,30 +131,14 @@ class MarkpostClient:
         logger.info(f"Content uploaded successfully: {published_url}")
         return published_url
 
-    def upload_batch(
+    async def upload_batch(
         self,
         content: str,
         title: str | None = None,
         batch_index: int = 0,
         total_batches: int = 1,
     ) -> str:
-        """Upload a batch of content to Markpost with batch suffix in title.
-
-        Args:
-            content: Content body to publish
-            title: Content title (batch suffix will be appended if total_batches > 1)
-            batch_index: Current batch index (0-based)
-            total_batches: Total number of batches
-
-        Returns:
-            Full URL of the published post
-
-        Raises:
-            ProgressException: If upload fails
-
-        Note:
-            When total_batches > 1, appends " (n/m)" suffix to title
-        """
+        """Upload a batch of content to Markpost with batch suffix in title."""
         final_title = title
         if total_batches > 1 and title:
             final_title = f"{title} ({batch_index + 1}/{total_batches})"
@@ -168,9 +148,9 @@ class MarkpostClient:
             f"({len(content.encode('utf-8'))} bytes)"
         )
 
-        return self.upload(content, final_title)
+        return await self.upload(content, final_title)
 
-    def get_status(self, post_id: str) -> bool:
+    async def get_status(self, post_id: str) -> bool:
         """Check if a post exists by ID.
 
         Args:
@@ -181,11 +161,6 @@ class MarkpostClient:
 
         Raises:
             ProgressException: If network error occurs
-
-        Note:
-            The Markpost GET /:id endpoint returns HTML rather than JSON.
-            This method only checks the HTTP status code to verify existence.
-            API documentation is unclear about exact response format.
         """
         if not post_id:
             raise ProgressException("Post ID cannot be empty")
@@ -194,17 +169,18 @@ class MarkpostClient:
 
         try:
             logger.debug(f"Checking post status: {sanitize(post_id)}")
-            response = requests.get(url, timeout=self.timeout)
-
-            exists = response.status_code == 200
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as response:
+                    exists = response.status == 200
             logger.debug(
                 f"Post {sanitize(post_id)} status: "
                 f"{'exists' if exists else 'not found'}"
             )
             return exists
 
-        except requests.RequestException as e:
-            _handle_request_exception(e, "check post status")
+        except aiohttp.ClientError as e:
+            _handle_client_exception(e, "check post status")
 
     def _mask_url(self, url: str) -> str:
         """Mask sensitive information in URL for logging.

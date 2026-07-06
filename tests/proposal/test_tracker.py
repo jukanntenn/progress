@@ -1,7 +1,7 @@
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -33,7 +33,7 @@ def _make_repo(tmp_path: Path, files: dict[str, str]) -> Path:
 
 def _mock_analyzer(**overrides):
     analyzer = Mock()
-    analyzer.analyze = Mock(return_value=('{"summary": "s", "detail": "d"}'))
+    analyzer.analyze = AsyncMock(return_value=('{"summary": "s", "detail": "d"}'))
     for k, v in overrides.items():
         setattr(analyzer, k, v)
     return analyzer
@@ -42,14 +42,14 @@ def _mock_analyzer(**overrides):
 def _mock_git(tmp_path, commit, **overrides):
     git_client = Mock()
     git_client.workspace_dir = tmp_path / "ws"
-    git_client.get_current_commit = Mock(return_value=commit)
-    git_client.get_changed_file_statuses = Mock(return_value=[])
-    git_client.get_file_creation_date = Mock(return_value="2024-01-01 00:00:00 +0000")
-    git_client.fetch_and_reset = Mock()
-    git_client.get_file_diff = Mock(return_value="")
+    git_client.get_current_commit = AsyncMock(return_value=commit)
+    git_client.get_changed_file_statuses = AsyncMock(return_value=[])
+    git_client.get_file_creation_date = AsyncMock(return_value="2024-01-01 00:00:00 +0000")
+    git_client.fetch_and_reset = AsyncMock()
+    git_client.get_file_diff = AsyncMock(return_value="")
     git_client.timeout = 30
     for k, v in overrides.items():
-        setattr(git_client, k, v if isinstance(v, Mock) else Mock(return_value=v))
+        setattr(git_client, k, v if isinstance(v, Mock) else AsyncMock(return_value=v))
     return git_client
 
 
@@ -61,17 +61,27 @@ def _make_tracker(analyzer, git_client):
     )
 
 
+def _async_return(value):
+    """Build an awaitable returning ``value`` — replaces the sync lambda override
+    for ``tracker._clone_or_update`` (now awaited) in tests that stub the clone."""
+
+    async def _stub(config):
+        return value
+
+    return _stub
+
+
 @pytest.fixture()
-def db(tmp_path: Path):
+async def db(tmp_path: Path):
     db_path = tmp_path / "test.db"
-    init_db(str(db_path))
-    create_tables()
+    await init_db(str(db_path))
+    await create_tables()
     yield
-    close_db()
+    await close_db()
 
 
 class TestInitialCheck:
-    def test_saves_all_proposals_to_db(self, db, tmp_path: Path):
+    async def test_saves_all_proposals_to_db(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -82,17 +92,17 @@ class TestInitialCheck:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        reports = tracker.check(ProposalKind.EIP)
+        reports = await tracker.check(ProposalKind.EIP)
 
         assert len(reports) == 1
-        assert Proposal.select().count() == 2
+        assert await Proposal.all().count() == 2
 
-        state = ProposalTrackerState.get(ProposalTrackerState.kind == "eip")
+        state = await ProposalTrackerState.get(kind="eip")
         assert state.last_seen_commit == commit
 
-    def test_returns_one_verification_report(self, db, tmp_path: Path):
+    async def test_returns_one_verification_report(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -103,22 +113,22 @@ class TestInitialCheck:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        reports = tracker.check(ProposalKind.RFC)
+        reports = await tracker.check(ProposalKind.RFC)
         assert len(reports) == 1
 
-    def test_empty_repo_returns_no_reports(self, db, tmp_path: Path):
+    async def test_empty_repo_returns_no_reports(self, db, tmp_path: Path):
         repo_dir = _make_repo(tmp_path, {"README.md": "# README\n"})
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        reports = tracker.check(ProposalKind.RFC)
+        reports = await tracker.check(ProposalKind.RFC)
         assert len(reports) == 0
 
-    def test_updates_last_seen_commit(self, db, tmp_path: Path):
+    async def test_updates_last_seen_commit(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {"EIPS/eip-1.md": "---\neip: 1\ntitle: Test\nstatus: Draft\n---\n\nBody\n"},
@@ -126,16 +136,16 @@ class TestInitialCheck:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        tracker.check(ProposalKind.EIP)
+        await tracker.check(ProposalKind.EIP)
 
-        state = ProposalTrackerState.get(ProposalTrackerState.kind == "eip")
+        state = await ProposalTrackerState.get(kind="eip")
         assert state.last_seen_commit == commit
 
 
 class TestIncrementalCheck:
-    def test_detect_status_change_draft_to_final(self, db, tmp_path: Path):
+    async def test_detect_status_change_draft_to_final(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -147,8 +157,8 @@ class TestIncrementalCheck:
         analyzer = _mock_analyzer()
         git_client = _mock_git(tmp_path, commit1, get_file_diff="diff content")
         tracker = _make_tracker(analyzer, git_client)
-        tracker._clone_or_update = lambda config: repo_dir
-        tracker.check(ProposalKind.EIP)
+        tracker._clone_or_update = _async_return(repo_dir)
+        await tracker.check(ProposalKind.EIP)
 
         (repo_dir / "EIPS" / "eip-1.md").write_text(
             "---\neip: 1\ntitle: Test EIP\nstatus: Final\ntype: Standards Track\n---\n\nBody changed\n",
@@ -158,16 +168,16 @@ class TestIncrementalCheck:
         _git(repo_dir, "commit", "-m", "update status")
         commit2 = _git(repo_dir, "rev-parse", "HEAD")
 
-        git_client.get_current_commit = Mock(return_value=commit2)
-        git_client.get_changed_file_statuses = Mock(
+        git_client.get_current_commit = AsyncMock(return_value=commit2)
+        git_client.get_changed_file_statuses = AsyncMock(
             return_value=[("M", "EIPS/eip-1.md")]
         )
 
-        reports = tracker.check(ProposalKind.EIP)
+        reports = await tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].new_status.value == "final"
 
-    def test_no_change_same_commit_returns_empty(self, db, tmp_path: Path):
+    async def test_no_change_same_commit_returns_empty(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {"EIPS/eip-1.md": "---\neip: 1\ntitle: Test\nstatus: Draft\n---\n\nBody\n"},
@@ -175,42 +185,42 @@ class TestIncrementalCheck:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        tracker.check(ProposalKind.EIP)
-        reports2 = tracker.check(ProposalKind.EIP)
+        await tracker.check(ProposalKind.EIP)
+        reports2 = await tracker.check(ProposalKind.EIP)
         assert len(reports2) == 0
 
 
 class TestDeletedFile:
-    def test_nonterminal_becomes_withdrawn(self, db, tmp_path: Path):
+    async def test_nonterminal_becomes_withdrawn(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
-                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test EIP\nstatus: Draft\n---\n\nBody\n"
+                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test\nstatus: Draft\n---\n\nBody\n"
             },
         )
         commit1 = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit1))
-        tracker._clone_or_update = lambda config: repo_dir
-        tracker.check(ProposalKind.EIP)
+        tracker._clone_or_update = _async_return(repo_dir)
+        await tracker.check(ProposalKind.EIP)
 
         _git(repo_dir, "rm", "EIPS/eip-1.md")
         _git(repo_dir, "commit", "-m", "delete eip")
         commit2 = _git(repo_dir, "rev-parse", "HEAD")
 
         git_client = tracker.git
-        git_client.get_current_commit = Mock(return_value=commit2)
-        git_client.get_changed_file_statuses = Mock(
+        git_client.get_current_commit = AsyncMock(return_value=commit2)
+        git_client.get_changed_file_statuses = AsyncMock(
             return_value=[("D", "EIPS/eip-1.md")]
         )
 
-        reports = tracker.check(ProposalKind.EIP)
+        reports = await tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].new_status.value == "withdrawn"
 
-    def test_terminal_no_status_change(self, db, tmp_path: Path):
+    async def test_terminal_no_status_change(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -220,41 +230,41 @@ class TestDeletedFile:
         commit1 = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit1))
-        tracker._clone_or_update = lambda config: repo_dir
-        tracker.check(ProposalKind.EIP)
+        tracker._clone_or_update = _async_return(repo_dir)
+        await tracker.check(ProposalKind.EIP)
 
         _git(repo_dir, "rm", "EIPS/eip-1.md")
         _git(repo_dir, "commit", "-m", "delete eip")
         commit2 = _git(repo_dir, "rev-parse", "HEAD")
 
         git_client = tracker.git
-        git_client.get_current_commit = Mock(return_value=commit2)
-        git_client.get_changed_file_statuses = Mock(
+        git_client.get_current_commit = AsyncMock(return_value=commit2)
+        git_client.get_changed_file_statuses = AsyncMock(
             return_value=[("D", "EIPS/eip-1.md")]
         )
 
-        reports = tracker.check(ProposalKind.EIP)
+        reports = await tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].new_status.value == "final"
 
-    def test_unknown_file_returns_none(self, db, tmp_path: Path):
+    async def test_unknown_file_returns_none(self, db, tmp_path: Path):
         repo_dir = _make_repo(tmp_path, {"README.md": "# Hello\n"})
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
-        state = ProposalTrackerState.create(kind="eip", last_seen_commit=commit)
+        state = await ProposalTrackerState.create(kind="eip", last_seen_commit=commit)
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
 
         from progress.contrib.proposal.parser import EIPParser
 
-        result = tracker._handle_deleted(
+        result = await tracker._handle_deleted(
             ProposalKind.EIP, state, EIPParser(), "EIPS/eip-999.md", commit
         )
         assert result is None
 
 
 class TestErrorHandling:
-    def test_parse_error_skipped_gracefully(self, db, tmp_path: Path):
+    async def test_parse_error_skipped_gracefully(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -264,12 +274,12 @@ class TestErrorHandling:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         tracker = _make_tracker(_mock_analyzer(), _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        reports = tracker.check(ProposalKind.PEP)
+        reports = await tracker.check(ProposalKind.PEP)
         assert len(reports) == 0
 
-    def test_analysis_failure_does_not_block_check(self, db, tmp_path: Path):
+    async def test_analysis_failure_does_not_block_check(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {"EIPS/eip-1.md": "---\neip: 1\ntitle: Test\nstatus: Draft\n---\n\nBody\n"},
@@ -277,42 +287,42 @@ class TestErrorHandling:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         analyzer = _mock_analyzer(
-            analyze=Mock(side_effect=Exception("AI service unavailable"))
+            analyze=AsyncMock(side_effect=Exception("AI service unavailable"))
         )
         tracker = _make_tracker(analyzer, _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        reports = tracker.check(ProposalKind.EIP)
+        reports = await tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].analysis_summary is None
 
 
 class TestLanguagePropagation:
-    def test_configured_language_reaches_analysis_prompt(self, db, tmp_path: Path):
+    async def test_configured_language_reaches_analysis_prompt(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
-                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test EIP\nstatus: Draft\n---\n\nBody\n"
+                "EIPS/eip-1.md": "---\neip: 1\ntitle: Test\nstatus: Draft\n---\n\nBody\n"
             },
         )
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         analyzer = _mock_analyzer()
-        analyzer.analyze = Mock(return_value=("summary", "detail"))
+        analyzer.analyze = AsyncMock(return_value=("summary", "detail"))
         tracker = ProposalTracker(
             analyzer=analyzer,
             git_client=_mock_git(tmp_path, commit),
             clock=lambda: datetime.now(ZoneInfo("UTC")),
             language="zh",
         )
-        tracker._clone_or_update = lambda config: repo_dir  # ty: ignore[invalid-assignment]
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        tracker.check(ProposalKind.EIP)
+        await tracker.check(ProposalKind.EIP)
 
         prompt = analyzer.analyze.call_args.kwargs["prompt"]
         assert 'language is "zh"' in prompt
 
-    def test_default_language_is_english(self, db, tmp_path: Path):
+    async def test_default_language_is_english(self, db, tmp_path: Path):
         repo_dir = _make_repo(
             tmp_path,
             {
@@ -322,25 +332,25 @@ class TestLanguagePropagation:
         commit = _git(repo_dir, "rev-parse", "HEAD")
 
         analyzer = _mock_analyzer()
-        analyzer.analyze = Mock(return_value=("summary", "detail"))
+        analyzer.analyze = AsyncMock(return_value=("summary", "detail"))
         tracker = _make_tracker(analyzer, _mock_git(tmp_path, commit))
-        tracker._clone_or_update = lambda config: repo_dir
+        tracker._clone_or_update = _async_return(repo_dir)
 
-        tracker.check(ProposalKind.EIP)
+        await tracker.check(ProposalKind.EIP)
 
         prompt = analyzer.analyze.call_args.kwargs["prompt"]
         assert 'language is "en"' in prompt
 
 
 class TestCloneFailure:
-    def test_clone_failure_reports_error_and_reraises(
+    async def test_clone_failure_reports_error_and_reraises(
         self, db, tmp_path: Path, monkeypatch
     ):
         from progress.errors import GitException
 
         analyzer = _mock_analyzer()
         tracker = _make_tracker(analyzer, _mock_git(tmp_path, "abc"))
-        tracker._clone_or_update = Mock(side_effect=GitException("exit status 128"))
+        tracker._clone_or_update = AsyncMock(side_effect=GitException("exit status 128"))
 
         reported = []
         monkeypatch.setattr(
@@ -349,7 +359,7 @@ class TestCloneFailure:
         )
 
         with pytest.raises(GitException):
-            tracker.check(ProposalKind.ERC)
+            await tracker.check(ProposalKind.ERC)
 
         assert len(reported) == 1
         assert isinstance(reported[0][0], GitException)
@@ -409,7 +419,7 @@ class TestCloneOrUpdateSelfHeal:
         )
         (git_dir / "HEAD").write_text("ref: refs/heads/.invalid\n", encoding="utf-8")
 
-    def test_re_clones_when_head_is_corrupt(self, db, tmp_path: Path):
+    async def test_re_clones_when_head_is_corrupt(self, db, tmp_path: Path):
         from progress.git import GitClient
 
         remote = self._make_remote(tmp_path)
@@ -417,19 +427,19 @@ class TestCloneOrUpdateSelfHeal:
         config = self._erc_config(remote)
         tracker = _make_tracker(_mock_analyzer(), git_client)
 
-        repo_path = tracker._clone_or_update(config)
+        repo_path = await tracker._clone_or_update(config)
         self._corrupt_head(repo_path)
         with pytest.raises(ValueError):
-            git_client.get_current_commit(repo_path)
+            await git_client.get_current_commit(repo_path)
 
-        returned = tracker._clone_or_update(config)
+        returned = await tracker._clone_or_update(config)
 
         assert returned == repo_path
-        assert git_client.get_current_commit(repo_path) == _git(
+        assert await git_client.get_current_commit(repo_path) == _git(
             repo_path, "rev-parse", "HEAD"
         )
 
-    def test_healthy_clone_is_reused(self, db, tmp_path: Path):
+    async def test_healthy_clone_is_reused(self, db, tmp_path: Path):
         from progress.git import GitClient
 
         remote = self._make_remote(tmp_path)
@@ -437,9 +447,9 @@ class TestCloneOrUpdateSelfHeal:
         config = self._erc_config(remote)
         tracker = _make_tracker(_mock_analyzer(), git_client)
 
-        first = tracker._clone_or_update(config)
-        first_commit = git_client.get_current_commit(first)
-        second = tracker._clone_or_update(config)
+        first = await tracker._clone_or_update(config)
+        first_commit = await git_client.get_current_commit(first)
+        second = await tracker._clone_or_update(config)
 
         assert second == first
-        assert git_client.get_current_commit(second) == first_commit
+        assert await git_client.get_current_commit(second) == first_commit

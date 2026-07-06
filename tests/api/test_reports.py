@@ -49,8 +49,8 @@ def test_get_report_not_found(client: TestClient):
     assert response.json()["detail"] == "Report not found"
 
 
-def test_get_report_renders_markdown(client: TestClient):
-    report = Report.create(
+async def test_get_report_renders_markdown(client: TestClient):
+    report = await Report.create(
         title="Test Report",
         content="# Heading\n\n<details><summary>Click</summary>Content</details>",
         repo=None,

@@ -1,10 +1,14 @@
 """Timezone helpers."""
 
-from datetime import datetime
+from datetime import UTC, datetime, tzinfo
 from zoneinfo import ZoneInfo
 
 
-def get_now(timezone: ZoneInfo) -> datetime:
+def now_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def get_now(timezone: tzinfo) -> datetime:
     return datetime.now(timezone)
 
 

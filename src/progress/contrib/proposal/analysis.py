@@ -10,7 +10,7 @@ from .types import ProposalKind
 logger = logging.getLogger(__name__)
 
 
-def run_analysis(
+async def run_analysis(
     analyzer: Analyzer,
     template_name: str,
     kind: ProposalKind,
@@ -31,7 +31,7 @@ def run_analysis(
             new_status=new_raw_status,
             language=language,
         )
-        result = analyzer.analyze(
+        result = await analyzer.analyze(
             content=content or "", prompt=prompt, parser=AnalysisResultParser()
         )
         if isinstance(result, tuple):

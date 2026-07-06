@@ -12,12 +12,12 @@ class MarkpostStorage:
     def __init__(self, config: MarkpostConfig) -> None:
         self._client = MarkpostClient(config)
 
-    def save(self, title: str, bodies: list[str]) -> list[str]:
+    async def save(self, title: str, bodies: list[str]) -> list[str]:
         urls: list[str] = []
         total = len(bodies)
         for idx, body in enumerate(bodies):
             try:
-                url = self._client.upload(body, title=title)
+                url = await self._client.upload(body, title=title)
                 urls.append(url)
             except Exception:
                 logger.warning(

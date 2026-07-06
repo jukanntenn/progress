@@ -38,7 +38,7 @@ class Analyzer(ABC):
         return result  # ty: ignore[invalid-return-type]  # noop identity: returns the raw string unchanged. Only sound when R is str, which is the only case where the caller omits the parser.
 
     @abstractmethod
-    def analyze[R](
+    async def analyze[R](
         self,
         content: str,
         prompt: str = "",

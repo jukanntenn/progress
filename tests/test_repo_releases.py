@@ -1,7 +1,7 @@
 """Repository release checking unit tests (simplified)"""
 
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -34,7 +34,7 @@ def mock_git_client():
 
     git = Mock(spec=GitClient)
     git.workspace_dir = Path("/tmp/test")
-    git.get_commit_diff = Mock(return_value="diff content")
+    git.get_commit_diff = AsyncMock(return_value="diff content")
     return git
 
 
@@ -42,6 +42,9 @@ def mock_git_client():
 def mock_github_client():
     """Create a mock GitHubClient."""
     github_client = Mock(spec=GitHubClient)
+    github_client.list_releases = AsyncMock()
+    github_client.get_release_commit = AsyncMock()
+    github_client.get_release_body = AsyncMock()
     return github_client
 
 
@@ -55,14 +58,14 @@ def mock_repository():
     repo.last_release_tag = None
     repo.last_release_commit_hash = None
     repo.last_release_check_time = None
-    repo.save = Mock()
+    repo.save = AsyncMock()
     return repo
 
 
 class TestCheckReleasesBasic:
     """Test basic Repo.check_releases() scenarios."""
 
-    def test_first_check_with_releases(
+    async def test_first_check_with_releases(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test first-time check when releases exist."""
@@ -82,7 +85,7 @@ class TestCheckReleasesBasic:
             mock_config,
             github_client=mock_github_client,
         )
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is not None
         assert result["is_first_check"] is True
@@ -93,15 +96,15 @@ class TestCheckReleasesBasic:
         assert result["releases"][0]["notes"] == "First release"
         assert result["releases"][0]["commit_hash"] == "abc123def456"
 
-        mock_github_client.list_releases.assert_called_once_with("test", "repo")
-        mock_github_client.get_release_commit.assert_called_once_with(
+        mock_github_client.list_releases.assert_awaited_once_with("test", "repo")
+        mock_github_client.get_release_commit.assert_awaited_once_with(
             "test", "repo", "v1.0.0"
         )
-        mock_github_client.get_release_body.assert_called_once_with(
+        mock_github_client.get_release_body.assert_awaited_once_with(
             "test", "repo", "v1.0.0"
         )
 
-    def test_first_check_returns_only_latest_release(
+    async def test_first_check_returns_only_latest_release(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         mock_github_client.list_releases.return_value = [
@@ -125,14 +128,14 @@ class TestCheckReleasesBasic:
             mock_config,
             github_client=mock_github_client,
         )
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is not None
         assert result["is_first_check"] is True
         assert len(result["releases"]) == 1
         assert result["releases"][0]["tag_name"] == "v2.0.0"
 
-    def test_first_check_no_releases(
+    async def test_first_check_no_releases(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test first-time check when repository has no releases."""
@@ -144,11 +147,11 @@ class TestCheckReleasesBasic:
             mock_config,
             github_client=mock_github_client,
         )
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is None
 
-    def test_gh_cli_failure_returns_none(
+    async def test_gh_cli_failure_returns_none(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test that GitHub CLI failure returns None gracefully."""
@@ -160,11 +163,11 @@ class TestCheckReleasesBasic:
             mock_config,
             github_client=mock_github_client,
         )
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is None
 
-    def test_incremental_check_filters_by_date(
+    async def test_incremental_check_filters_by_date(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test that incremental check filters releases by date correctly."""
@@ -200,7 +203,7 @@ class TestCheckReleasesBasic:
         mock_github_client.get_release_commit.return_value = "abc123"
         mock_github_client.get_release_body.return_value = "Release notes"
 
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is not None
         assert result["is_first_check"] is False
@@ -210,7 +213,7 @@ class TestCheckReleasesBasic:
         assert "v1.1.0" in tag_names
         assert "v2.0.0" in tag_names
 
-    def test_incremental_check_accepts_string_last_check_time(
+    async def test_incremental_check_accepts_string_last_check_time(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         repo = Repo(
@@ -221,7 +224,7 @@ class TestCheckReleasesBasic:
         )
         repo.model.last_release_tag = "v1.0.0"
         repo.model.last_release_commit_hash = "oldhash"
-        repo.model.last_release_check_time = "2024-01-01 00:00:00+00:00"  # ty: ignore[invalid-assignment]  # Peewee DateTimeField descriptor __set__
+        repo.model.last_release_check_time = "2024-01-01 00:00:00+00:00"
 
         mock_github_client.list_releases.return_value = [
             {
@@ -233,7 +236,7 @@ class TestCheckReleasesBasic:
         mock_github_client.get_release_commit.return_value = "abc123"
         mock_github_client.get_release_body.return_value = "Release notes"
 
-        result = repo.check_releases()
+        result = await repo.check_releases()
 
         assert result is not None
         assert result["is_first_check"] is False
@@ -244,34 +247,28 @@ class TestCheckReleasesBasic:
 class TestUpdateReleases:
     """Test Repo.update_releases() method."""
 
-    def test_updates_repository_fields(
+    async def test_updates_repository_fields(
         self, mock_repository, mock_git_client, mock_config
     ):
         """Test that update_releases sets the correct fields."""
-        from progress import db
-
         repo = Repo(mock_repository, mock_git_client, mock_config)
 
-        # Mock the database and atomic transaction
-        with patch("progress.contrib.repo.repo.get_now") as mock_get_now:
-            with patch.object(db, "database") as mock_database:
-                mock_get_now.return_value = datetime(
-                    2024, 2, 1, 0, 0, 0, tzinfo=ZoneInfo("UTC")
-                )
-                mock_database.atomic.return_value.__enter__ = Mock()
-                mock_database.atomic.return_value.__exit__ = Mock(return_value=False)
+        # Mock the database connection context manager
+        with patch("progress.contrib.repo.repo.database_connection") as mock_conn:
+            mock_conn.return_value.__aenter__ = AsyncMock()
+            mock_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
-                repo.update_releases("v2.0.0", "abc123")
+            await repo.update_releases("v2.0.0", "abc123")
 
-                assert repo.model.last_release_tag == "v2.0.0"
-                assert repo.model.last_release_commit_hash == "abc123"
-                assert repo.model.last_release_check_time is not None
+            assert repo.model.last_release_tag == "v2.0.0"
+            assert repo.model.last_release_commit_hash == "abc123"
+            assert repo.model.last_release_check_time is not None
 
 
 class TestReleaseAnalysisFallback:
     """Test fallback behavior when AI analysis fails."""
 
-    def test_analysis_failure_generates_fallback_summary(
+    async def test_analysis_failure_generates_fallback_summary(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test that when AI analysis fails, a fallback summary is generated."""
@@ -302,18 +299,19 @@ class TestReleaseAnalysisFallback:
         manager = RepositoryManager(analyzer, reporter, mock_config)
 
         with patch("progress.contrib.repo.repository.Repo", return_value=repo):
-            with patch.object(repo, "check_releases", return_value=release_data):
-                with patch.object(repo, "update_releases"):
-                    with patch.object(repo, "clone_or_update"):
-                        with patch.object(repo, "get_diff", return_value=None):
+            with patch.object(repo, "check_releases", new_callable=AsyncMock, return_value=release_data):
+                with patch.object(repo, "update_releases", new_callable=AsyncMock):
+                    with patch.object(repo, "clone_or_update", new_callable=AsyncMock):
+                        with patch.object(repo, "get_diff", new_callable=AsyncMock, return_value=None):
                             with patch.object(
-                                repo, "get_current_commit", return_value="current123"
+                                repo, "get_current_commit", new_callable=AsyncMock, return_value="current123"
                             ):
                                 with patch(
                                     "progress.contrib.repo.repository.analyze_releases",
+                                    new_callable=AsyncMock,
                                     side_effect=AnalysisException("Claude Code failed"),
                                 ):
-                                    result = manager.check(mock_repository)
+                                    result = await manager.check(mock_repository)
 
         assert result is not None
         assert result.releases is not None
@@ -326,7 +324,7 @@ class TestReleaseAnalysisFallback:
             or "tag" in result.releases[0]["ai_detail"].lower()
         )
 
-    def test_analysis_failure_with_no_notes(
+    async def test_analysis_failure_with_no_notes(
         self, mock_repository, mock_git_client, mock_config, mock_github_client
     ):
         """Test fallback when release has no notes."""
@@ -357,18 +355,19 @@ class TestReleaseAnalysisFallback:
         manager = RepositoryManager(analyzer, reporter, mock_config)
 
         with patch("progress.contrib.repo.repository.Repo", return_value=repo):
-            with patch.object(repo, "check_releases", return_value=release_data):
-                with patch.object(repo, "update_releases"):
-                    with patch.object(repo, "clone_or_update"):
-                        with patch.object(repo, "get_diff", return_value=None):
+            with patch.object(repo, "check_releases", new_callable=AsyncMock, return_value=release_data):
+                with patch.object(repo, "update_releases", new_callable=AsyncMock):
+                    with patch.object(repo, "clone_or_update", new_callable=AsyncMock):
+                        with patch.object(repo, "get_diff", new_callable=AsyncMock, return_value=None):
                             with patch.object(
-                                repo, "get_current_commit", return_value="current123"
+                                repo, "get_current_commit", new_callable=AsyncMock, return_value="current123"
                             ):
                                 with patch(
                                     "progress.contrib.repo.repository.analyze_releases",
+                                    new_callable=AsyncMock,
                                     side_effect=AnalysisException("AI unavailable"),
                                 ):
-                                    result = manager.check(mock_repository)
+                                    result = await manager.check(mock_repository)
 
         assert result is not None
         assert result.releases is not None

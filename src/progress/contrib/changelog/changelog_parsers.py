@@ -4,7 +4,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-import requests
+import aiohttp
 from lxml import html
 
 from ...errors import ChangelogParseError
@@ -21,30 +21,28 @@ class ChangelogParser(ABC):
     def __init__(self, timeout: int = 30):
         self._timeout = timeout
 
-    def fetch(self, url: str) -> str:
+    async def fetch(self, url: str) -> str:
         try:
-            response = requests.get(
-                url,
-                timeout=self._timeout,
-                headers={"User-Agent": "progress"},
-            )
-            response.raise_for_status()
-            return self._decode_response_text(response)
-        except requests.RequestException as e:
+            timeout = aiohttp.ClientTimeout(total=self._timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    url, headers={"User-Agent": "progress"}
+                ) as response:
+                    response.raise_for_status()
+                    raw = await response.read()
+                    charset = (response.charset or "").strip().lower()
+                    return self._decode_bytes(raw, charset)
+        except aiohttp.ClientError as e:
             raise ChangelogParseError(
                 f"Failed to fetch changelog from {url}: {e}"
             ) from e
 
     @staticmethod
-    def _decode_response_text(response: requests.Response) -> str:
-        raw = response.content
-        encoding = (response.encoding or "").strip().lower()
-        apparent = (getattr(response, "apparent_encoding", None) or "").strip().lower()
-
+    def _decode_bytes(raw: bytes, charset: str) -> str:
         candidates: list[str] = []
-        if encoding:
-            candidates.append(encoding)
-        candidates.extend(["utf-8", apparent])
+        if charset:
+            candidates.append(charset)
+        candidates.append("utf-8")
 
         bad_encodings = {"iso-8859-1", "latin-1", "windows-1252"}
         seen: set[str] = set()
@@ -60,7 +58,7 @@ class ChangelogParser(ABC):
                 continue
 
             if enc in bad_encodings and (
-                "â\x80" in text or "ã\x80" in text or "â" in text or "ã" in text
+                "â\x80" in text or "ã\x80" in text or "â€" in text or "ã€" in text
             ):
                 continue
 

@@ -1,11 +1,25 @@
 """Tests for MarkpostClient."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiohttp
 import pytest
-import requests
 
 from progress.config import MarkpostConfig
 from progress.errors import ClientError, ProgressException
 from progress.utils.markpost import MarkpostClient
+
+
+def _client_response_error(status: int, message: str) -> aiohttp.ClientResponseError:
+    """Build a ClientResponseError whose __str__ won't blow up (needs real_url)."""
+    request_info = MagicMock()
+    request_info.real_url = "https://example.com/p/key"
+    return aiohttp.ClientResponseError(
+        request_info=request_info,
+        history=(),
+        status=status,
+        message=message,
+    )
 
 
 class TestUrlParsing:
@@ -67,150 +81,167 @@ class TestUrlMasking:
 class TestUpload:
     """Test upload method."""
 
-    def test_upload_success(self, monkeypatch):
+    async def test_upload_success(self):
         """Test successful upload."""
 
         class FakeResponse:
-            status_code = 200
-
-            def json(self):
-                return {"id": "test123"}
+            status = 200
 
             def raise_for_status(self):
                 pass
 
-        def fake_post(*_, **__):
-            return FakeResponse()
-
-        monkeypatch.setattr(requests, "post", fake_post)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        url = client.upload("content", "title")
-        assert url == "https://example.com/test123"
+        with patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls:
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+            resp.json = AsyncMock(return_value={"id": "test123"})
 
-    def test_upload_empty_content(self):
+            session = MagicMock()
+            session.post.return_value.__aenter__.return_value = resp
+            session.post.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            url = await client.upload("content", "title")
+            assert url == "https://example.com/test123"
+
+    async def test_upload_empty_content(self):
         """Test upload with empty content raises exception."""
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ProgressException, match="Content cannot be empty"):
-            client.upload("")
+            await client.upload("")
 
-    def test_upload_missing_id_field(self, monkeypatch):
+    async def test_upload_missing_id_field(self):
         """Test upload when API response missing 'id' field."""
 
-        class FakeResponse:
-            status_code = 200
-
-            def json(self):
-                return {}
-
-            def raise_for_status(self):
-                pass
-
-        def fake_post(*_, **__):
-            return FakeResponse()
-
-        monkeypatch.setattr(requests, "post", fake_post)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        with pytest.raises(ProgressException, match="missing 'id'"):
-            client.upload("content", "title")
+        with patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls:
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+            resp.json = AsyncMock(return_value={})
 
-    def test_upload_4xx_error_no_retry(self, monkeypatch):
-        """Test 4XX errors raise ClientError and are not retried."""
+            session = MagicMock()
+            session.post.return_value.__aenter__.return_value = resp
+            session.post.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            with pytest.raises(ProgressException, match="missing 'id'"):
+                await client.upload("content", "title")
+
+    async def test_upload_4xx_error_no_retry(self):
+        """Test 4XX HTTP errors are reported with their status and not retried."""
         call_count = []
 
-        class FakeResponse:
-            status_code = 400
-            text = '{"error": "Invalid request"}'
-
-        def fake_post(*_, **__):
-            call_count.append(1)
-            e = requests.RequestException()
-            e.response = FakeResponse()  # type: ignore[attr-defined]
-            raise e
-
-        monkeypatch.setattr(requests, "post", fake_post)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        with pytest.raises(ClientError, match="Client error 400"):
-            client.upload("content", "title")
+        with patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls:
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock(
+                side_effect=_client_response_error(400, "Bad Request")
+            )
 
-        assert len(call_count) == 1, "4XX errors should not be retried"
+            session = MagicMock()
 
-    def test_upload_5xx_error_with_retry(self, monkeypatch):
+            def counting_post(*args, **kwargs):
+                call_count.append(1)
+                return session.post.return_value
+
+            session.post.side_effect = counting_post
+            session.post.return_value.__aenter__.return_value = resp
+            session.post.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            with pytest.raises(ClientError, match="Client error 400"):
+                await client.upload("content", "title")
+
+            assert len(call_count) == 1, "4XX errors should not be retried"
+
+    async def test_upload_5xx_error_with_retry(self):
         """Test 5XX errors are retried (3 attempts total)."""
         call_count = []
 
-        monkeypatch.setattr("progress.utils.functional.time.sleep", lambda _seconds: None)
-
-        class FakeResponse:
-            status_code = 500
-            text = '{"error": "Internal server error"}'
-
-        def fake_post(*_, **__):
-            call_count.append(1)
-            e = requests.RequestException()
-            e.response = FakeResponse()  # type: ignore[attr-defined]
-            raise e
-
-        monkeypatch.setattr(requests, "post", fake_post)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        with pytest.raises(requests.RequestException):
-            client.upload("content", "title")
+        with (
+            patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls,
+            patch("progress.utils.functional.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock(
+                side_effect=_client_response_error(500, "Internal server error")
+            )
 
-        assert len(call_count) == 3, "5XX errors should be retried 3 times"
+            session = MagicMock()
+
+            def counting_post(*args, **kwargs):
+                call_count.append(1)
+                return session.post.return_value
+
+            session.post.side_effect = counting_post
+            session.post.return_value.__aenter__.return_value = resp
+            session.post.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            with pytest.raises(aiohttp.ClientError):
+                await client.upload("content", "title")
+
+            assert len(call_count) == 3, "5XX errors should be retried 3 times"
 
 
 class TestGetStatus:
     """Test get_status method."""
 
-    def test_get_status_exists(self, monkeypatch):
+    async def test_get_status_exists(self):
         """Test checking existing post."""
 
-        class FakeResponse:
-            status_code = 200
-
-        def fake_get(*_, **__):
-            return FakeResponse()
-
-        monkeypatch.setattr(requests, "get", fake_get)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        assert client.get_status("abc123") is True
+        with patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls:
+            resp = MagicMock()
+            resp.status = 200
 
-    def test_get_status_not_found(self, monkeypatch):
+            session = MagicMock()
+            session.get.return_value.__aenter__.return_value = resp
+            session.get.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            assert await client.get_status("abc123") is True
+
+    async def test_get_status_not_found(self):
         """Test checking non-existent post."""
 
-        class FakeResponse:
-            status_code = 404
-
-        def fake_get(*_, **__):
-            return FakeResponse()
-
-        monkeypatch.setattr(requests, "get", fake_get)
-
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
-        assert client.get_status("abc123") is False
+        with patch("progress.utils.markpost.aiohttp.ClientSession") as mock_session_cls:
+            resp = MagicMock()
+            resp.status = 404
 
-    def test_get_status_empty_id(self):
+            session = MagicMock()
+            session.get.return_value.__aenter__.return_value = resp
+            session.get.return_value.__aexit__.return_value = None
+
+            mock_session_cls.return_value.__aenter__.return_value = session
+
+            assert await client.get_status("abc123") is False
+
+    async def test_get_status_empty_id(self):
         """Test get_status with empty post_id."""
         config = MarkpostConfig(url="https://example.com/p/key", timeout=30)  # ty: ignore[invalid-argument-type]
         client = MarkpostClient(config)
 
         with pytest.raises(ProgressException, match="Post ID cannot be empty"):
-            client.get_status("")
+            await client.get_status("")

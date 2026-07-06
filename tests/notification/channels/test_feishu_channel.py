@@ -1,50 +1,57 @@
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
+import aiohttp
 import pytest
-import requests
 
 from progress.errors import ExternalServiceException
 from progress.notification.channels.feishu import FeishuChannel
 
 
-def test_feishu_channel_send_success() -> None:
+async def test_feishu_channel_send_success() -> None:
     channel = FeishuChannel(webhook_url="https://example.com/webhook", timeout=30)
     payload = '{"header": {}, "elements": []}'
 
-    with patch("requests.post") as mock_post:
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_post.return_value = mock_response
+    with patch("progress.notification.channels.feishu.aiohttp.ClientSession") as mock_session_cls:
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
 
-        channel.send(payload)
+        session = MagicMock()
+        session.post.return_value.__aenter__.return_value = resp
+        session.post.return_value.__aexit__.return_value = None
 
-        mock_post.assert_called_once()
-        _, kwargs = mock_post.call_args
+        mock_session_cls.return_value.__aenter__.return_value = session
+
+        await channel.send(payload)
+
+        session.post.assert_called_once()
+        _, kwargs = session.post.call_args
         assert kwargs["url"] == "https://example.com/webhook"
-        assert kwargs["timeout"] == 30
         assert kwargs["json"]["msg_type"] == "interactive"
         assert kwargs["json"]["card"] == {"header": {}, "elements": []}
-        mock_response.raise_for_status.assert_called_once()
+        resp.raise_for_status.assert_called_once()
 
 
-def test_feishu_channel_send_raises_on_request_error() -> None:
+async def test_feishu_channel_send_raises_on_request_error() -> None:
     channel = FeishuChannel(webhook_url="https://example.com/webhook", timeout=30)
     payload = '{"header": {}, "elements": []}'
 
-    with patch("requests.post") as mock_post:
-        mock_post.side_effect = requests.RequestException("Connection error")
+    with patch("progress.notification.channels.feishu.aiohttp.ClientSession") as mock_session_cls:
+        session = MagicMock()
+        session.post.side_effect = aiohttp.ClientError("Connection error")
+
+        mock_session_cls.return_value.__aenter__.return_value = session
 
         with pytest.raises(
             ExternalServiceException, match="Feishu notification failed"
         ):
-            channel.send(payload)
+            await channel.send(payload)
 
 
-def test_feishu_channel_send_raises_on_invalid_json() -> None:
+async def test_feishu_channel_send_raises_on_invalid_json() -> None:
     channel = FeishuChannel(webhook_url="https://example.com/webhook", timeout=30)
     payload = "not-json"
 
     with pytest.raises(Exception):
-        channel.send(payload)
+        await channel.send(payload)

@@ -43,7 +43,7 @@ def test_github_client_initialization_without_proxy():
 class TestListReleases:
     """Test list_releases method."""
 
-    def test_success_with_releases(self):
+    async def test_success_with_releases(self):
         """Test successful release list retrieval."""
         mock_repo = Mock()
         mock_release1 = Mock()
@@ -68,7 +68,7 @@ class TestListReleases:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        releases = client.list_releases("owner", "repo", limit=10)
+        releases = await client.list_releases("owner", "repo", limit=10)
 
         assert len(releases) == 2
         assert releases[0]["tagName"] == "v2.0.0"
@@ -76,7 +76,7 @@ class TestListReleases:
         assert releases[0]["publishedAt"] == "2024-02-01T00:00:00Z"
         assert releases[1]["publishedAt"] == "2024-01-01T00:00:00Z"
 
-    def test_success_no_releases(self):
+    async def test_success_no_releases(self):
         """Test repository with no releases."""
         mock_repo = Mock()
         mock_repo.get_releases.return_value = []
@@ -87,11 +87,11 @@ class TestListReleases:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        releases = client.list_releases("owner", "repo")
+        releases = await client.list_releases("owner", "repo")
 
         assert releases == []
 
-    def test_repository_not_found(self):
+    async def test_repository_not_found(self):
         """Test repository not found error."""
         from github import UnknownObjectException
 
@@ -103,11 +103,11 @@ class TestListReleases:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        releases = client.list_releases("owner", "repo")
+        releases = await client.list_releases("owner", "repo")
 
         assert releases == []
 
-    def test_rate_limit_error(self):
+    async def test_rate_limit_error(self):
         """Test rate limit error."""
         from github import RateLimitExceededException
 
@@ -120,11 +120,11 @@ class TestListReleases:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.list_releases("owner", "repo")
+            await client.list_releases("owner", "repo")
 
         assert "rate limit" in str(exc_info.value).lower()
 
-    def test_bad_credentials(self):
+    async def test_bad_credentials(self):
         """Test bad credentials error."""
         from github import BadCredentialsException
 
@@ -137,7 +137,7 @@ class TestListReleases:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.list_releases("owner", "repo")
+            await client.list_releases("owner", "repo")
 
         assert (
             "access denied" in str(exc_info.value).lower()
@@ -148,7 +148,7 @@ class TestListReleases:
 class TestListRepos:
     """Test list_repos method."""
 
-    def test_success(self):
+    async def test_success(self):
         """Test successful repository list retrieval."""
         mock_repo1 = Mock()
         mock_repo1.full_name = "owner/repo1"
@@ -173,14 +173,14 @@ class TestListRepos:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        repos = client.list_repos("owner", limit=100, source=True)
+        repos = await client.list_repos("owner", limit=100, source=True)
 
         assert len(repos) == 2
         assert repos[0]["nameWithOwner"] == "owner/repo1"
         assert repos[0]["description"] == "First repository"
         assert repos[1]["nameWithOwner"] == "owner/repo2"
 
-    def test_organization_not_found(self):
+    async def test_organization_not_found(self):
         """Test organization not found returns empty list."""
         from github import UnknownObjectException
 
@@ -192,11 +192,11 @@ class TestListRepos:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        repos = client.list_repos("nonexistent")
+        repos = await client.list_repos("nonexistent")
 
         assert repos == []
 
-    def test_rate_limit_error(self):
+    async def test_rate_limit_error(self):
         """Test rate limit error."""
         from github import RateLimitExceededException
 
@@ -209,7 +209,7 @@ class TestListRepos:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.list_repos("owner")
+            await client.list_repos("owner")
 
         assert "rate limit" in str(exc_info.value).lower()
 
@@ -217,7 +217,7 @@ class TestListRepos:
 class TestGetReleaseCommit:
     """Test get_release_commit method."""
 
-    def test_success(self):
+    async def test_success(self):
         """Test successful release commit retrieval."""
         mock_release = Mock()
         mock_release.tag_name = "v1.0.0"
@@ -241,11 +241,11 @@ class TestGetReleaseCommit:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        commit = client.get_release_commit("owner", "repo", "v1.0.0")
+        commit = await client.get_release_commit("owner", "repo", "v1.0.0")
 
         assert commit == "abc123def456"
 
-    def test_release_not_found(self):
+    async def test_release_not_found(self):
         """Test release not found raises GitException."""
         mock_repo = Mock()
         mock_repo.get_releases.return_value = []
@@ -257,11 +257,11 @@ class TestGetReleaseCommit:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.get_release_commit("owner", "repo", "v1.0.0")
+            await client.get_release_commit("owner", "repo", "v1.0.0")
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_rate_limit_error(self):
+    async def test_rate_limit_error(self):
         """Test rate limit error."""
         from github import RateLimitExceededException
 
@@ -274,7 +274,7 @@ class TestGetReleaseCommit:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.get_release_commit("owner", "repo", "v1.0.0")
+            await client.get_release_commit("owner", "repo", "v1.0.0")
 
         assert "rate limit" in str(exc_info.value).lower()
 
@@ -282,7 +282,7 @@ class TestGetReleaseCommit:
 class TestGetReleaseBody:
     """Test get_release_body method."""
 
-    def test_success(self):
+    async def test_success(self):
         """Test successful release body retrieval."""
         mock_release = Mock()
         mock_release.tag_name = "v1.0.0"
@@ -301,11 +301,11 @@ class TestGetReleaseBody:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        body = client.get_release_body("owner", "repo", "v1.0.0")
+        body = await client.get_release_body("owner", "repo", "v1.0.0")
 
         assert body == "Release notes here"
 
-    def test_success_with_empty_body(self):
+    async def test_success_with_empty_body(self):
         """Test release with empty body returns empty string."""
         mock_release = Mock()
         mock_release.tag_name = "v1.0.0"
@@ -324,11 +324,11 @@ class TestGetReleaseBody:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        body = client.get_release_body("owner", "repo", "v1.0.0")
+        body = await client.get_release_body("owner", "repo", "v1.0.0")
 
         assert body == ""
 
-    def test_release_not_found(self):
+    async def test_release_not_found(self):
         """Test release not found raises GitException."""
         mock_repo = Mock()
         mock_repo.get_releases.return_value = []
@@ -340,7 +340,7 @@ class TestGetReleaseBody:
         client.github = mock_github
 
         with pytest.raises(GitException) as exc_info:
-            client.get_release_body("owner", "repo", "v1.0.0")
+            await client.get_release_body("owner", "repo", "v1.0.0")
 
         assert "not found" in str(exc_info.value).lower()
 
@@ -348,7 +348,7 @@ class TestGetReleaseBody:
 class TestGetReadme:
     """Test get_readme method."""
 
-    def test_success(self):
+    async def test_success(self):
         """Test successful README retrieval."""
         mock_content = Mock()
         mock_content.decoded_content.decode.return_value = (
@@ -364,11 +364,11 @@ class TestGetReadme:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        readme = client.get_readme("owner", "repo")
+        readme = await client.get_readme("owner", "repo")
 
         assert readme == "# README\n\nThis is a readme"
 
-    def test_readme_not_found(self):
+    async def test_readme_not_found(self):
         """Test README not found returns None."""
         from github import UnknownObjectException
 
@@ -383,11 +383,11 @@ class TestGetReadme:
         client = GitHubClient(token="test")
         client.github = mock_github
 
-        readme = client.get_readme("owner", "repo")
+        readme = await client.get_readme("owner", "repo")
 
         assert readme is None
 
-    def test_api_error(self):
+    async def test_api_error(self):
         """Test API error raises GitException."""
         from github import GithubException
 
@@ -403,4 +403,4 @@ class TestGetReadme:
         client.github = mock_github
 
         with pytest.raises(GitException):
-            client.get_readme("owner", "repo")
+            await client.get_readme("owner", "repo")

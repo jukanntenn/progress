@@ -15,7 +15,7 @@ class TruncateAnalyzer(Analyzer):
         self._max_chars: int = config.truncate_chars
 
     @override
-    def analyze[R](
+    async def analyze[R](
         self,
         content: str,
         prompt: str = "",

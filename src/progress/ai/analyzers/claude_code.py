@@ -9,11 +9,11 @@ from .base import Analyzer
 
 class ClaudeCodeAnalyzer(Analyzer):
     @override
-    def analyze[R](
+    async def analyze[R](
         self,
         content: str,
         prompt: str = "",
         parser: ParserType[R] | None = None,
     ) -> R:
-        stdout = run_tool("claude_code", prompt, content, config=self._config)
+        stdout = await run_tool("claude_code", prompt, content, config=self._config)
         return self.apply_parser(parser, stdout)

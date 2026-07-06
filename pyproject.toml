@@ -9,7 +9,10 @@ dependencies = [
     "feedgen>=0.9.0",
     "jinja2>=3.1.0",
     "markdown-it-py>=3.0.0",
-    "peewee>=3.18.3",
+    "tortoise-orm>=1.1.7",
+    "aiohttp>=3.12.0",
+    "aiosmtplib>=3.0.0",
+    "aiofiles>=24.1.0",
     "requests>=2.32.5",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
@@ -24,13 +27,14 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.64b0",
     "opentelemetry-instrumentation-sqlite3>=0.64b0",
     "opentelemetry-instrumentation-requests>=0.64b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.64b0",
     "opentelemetry-instrumentation-logging>=0.64b0",
     "sentry-sdk[fastapi]>=2.60.0",
     "json-repair>=0.61.1",
 ]
 
 [project.optional-dependencies]
-dev = ["watchdog>=5.0.0", "pytest>=9.0.2", "types-peewee>=3.18.0"]
+dev = ["watchdog>=5.0.0", "pytest>=9.0.2"]
 test = ["pytest>=9.0.2", "httpx>=0.27.0"]
 
 [build-system]
@@ -45,10 +49,12 @@ entrypoint = "progress.main:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-asyncio>=0.24.0",
     "httpx>=0.27.0",
 ]
 

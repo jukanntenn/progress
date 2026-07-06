@@ -1,39 +1,26 @@
-import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
+"""ChangelogTracker model (table: changelog_trackers)."""
 
-from peewee import AutoField, BooleanField, CharField, DateTimeField
-from progress.db.models import BaseModel
+from tortoise import fields
 
-logger = logging.getLogger(__name__)
-
-UTC = ZoneInfo("UTC")
+from progress.db.models.base import BaseModel
+from progress.utils.timezone import now_utc
 
 
 class ChangelogTracker(BaseModel):
-    id = AutoField()
-    name = CharField()
-    url = CharField(unique=True)
-    parser_type = CharField()
-    last_seen_version = CharField(null=True)
-    enabled = BooleanField(default=True)
-    last_check_time = DateTimeField(null=True)
-    created_at = DateTimeField(default=lambda: datetime.now(UTC))
-    updated_at = DateTimeField(default=lambda: datetime.now(UTC))
+    """A remote changelog feed to monitor for new versions."""
+
+    id: int = fields.IntField(primary_key=True)  # ty: ignore[invalid-assignment]
+    name: str = fields.CharField(max_length=255)  # ty: ignore[invalid-assignment]
+    url: str = fields.CharField(max_length=255, unique=True)  # ty: ignore[invalid-assignment]
+    parser_type: str = fields.CharField(max_length=255)  # ty: ignore[invalid-assignment]
+    last_seen_version: str | None = fields.CharField(max_length=255, null=True)  # ty: ignore[invalid-assignment]
+    enabled: bool = fields.BooleanField(default=True)  # ty: ignore[invalid-assignment]
+    last_check_time = fields.DatetimeField(null=True, default=None)
+    created_at = fields.DatetimeField(default=now_utc)
+    updated_at = fields.DatetimeField(default=now_utc)
 
     class Meta:
-        table_name = "changelog_trackers"
+        table = "changelog_trackers"
 
 
-def create_tables():
-    """Create database tables and migrate schema."""
-    from ...db import _require_db
-
-    _require_db().create_tables(
-        [
-            ChangelogTracker,
-        ],
-        safe=True,
-    )
-
-    logger.info("Database tables created")
+__all__ = ["ChangelogTracker"]

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+import aiosmtplib
 
 from ...errors import ExternalServiceException
 
@@ -31,10 +32,10 @@ class EmailChannel:
         self._starttls = starttls
         self._ssl = ssl
 
-    def send(self, payload: str) -> None:
+    async def send(self, payload: str) -> None:
         subject, html_content = self._parse_payload(payload)
         mime_message = self._build_mime(subject=subject, html_content=html_content)
-        self._send_mime(mime_message)
+        await self._send_mime(mime_message)
 
     def _parse_payload(self, payload: str) -> tuple[str, str]:
         if payload.startswith("Subject:"):
@@ -52,28 +53,29 @@ class EmailChannel:
         msg.attach(MIMEText(html_content, "html", "utf-8"))
         return msg
 
-    def _send_mime(self, mime_message: MIMEMultipart) -> None:
+    async def _send_mime(self, mime_message: MIMEMultipart) -> None:
         try:
             server = self._create_server()
+            await server.connect()
             try:
                 if self._user and self._password:
-                    server.login(self._user, self._password)
-                server.sendmail(
+                    await server.login(self._user, self._password)
+                await server.sendmail(
                     self._from_addr,
                     self._recipient,
                     mime_message.as_string(),
                 )
             finally:
-                server.quit()
-        except (smtplib.SMTPException, OSError) as e:
+                server.close()
+                await server.quit()
+        except (aiosmtplib.SMTPException, OSError) as e:
             logger.warning("Failed to send email notification: %s", e)
             raise ExternalServiceException(f"Email notification failed: {e}") from e
 
-    def _create_server(self) -> smtplib.SMTP | smtplib.SMTP_SSL:
-        if self._ssl:
-            return smtplib.SMTP_SSL(self._host, self._port)
-        if self._starttls:
-            server = smtplib.SMTP(self._host, self._port)
-            server.starttls()
-            return server
-        return smtplib.SMTP(self._host, self._port)
+    def _create_server(self) -> aiosmtplib.SMTP:
+        return aiosmtplib.SMTP(
+            hostname=self._host,
+            port=self._port,
+            use_tls=self._ssl,
+            start_tls=self._starttls,
+        )

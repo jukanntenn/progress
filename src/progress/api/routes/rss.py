@@ -12,7 +12,7 @@ router = APIRouter(tags=["rss"])
 
 
 @router.get("/rss")
-def get_rss(request: Request, timezone_str: str = "UTC", language: str = "en"):
+async def get_rss(request: Request, timezone_str: str = "UTC", language: str = "en"):
     timezone = pytz.timezone(timezone_str)
 
     fg = FeedGenerator()
@@ -22,7 +22,9 @@ def get_rss(request: Request, timezone_str: str = "UTC", language: str = "en"):
     fg.language(language)
 
     reports = (
-        Report.select().where(Report.repo.is_null()).order_by(Report.created_at.desc()).limit(50)
+        await Report.filter(repo_id__isnull=True)
+        .order_by("-created_at")
+        .limit(50)
     )
 
     for report in reports:

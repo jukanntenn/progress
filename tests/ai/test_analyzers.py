@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -44,77 +44,77 @@ class TestNoop:
 
 
 class TestTruncateAnalyzer:
-    def test_truncates_content(self):
+    async def test_truncates_content(self):
         analyzer = TruncateAnalyzer(_config(truncate_chars=5))
-        result = analyzer.analyze("hello world")
+        result = await analyzer.analyze("hello world")
         assert result == "hello"
 
-    def test_returns_full_content_when_short(self):
+    async def test_returns_full_content_when_short(self):
         analyzer = TruncateAnalyzer(_config(truncate_chars=100))
-        result = analyzer.analyze("hi")
+        result = await analyzer.analyze("hi")
         assert result == "hi"
 
-    def test_applies_parser(self):
+    async def test_applies_parser(self):
         analyzer = TruncateAnalyzer(_config(truncate_chars=5))
-        result = analyzer.analyze("hello world", parser=list)
+        result = await analyzer.analyze("hello world", parser=list)
         assert result == ["h", "e", "l", "l", "o"]
 
-    def test_empty_content(self):
+    async def test_empty_content(self):
         analyzer = TruncateAnalyzer(_config(truncate_chars=10))
-        result = analyzer.analyze("")
+        result = await analyzer.analyze("")
         assert result == ""
 
 
 class TestClaudeCodeAnalyzer:
-    @patch("progress.ai.analyzers.claude_code.run_tool")
-    def test_analyze_returns_parsed_stdout(self, mock_run_tool):
+    @patch("progress.ai.analyzers.claude_code.run_tool", new_callable=AsyncMock)
+    async def test_analyze_returns_parsed_stdout(self, mock_run_tool):
         mock_run_tool.return_value = "result text"
         analyzer = ClaudeCodeAnalyzer(_config())
-        result = analyzer.analyze("some content", "my prompt")
+        result = await analyzer.analyze("some content", "my prompt")
         assert result == "result text"
         mock_run_tool.assert_called_once_with(
             "claude_code", "my prompt", "some content", config=analyzer._config
         )
 
-    @patch("progress.ai.analyzers.claude_code.run_tool")
-    def test_analyze_applies_parser(self, mock_run_tool):
+    @patch("progress.ai.analyzers.claude_code.run_tool", new_callable=AsyncMock)
+    async def test_analyze_applies_parser(self, mock_run_tool):
         mock_run_tool.return_value = '{"key": "value"}'
         analyzer = ClaudeCodeAnalyzer(_config())
-        result = analyzer.analyze("content", "prompt", parser=json.loads)
+        result = await analyzer.analyze("content", "prompt", parser=json.loads)
         assert result == {"key": "value"}
 
-    @patch("progress.ai.analyzers.claude_code.run_tool")
-    def test_propagates_analysis_exception(self, mock_run_tool):
+    @patch("progress.ai.analyzers.claude_code.run_tool", new_callable=AsyncMock)
+    async def test_propagates_analysis_exception(self, mock_run_tool):
         mock_run_tool.side_effect = AnalysisException("boom")
         analyzer = ClaudeCodeAnalyzer(_config())
         with pytest.raises(AnalysisException, match="boom"):
-            analyzer.analyze("content", "prompt")
+            await analyzer.analyze("content", "prompt")
 
 
 class TestCodexAnalyzer:
-    @patch("progress.ai.analyzers.codex.run_tool")
-    def test_analyze_returns_parsed_stdout(self, mock_run_tool):
+    @patch("progress.ai.analyzers.codex.run_tool", new_callable=AsyncMock)
+    async def test_analyze_returns_parsed_stdout(self, mock_run_tool):
         mock_run_tool.return_value = "result text"
         analyzer = CodexAnalyzer(_config())
-        result = analyzer.analyze("some content", "my prompt")
+        result = await analyzer.analyze("some content", "my prompt")
         assert result == "result text"
         mock_run_tool.assert_called_once_with(
             "codex", "my prompt", "some content", config=analyzer._config
         )
 
-    @patch("progress.ai.analyzers.codex.run_tool")
-    def test_analyze_applies_parser(self, mock_run_tool):
+    @patch("progress.ai.analyzers.codex.run_tool", new_callable=AsyncMock)
+    async def test_analyze_applies_parser(self, mock_run_tool):
         mock_run_tool.return_value = '{"key": "value"}'
         analyzer = CodexAnalyzer(_config())
-        result = analyzer.analyze("content", "prompt", parser=json.loads)
+        result = await analyzer.analyze("content", "prompt", parser=json.loads)
         assert result == {"key": "value"}
 
-    @patch("progress.ai.analyzers.codex.run_tool")
-    def test_propagates_analysis_exception(self, mock_run_tool):
+    @patch("progress.ai.analyzers.codex.run_tool", new_callable=AsyncMock)
+    async def test_propagates_analysis_exception(self, mock_run_tool):
         mock_run_tool.side_effect = AnalysisException("boom")
         analyzer = CodexAnalyzer(_config())
         with pytest.raises(AnalysisException, match="boom"):
-            analyzer.analyze("content", "prompt")
+            await analyzer.analyze("content", "prompt")
 
 
 class TestCreateAnalyzer:

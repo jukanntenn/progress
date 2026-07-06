@@ -62,7 +62,7 @@ class PublishResult:
     batch_urls: list[str]
 
 
-def publish_report(
+async def publish_report(
     *,
     report_id: int,
     title: str,
@@ -84,7 +84,7 @@ def publish_report(
     for idx, body in enumerate(bodies):
         batch_title = f"{title} ({idx + 1}/{total})" if total > 1 else title
         try:
-            url = markpost_client.upload(body, title=batch_title)
+            url = await markpost_client.upload(body, title=batch_title)
             urls.append(url)
         except Exception as exc:
             logger.warning(
@@ -99,14 +99,14 @@ def publish_report(
     else:
         markpost_url = ""
         for seq, url in enumerate(urls, start=1):
-            Batch.create(
-                report=report_id,
+            await Batch.create(
+                report_id=report_id,
                 title=title,
                 markpost_url=url,
                 seq=seq,
             )
 
-    Report.update(markpost_url=markpost_url).where(Report.id == report_id).execute()
+    await Report.filter(id=report_id).update(markpost_url=markpost_url)
     logger.info(
         "Published report %s: %d/%d batch(es) uploaded (markpost_url=%r)",
         report_id,
@@ -117,7 +117,7 @@ def publish_report(
     return PublishResult(markpost_url=markpost_url, batch_urls=urls)
 
 
-def publish_monolithic(
+async def publish_monolithic(
     *,
     report_id: int,
     title: str,
@@ -158,7 +158,7 @@ def publish_monolithic(
         )
         bodies = [stub]
 
-    result = publish_report(
+    result = await publish_report(
         report_id=report_id,
         title=title,
         bodies=bodies,

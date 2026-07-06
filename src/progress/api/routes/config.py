@@ -52,8 +52,8 @@ class TimezonesResponse(BaseModel):
 
 
 @router.get("", response_model=ConfigResponse)
-def get_config():
-    loaded = load_app_config()
+async def get_config():
+    loaded = await load_app_config()
     if loaded is None:
         raise HTTPException(
             status_code=409,
@@ -64,9 +64,9 @@ def get_config():
 
 
 @router.post("", response_model=ConfigResponse)
-def save_config(request: ConfigSaveRequest):
+async def save_config(request: ConfigSaveRequest):
     try:
-        merged, version = save_app_config(request.config, request.version)
+        merged, version = await save_app_config(request.config, request.version)
     except ConfigVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
     except ConfigException as e:
@@ -75,9 +75,9 @@ def save_config(request: ConfigSaveRequest):
 
 
 @router.post("/validate", response_model=ConfigValidateResponse)
-def validate_config(request: ConfigValidateRequest):
+async def validate_config(request: ConfigValidateRequest):
     try:
-        validate_app_config(request.config)
+        await validate_app_config(request.config)
     except ConfigException as e:
         return ConfigValidateResponse(success=False, error=str(e))
     return ConfigValidateResponse(success=True)
@@ -114,28 +114,28 @@ class OwnerView(BaseModel):
 
 
 @router.get("/repos", response_model=list[RepoView])
-def list_repos():
+async def list_repos():
     return [
         RepoView(id=r.id, name=r.name, url=r.url, branch=r.branch, enabled=r.enabled)
-        for r in Repository.select().order_by(Repository.id)
+        for r in await Repository.all().order_by("id")
     ]
 
 
 @router.put("/repos", response_model=list[RepoView])
-def replace_repos_route(request: Request, repos: list[RepositoryConfig]):
-    replace_repositories(repos, request.app.state.config.github.protocol)
-    return list_repos()
+async def replace_repos_route(request: Request, repos: list[RepositoryConfig]):
+    await replace_repositories(repos, request.app.state.config.github.protocol)
+    return await list_repos()
 
 
 @router.get("/owners", response_model=list[OwnerView])
-def list_owners():
+async def list_owners():
     return [
         OwnerView(id=o.id, owner_type=o.owner_type, name=o.name, enabled=o.enabled)
-        for o in GitHubOwner.select().order_by(GitHubOwner.id)
+        for o in await GitHubOwner.all().order_by("id")
     ]
 
 
 @router.put("/owners", response_model=list[OwnerView])
-def replace_owners_route(owners: list[OwnerConfig]):
-    replace_owners(owners)
-    return list_owners()
+async def replace_owners_route(owners: list[OwnerConfig]):
+    await replace_owners(owners)
+    return await list_owners()

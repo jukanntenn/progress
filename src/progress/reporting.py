@@ -138,11 +138,11 @@ def add_batch_suffix(title: str, batch_index: int, total_batches: int) -> str:
     return title
 
 
-def generate_title_and_summary(
+async def generate_title_and_summary(
     analyzer: Analyzer, aggregated_report: str, language: str
 ) -> tuple[str, str]:
     prompt = render("title_summary_prompt.j2", language=language)
-    output = analyzer.analyze(content=aggregated_report, prompt=prompt).strip()
+    output = (await analyzer.analyze(content=aggregated_report, prompt=prompt)).strip()
     title = _("Progress Report for Open Source Projects")
     summary = _("A progress report for open source projects.")
     for line in output.split("\n"):
@@ -153,7 +153,7 @@ def generate_title_and_summary(
     return title, summary
 
 
-def generate_report_title_and_content(
+async def generate_report_title_and_content(
     analyzer: Analyzer, aggregated_report, timezone, language, batch_context=None
 ):
     batch_index = batch_context.get("batch_index", 0) if batch_context else 0
@@ -161,7 +161,7 @@ def generate_report_title_and_content(
 
     try:
         logger.info("Generating title and summary with Claude...")
-        title, summary = generate_title_and_summary(
+        title, summary = await generate_title_and_summary(
             analyzer, aggregated_report, language
         )
         final_report = (
@@ -209,7 +209,7 @@ def assemble_batch_body(
     return body
 
 
-def publish_monolithic_report(
+async def publish_monolithic_report(
     *,
     report_id: int,
     title: str,
@@ -218,7 +218,7 @@ def publish_monolithic_report(
     markpost_client: MarkpostClient | None,
 ) -> str:
     web_base_url = str(config.web.base_url) if config.web.base_url else None
-    return publish_monolithic(
+    return await publish_monolithic(
         report_id=report_id,
         title=title,
         body=body,
@@ -228,7 +228,7 @@ def publish_monolithic_report(
     )
 
 
-def process_reports(
+async def process_reports(
     config: Config,
     check_result,
     reporter,
@@ -263,7 +263,7 @@ def process_reports(
 
     logger.info("Generating unified title and summary...")
     try:
-        unified_title, unified_summary = generate_title_and_summary(
+        unified_title, unified_summary = await generate_title_and_summary(
             analyzer, full_aggregated_report, config.analysis.language
         )
         logger.info(f"Generated unified title: {unified_title}")
@@ -282,7 +282,7 @@ def process_reports(
 
     logger.info("Saving aggregated report to database...")
     try:
-        aggregated_report_id = save_report(
+        aggregated_report_id = await save_report(
             config=config,
             commit_count=check_result.total_commits,
             markpost_url="",
@@ -295,10 +295,10 @@ def process_reports(
 
     logger.info("Saving per-repository reports to database...")
     for report in check_result.reports:
-        repo = Repository.get_or_none(Repository.name == report.repo_name)
+        repo = await Repository.get_or_none(name=report.repo_name)
         if repo:
             try:
-                save_report(
+                await save_report(
                     config=config,
                     repo_id=repo.id,
                     commit_hash=report.current_commit,
@@ -394,7 +394,7 @@ def process_reports(
         batch_bodies.append(body)
         batch_meta.append(batch)
 
-    result = publish_report(
+    result = await publish_report(
         report_id=aggregated_report_id,
         title=unified_title,
         bodies=batch_bodies,
@@ -414,7 +414,7 @@ def process_reports(
         }
 
         logger.info(f"Sending notification for batch {batch.batch_index + 1}...")
-        send_notification_fn(
+        await send_notification_fn(
             notification_config,
             title=_("Progress Report for Open Source Projects"),
             total_commits=batch_commit_count,

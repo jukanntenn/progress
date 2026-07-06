@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
-import requests
+import aiohttp
 
 from ...errors import ExternalServiceException
 
@@ -15,16 +15,18 @@ class FeishuChannel:
         self._webhook_url = webhook_url
         self._timeout = timeout
 
-    def send(self, payload: str) -> None:
+    async def send(self, payload: str) -> None:
         logger.info("Sending Feishu notification")
         card = json.loads(payload)
         payload_data = {"msg_type": "interactive", "card": card}
         try:
-            resp = requests.post(
-                url=self._webhook_url, json=payload_data, timeout=self._timeout
-            )
-            resp.raise_for_status()
+            timeout = aiohttp.ClientTimeout(total=self._timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    url=self._webhook_url, json=payload_data
+                ) as resp:
+                    resp.raise_for_status()
             logger.info("Feishu notification sent successfully")
-        except requests.RequestException as e:
+        except aiohttp.ClientError as e:
             logger.warning("Failed to send Feishu notification: %s", e)
             raise ExternalServiceException(f"Feishu notification failed: {e}") from e

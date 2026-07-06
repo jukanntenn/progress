@@ -24,6 +24,9 @@ from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
 from opentelemetry import metrics, trace
+from opentelemetry.instrumentation.aiohttp_client import (
+    AioHttpClientInstrumentor,
+)
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
@@ -208,6 +211,11 @@ def _setup_otel(
         RequestsInstrumentor().instrument()
     except Exception as e:
         logger.warning("Requests instrumentation failed: %s", e)
+
+    try:
+        AioHttpClientInstrumentor().instrument()
+    except Exception as e:
+        logger.warning("Aiohttp client instrumentation failed: %s", e)
 
 
 def _register_business_metrics() -> None:

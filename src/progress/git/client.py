@@ -1,8 +1,15 @@
-"""Git client for low-level git operations."""
+"""Git client for low-level git operations.
 
+GitPython (sync, in-process) is retained and every blocking operation runs
+off the event loop via ``asyncio.to_thread``. The public methods are all
+coroutines; the ``_*_sync`` helpers contain the original GitPython /
+``run_command`` logic unchanged.
+"""
+
+import asyncio
 import logging
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 
 import git
 
@@ -28,7 +35,7 @@ def _handle_git_retry(args: tuple[Any, ...], kwargs: dict[str, Any], error: Exce
 
     if is_lock_error:
         logger.warning("Git lock file conflict detected, cleaning up...")
-        client_instance._cleanup_git_locks(repo_path)
+        client_instance._cleanup_git_locks_sync(repo_path)
 
 
 @retry(
@@ -40,17 +47,8 @@ def _handle_git_retry(args: tuple[Any, ...], kwargs: dict[str, Any], error: Exce
         args, kwargs, error, attempt
     ),
 )
-def _run_git_command(args: list[str], repo_path: Path, timeout: int) -> str:
-    """Run Git command and return output.
-
-    Args:
-        args: Git command arguments (without 'git' and '-C')
-        repo_path: Repository path
-        timeout: Command timeout in seconds
-
-    Returns:
-        Command output
-    """
+def _run_git_command_sync(args: list[str], repo_path: Path, timeout: int) -> str:
+    """Run Git command and return output (sync)."""
     cmd = [CMD_GIT, "-C", str(repo_path)] + args
     return run_command(cmd, timeout=timeout)
 
@@ -63,23 +61,12 @@ class GitClient:
         workspace_dir: str = WORKSPACE_DIR_DEFAULT,
         timeout: int = TIMEOUT_GIT_COMMAND,
     ):
-        """Initialize Git client.
-
-        Args:
-            workspace_dir: Working directory path
-            timeout: Command timeout in seconds
-        """
         self.workspace_dir = Path(workspace_dir)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         logger.debug(f"Git workspace directory: {self.workspace_dir}")
 
-    def _cleanup_git_locks(self, repo_path: Path):
-        """Clean up git lock files.
-
-        Args:
-            repo_path: Repository path
-        """
+    def _cleanup_git_locks_sync(self, repo_path: Path):
         git_dir = repo_path / ".git"
         if not git_dir.exists():
             return
@@ -94,36 +81,29 @@ class GitClient:
                 except Exception as e:
                     logger.debug(f"Failed to delete lock file {lock_file}: {e}")
 
-    def get_current_commit(self, repo_path: Path) -> str:
-        """Get current commit hash."""
+    async def _cleanup_git_locks(self, repo_path: Path):
+        await asyncio.to_thread(self._cleanup_git_locks_sync, repo_path)
+
+    def _get_current_commit_sync(self, repo_path: Path) -> str:
         repo = git.Repo(str(repo_path))
         return repo.head.commit.hexsha
 
-    def get_previous_commit(self, repo_path: Path) -> str | None:
-        """Get second latest commit hash (HEAD^1).
+    async def get_current_commit(self, repo_path: Path) -> str:
+        return await asyncio.to_thread(self._get_current_commit_sync, repo_path)
 
-        Returns:
-            Second latest commit hash, or None if it doesn't exist
-        """
+    def _get_previous_commit_sync(self, repo_path: Path) -> str | None:
         repo = git.Repo(str(repo_path))
         try:
             return repo.head.commit.parents[0].hexsha
         except (IndexError, AttributeError):
             return None
 
-    def get_commit_diff(
+    async def get_previous_commit(self, repo_path: Path) -> str | None:
+        return await asyncio.to_thread(self._get_previous_commit_sync, repo_path)
+
+    def _get_commit_diff_sync(
         self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> str:
-        """Get diff between two commits.
-
-        Args:
-            repo_path: Repository path
-            old_commit: Old commit hash (None means get diff of latest two commits)
-            new_commit: New commit hash
-
-        Returns:
-            Diff content
-        """
         repo = git.Repo(str(repo_path))
         if old_commit is None:
             old = repo.head.commit.parents[0] if repo.head.commit.parents else None
@@ -144,20 +124,34 @@ class GitClient:
             for d in diff
         )
 
-    def get_changed_files(
+    async def get_commit_diff(
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> str:
+        return await asyncio.to_thread(
+            self._get_commit_diff_sync, repo_path, old_commit, new_commit
+        )
+
+    def _get_changed_files_sync(
         self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> list[str]:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
-        result = _run_git_command(
+        result = _run_git_command_sync(
             ["diff", "--name-only", commit_range], repo_path, self.timeout
         )
         return [line.strip() for line in result.splitlines() if line.strip()]
 
-    def get_changed_file_statuses(
+    async def get_changed_files(
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> list[str]:
+        return await asyncio.to_thread(
+            self._get_changed_files_sync, repo_path, old_commit, new_commit
+        )
+
+    def _get_changed_file_statuses_sync(
         self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> list[tuple[str, str]]:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
-        result = _run_git_command(
+        result = _run_git_command_sync(
             ["diff", "--name-status", commit_range], repo_path, self.timeout
         )
         items: list[tuple[str, str]] = []
@@ -171,7 +165,14 @@ class GitClient:
             items.append((parts[0].strip(), parts[1].strip()))
         return items
 
-    def get_file_diff(
+    async def get_changed_file_statuses(
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> list[tuple[str, str]]:
+        return await asyncio.to_thread(
+            self._get_changed_file_statuses_sync, repo_path, old_commit, new_commit
+        )
+
+    def _get_file_diff_sync(
         self,
         repo_path: Path,
         old_commit: str | None,
@@ -179,13 +180,24 @@ class GitClient:
         file_path: str,
     ) -> str:
         commit_range = f"{old_commit}..{new_commit}" if old_commit else "HEAD^1..HEAD"
-        return _run_git_command(
+        return _run_git_command_sync(
             ["diff", commit_range, "--", file_path], repo_path, self.timeout
         )
 
-    def get_file_creation_date(self, repo_path: Path, file_path: str) -> str | None:
+    async def get_file_diff(
+        self,
+        repo_path: Path,
+        old_commit: str | None,
+        new_commit: str,
+        file_path: str,
+    ) -> str:
+        return await asyncio.to_thread(
+            self._get_file_diff_sync, repo_path, old_commit, new_commit, file_path
+        )
+
+    def _get_file_creation_date_sync(self, repo_path: Path, file_path: str) -> str | None:
         try:
-            result = _run_git_command(
+            result = _run_git_command_sync(
                 [
                     "log",
                     "--diff-filter=A",
@@ -201,10 +213,14 @@ class GitClient:
         except RuntimeError:
             return None
 
-    def get_commit_messages(
+    async def get_file_creation_date(self, repo_path: Path, file_path: str) -> str | None:
+        return await asyncio.to_thread(
+            self._get_file_creation_date_sync, repo_path, file_path
+        )
+
+    def _get_commit_messages_sync(
         self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> list[str]:
-        """Get list of commit messages (full messages including body)."""
         repo = git.Repo(str(repo_path))
         if old_commit:
             old = repo.commit(old_commit)
@@ -212,13 +228,18 @@ class GitClient:
             commits = list(repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
         else:
             commits = [repo.head.commit]
-        messages = [str(c.message) for c in commits]
-        return messages
+        return [str(c.message) for c in commits]
 
-    def get_commit_count(
+    async def get_commit_messages(
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> list[str]:
+        return await asyncio.to_thread(
+            self._get_commit_messages_sync, repo_path, old_commit, new_commit
+        )
+
+    def _get_commit_count_sync(
         self, repo_path: Path, old_commit: str | None, new_commit: str
     ) -> int:
-        """Get commit count."""
         if not old_commit:
             return 1
         repo = git.Repo(str(repo_path))
@@ -226,44 +247,50 @@ class GitClient:
         new = repo.commit(new_commit)
         return sum(1 for _ in repo.iter_commits(f"{old.hexsha}..{new.hexsha}"))
 
-    def get_nth_commit_from_head(self, repo_path: Path, n: int) -> str | None:
-        """Get nth commit hash from HEAD (0-indexed).
+    async def get_commit_count(
+        self, repo_path: Path, old_commit: str | None, new_commit: str
+    ) -> int:
+        return await asyncio.to_thread(
+            self._get_commit_count_sync, repo_path, old_commit, new_commit
+        )
 
-        Args:
-            repo_path: Repository path
-            n: Nth commit (0=HEAD, 1=HEAD^1, 2=HEAD^2...)
-
-        Returns:
-            Commit hash, or None if it doesn't exist
-        """
+    def _get_nth_commit_from_head_sync(self, repo_path: Path, n: int) -> str | None:
         try:
-            result = _run_git_command(
+            result = _run_git_command_sync(
                 ["rev-parse", f"HEAD~{n}"], repo_path, self.timeout
             )
             return result.strip() if result.strip() else None
         except RuntimeError:
             return None
 
-    def get_total_commit_count(self, repo_path: Path) -> int:
-        """Get total commit count of current branch."""
+    async def get_nth_commit_from_head(self, repo_path: Path, n: int) -> str | None:
+        return await asyncio.to_thread(self._get_nth_commit_from_head_sync, repo_path, n)
+
+    def _get_total_commit_count_sync(self, repo_path: Path) -> int:
         try:
-            result = _run_git_command(
+            result = _run_git_command_sync(
                 ["rev-list", "--count", "HEAD"], repo_path, self.timeout
             )
             return int(result.strip())
         except RuntimeError:
             return 0
 
-    def get_recent_commit_hashes(self, repo_path: Path, max_count: int) -> list[str]:
-        """Get recent commit hashes (newest first)."""
-        result = _run_git_command(
+    async def get_total_commit_count(self, repo_path: Path) -> int:
+        return await asyncio.to_thread(self._get_total_commit_count_sync, repo_path)
+
+    def _get_recent_commit_hashes_sync(self, repo_path: Path, max_count: int) -> list[str]:
+        result = _run_git_command_sync(
             ["log", f"-{max_count}", "--format=%H"], repo_path, self.timeout
         )
         return [line.strip() for line in result.splitlines() if line.strip()]
 
-    def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> list[str]:
-        """Get recent commit messages (full messages including body)."""
-        result = _run_git_command(
+    async def get_recent_commit_hashes(self, repo_path: Path, max_count: int) -> list[str]:
+        return await asyncio.to_thread(
+            self._get_recent_commit_hashes_sync, repo_path, max_count
+        )
+
+    def _get_recent_commit_messages_sync(self, repo_path: Path, max_count: int) -> list[str]:
+        result = _run_git_command_sync(
             ["log", f"-{max_count}", "--pretty=format:%B%n%x00"],
             repo_path,
             self.timeout,
@@ -275,26 +302,32 @@ class GitClient:
         messages = [msg.strip() for msg in result.split("\x00") if msg.strip()]
         return messages
 
-    def get_recent_commit_patches(self, repo_path: Path, max_count: int) -> str:
-        """Get concatenated patches for recent commits (newest first)."""
-        return _run_git_command(
+    async def get_recent_commit_messages(self, repo_path: Path, max_count: int) -> list[str]:
+        return await asyncio.to_thread(
+            self._get_recent_commit_messages_sync, repo_path, max_count
+        )
+
+    def _get_recent_commit_patches_sync(self, repo_path: Path, max_count: int) -> str:
+        return _run_git_command_sync(
             ["log", f"-{max_count}", "-p", "--no-color", "--pretty=format:"],
             repo_path,
             self.timeout,
         )
 
-    def fetch_and_reset(self, repo_path: Path, branch: str) -> None:
-        """Fetch remote updates and force reset to remote branch.
+    async def get_recent_commit_patches(self, repo_path: Path, max_count: int) -> str:
+        return await asyncio.to_thread(
+            self._get_recent_commit_patches_sync, repo_path, max_count
+        )
 
-        Args:
-            repo_path: Repository path
-            branch: Branch name
-        """
-        self._cleanup_git_locks(repo_path)
+    def _fetch_and_reset_sync(self, repo_path: Path, branch: str) -> None:
+        self._cleanup_git_locks_sync(repo_path)
 
         repo = git.Repo(str(repo_path))
         repo.remotes.origin.fetch()
         repo.head.reset(f"origin/{branch}", index=True, working_tree=True)
+
+    async def fetch_and_reset(self, repo_path: Path, branch: str) -> None:
+        await asyncio.to_thread(self._fetch_and_reset_sync, repo_path, branch)
 
 
 __all__ = [

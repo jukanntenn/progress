@@ -1,8 +1,7 @@
 """Repository manager - unified management of all repository operations."""
 
+import asyncio
 import logging
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -11,6 +10,7 @@ from opentelemetry import context as otel_context
 from progress.ai import Analyzer
 from progress.config import Config, RepositoryConfig
 from progress.consts import WORKSPACE_DIR_DEFAULT
+from progress.db import database_connection
 from progress.db.models import Repository
 from progress.enums import Protocol
 from progress.git import GitClient, GitHubClient, normalize_repo_url, parse_repo_name
@@ -22,13 +22,6 @@ from .repo import Repo
 from .reporter import MarkdownReporter
 
 logger = logging.getLogger(__name__)
-
-
-def _get_database():
-    """Get database instance (late binding for the deferred database proxy)."""
-    from ... import db
-
-    return db.database
 
 
 @dataclass
@@ -46,23 +39,16 @@ class SyncResult:
         )
 
 
-def replace_repositories(
+async def replace_repositories(
     repos_config: list[RepositoryConfig], default_protocol: "Protocol | str"
 ) -> SyncResult:
-    """Persist the desired repos to the table, upserting and pruning the rest.
+    """Persist the desired repos to the table, upserting and pruning the rest."""
 
-    This performs no GitHub verification — it simply makes the ``repositories``
-    table match the desired set. Used by the config UI and ``config import``; the
-    tracking check verifies repos lazily and skips ones that no longer exist.
-    """
-
-    
-    database = _get_database()
     configured_urls = set()
     created_count = 0
     updated_count = 0
 
-    with database.atomic():
+    async with database_connection():
         for repo_config in repos_config:
             normalized_url = normalize_repo_url(
                 repo_config.url, repo_config.protocol, default_protocol
@@ -70,7 +56,7 @@ def replace_repositories(
             name = parse_repo_name(repo_config.url)
             configured_urls.add(normalized_url)
 
-            repo, created = Repository.get_or_create(
+            repo, created = await Repository.get_or_create(
                 url=normalized_url,
                 defaults={
                     "name": name,
@@ -83,16 +69,14 @@ def replace_repositories(
                 repo.branch = repo_config.branch
                 repo.enabled = repo_config.enabled
                 repo.url = normalized_url
-                repo.save()
+                await repo.save()
                 updated_count += 1
             else:
                 created_count += 1
 
-        deleted_count = (
-            Repository.delete().where(
-                Repository.url.not_in(configured_urls)  # ty: ignore[missing-argument,invalid-argument-type]  # peewee stubs type not_in as ClassVar[Callable[[Self, Any], Expression]]; ty treats Self as unbound instead of bound to the field instance
-            ).execute()
-        )
+        deleted_count = await Repository.filter(
+            url__not_in=list(configured_urls)
+        ).delete()
 
     return SyncResult(
         created=created_count, updated=updated_count, deleted=deleted_count
@@ -172,32 +156,15 @@ class RepositoryManager:
 
         self.github_client = GitHubClient(token=self.gh_token, proxy=self.proxy)
 
-    def list_enabled(self) -> list[Repository]:
-        """Get all enabled repositories.
+    async def list_enabled(self) -> list[Repository]:
+        """Get all enabled repositories."""
+        return await Repository.filter(enabled=True)
 
-        Returns:
-            List of enabled repositories
-        """
-        
-        database = _get_database()
-        with database.connection_context():
-            return list(Repository.select().where(Repository.enabled))
+    async def get_by_name(self, name: str) -> Repository | None:
+        """Get repository by name."""
+        return await Repository.get_or_none(name=name)
 
-    def get_by_name(self, name: str) -> Repository | None:
-        """Get repository by name.
-
-        Args:
-            name: Repository name
-
-        Returns:
-            Repository object or None
-        """
-        
-        database = _get_database()
-        with database.connection_context():
-            return Repository.get_or_none(Repository.name == name)
-
-    def _analyze_all_releases(
+    async def _analyze_all_releases(
         self,
         repo_name: str,
         branch: str,
@@ -240,7 +207,7 @@ class RepositoryManager:
         for i, release in enumerate(releases):
             diff_content = None
             if not is_first_check and repo_obj and previous_release_commit:
-                diff_content = self._get_release_diff(
+                diff_content = await self._get_release_diff(
                     repo_obj,
                     previous_release_commit,
                     release.get("commit_hash"),
@@ -261,7 +228,7 @@ class RepositoryManager:
             }
 
             try:
-                summary, detail = analyze_releases(
+                summary, detail = await analyze_releases(
                     self.analyzer,
                     repo_name,
                     branch,
@@ -305,7 +272,7 @@ class RepositoryManager:
 
         return analyzed_releases
 
-    def _get_release_diff(
+    async def _get_release_diff(
         self,
         repo_obj,
         previous_commit: str | None,
@@ -314,14 +281,14 @@ class RepositoryManager:
         if not previous_commit or not current_commit:
             return None
         try:
-            return repo_obj.git.get_commit_diff(
+            return await repo_obj.git.get_commit_diff(
                 repo_obj.repo_path, previous_commit, current_commit
             )
         except Exception as e:
             self.logger.warning(f"Failed to get release diff: {e}")
             return None
 
-    def check(self, repo: Repository) -> RepositoryReport | None:
+    async def check(self, repo: Repository) -> RepositoryReport | None:
         """Check code changes and releases for a single repository.
 
         Args:
@@ -347,12 +314,12 @@ class RepositoryManager:
             "repo.sync",
             attributes={"repo.name": str(repo.name), "repo.branch": str(repo.branch)},
         ):
-            repo_obj.clone_or_update()
+            await repo_obj.clone_or_update()
 
         # Check releases (independent from commits)
         releases_list = None
         try:
-            release_data = repo_obj.check_releases()
+            release_data = await repo_obj.check_releases()
         except Exception as e:
             self.logger.warning(
                 f"Failed to check releases for {repo.name}: {e}",
@@ -367,7 +334,7 @@ class RepositoryManager:
                 previous_release_commit = None
                 if not is_first_check and repo.last_release_commit_hash:
                     previous_release_commit = repo.last_release_commit_hash
-                releases_list = self._analyze_all_releases(
+                releases_list = await self._analyze_all_releases(
                     str(repo.name),
                     str(repo.branch),
                     release_data,
@@ -378,13 +345,13 @@ class RepositoryManager:
                 latest = releases_list[0] if releases_list else None
                 commit_hash = latest.get("commit_hash") if latest else None
                 if latest and commit_hash:
-                    repo_obj.update_releases(latest["tag_name"], commit_hash)
+                    await repo_obj.update_releases(latest["tag_name"], commit_hash)
             except Exception as e:
                 self.logger.error(f"Failed to analyze releases: {e}")
                 self.logger.info("Continuing with commit analysis...")
 
         # Get diff data, returns None if no new commits
-        diff_data = repo_obj.get_diff()
+        diff_data = await repo_obj.get_diff()
         if diff_data is None and not releases_list:
             self.logger.debug("No new commits or releases, skipping")
             return None
@@ -420,7 +387,7 @@ class RepositoryManager:
                         truncated,
                         original_length,
                         analyzed_length,
-                    ) = analyze_diff(
+                    ) = await analyze_diff(
                         self.analyzer,
                         str(repo.name),
                         str(repo.branch),
@@ -429,13 +396,13 @@ class RepositoryManager:
                         self.max_diff_length,
                         self.language,
                     )
-                current_commit = repo_obj.get_current_commit()
-                repo_obj.update(current_commit)
+                current_commit = await repo_obj.get_current_commit()
+                await repo_obj.update(current_commit)
             else:
                 self.logger.warning("Diff is empty, skipping commit analysis")
 
         if not current_commit:
-            current_commit = repo_obj.get_current_commit()
+            current_commit = await repo_obj.get_current_commit()
 
         self.logger.info(f"Repository {repo.name} check completed")
 
@@ -456,7 +423,7 @@ class RepositoryManager:
             releases=releases_list,
         )
 
-    def check_all(
+    async def check_all(
         self, repos: list[Repository] | None = None, concurrency: int = 1
     ) -> CheckAllResult:
         """Check all repositories (supports concurrency, skip on failure).
@@ -469,20 +436,20 @@ class RepositoryManager:
             CheckAllResult with reports, total commits, and status mapping
         """
         if repos is None:
-            repos = self.list_enabled()
+            repos = await self.list_enabled()
 
-        reports = []
+        reports: list[RepositoryReport] = []
         total_commits = 0
-        repo_statuses = {}
+        repo_statuses: dict[str, str] = {}
         parent_context = otel_context.get_current()
 
-        def process(repo_obj: Repository) -> tuple[RepositoryReport | None, str]:
+        async def process(repo_obj: Repository) -> tuple[RepositoryReport | None, str]:
             """Process single repository, return (report, status)."""
             token = otel_context.attach(parent_context)
             status = "failed"
             result: RepositoryReport | None = None
             try:
-                result = self.check(repo_obj)
+                result = await self.check(repo_obj)
                 status = "success" if result else "skipped"
             except Exception as e:
                 self.logger.error(
@@ -497,42 +464,34 @@ class RepositoryManager:
 
         if concurrency > 1:
             self.logger.info(
-                f"Using concurrent mode to check repositories (threads: {concurrency})"
+                f"Using concurrent mode to check repositories (tasks: {concurrency})"
             )
-            lock = threading.Lock()
+            semaphore = asyncio.Semaphore(concurrency)
 
-            def process_with_lock(
-                repo_obj: Repository,
-            ) -> tuple[RepositoryReport | None, str]:
-                result, status = process(repo_obj)
-                with lock:
-                    repo_statuses[repo_obj.name] = status
-                return result, status
+            async def process_bounded(repo_obj: Repository) -> tuple[RepositoryReport | None, str]:
+                async with semaphore:
+                    return await process(repo_obj)
 
-            with ThreadPoolExecutor(
-                max_workers=concurrency, thread_name_prefix="repo_checker"
-            ) as executor:
-                futures = {
-                    executor.submit(process_with_lock, repo): repo for repo in repos
-                }
-                for future in as_completed(futures):
-                    try:
-                        result, status = future.result()
-                        if result:
-                            with lock:
-                                reports.append(result)
-                                total_commits += result.commit_count
-                    except Exception as e:
-                        repo = futures[future]
-                        self.logger.error(
-                            f"Exception while processing repository {repo.name}: {e}"
-                        )
-                        with lock:
-                            repo_statuses[repo.name] = "failed"
+            results = await asyncio.gather(
+                *(process_bounded(repo) for repo in repos),
+                return_exceptions=True,
+            )
+            for repo_obj, res in zip(repos, results):
+                if isinstance(res, Exception):
+                    self.logger.error(
+                        f"Exception while processing repository {repo_obj.name}: {res}"
+                    )
+                    repo_statuses[repo_obj.name] = "failed"
+                    continue
+                result, status = res  # ty: ignore[not-iterable]  # narrowed by the isinstance(res, Exception) continue above; gather returns the tuple (report|None, str) here
+                repo_statuses[repo_obj.name] = status
+                if result:
+                    reports.append(result)
+                    total_commits += result.commit_count
         else:
             self.logger.info("Using serial mode to check repositories")
             for repo_obj in repos:
-                result, status = process(repo_obj)
+                result, status = await process(repo_obj)
                 repo_statuses[repo_obj.name] = status
                 if result:
                     reports.append(result)
