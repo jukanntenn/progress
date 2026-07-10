@@ -215,8 +215,9 @@ class TestAnalyzeReleases:
             branch="main",
             release_data=_make_release_data(),
             language="en",
+            max_diff_length=100000,
         )
-        assert result == ("s", "d")
+        assert result == ("s", "d", False, 0, 0)
         analyzer.analyze.assert_awaited_once()
 
     async def test_uses_parser(self):
@@ -227,9 +228,36 @@ class TestAnalyzeReleases:
             branch="main",
             release_data=_make_release_data(),
             language="en",
+            max_diff_length=100000,
         )
         call_kwargs = analyzer.analyze.call_args
         assert isinstance(call_kwargs.kwargs["parser"], AnalysisResultParser)
+
+    async def test_truncates_diff_content_over_limit(self):
+        release_data = {
+            **_make_release_data(),
+            "diff_content": "x" * 500,
+        }
+        captured = {}
+
+        async def fake_analyze(*, content, parser):
+            captured["prompt"] = content
+            return "s", "d"
+
+        analyzer = _make_analyzer()
+        analyzer.analyze = AsyncMock(side_effect=fake_analyze)
+        summary, detail, truncated, original, analyzed = await analyze_releases(
+            analyzer,
+            repo_name="owner/repo",
+            branch="main",
+            release_data=release_data,
+            language="en",
+            max_diff_length=100,
+        )
+        assert truncated is True
+        assert original == 500
+        assert analyzed == 100
+        assert "truncated" in captured["prompt"].lower()
 
 
 class TestAnalyzeReadme:

@@ -12,6 +12,9 @@ You are analyzing a GitHub release for a repository.
 {{ release_data.latest_release.notes if release_data.latest_release.notes else "No release notes provided." }}
 
 {% if release_data.diff_content %}
+{% if truncated %}
+**WARNING**: The diff was truncated due to size limitations (original: {{ original_diff_length }} chars, analyzed: {{ analyzed_diff_length }} chars). Analysis is based on partial diff.
+{% endif %}
 ### Code Changes
 
 The following diff shows code changes related to this release:

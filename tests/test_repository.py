@@ -62,7 +62,7 @@ class TestRepositoryManager:
         with patch(
             "progress.contrib.repo.repository.analyze_releases",
             new_callable=AsyncMock,
-            return_value=("**Summary of v1.0.0**", "**Detailed analysis of v1.0.0**"),
+            return_value=("**Summary of v1.0.0**", "**Detailed analysis of v1.0.0**", False, 0, 0),
         ) as mock_analyze:
             result = await repo_manager._analyze_all_releases(
                 "test/repo", "main", release_data
@@ -113,9 +113,9 @@ class TestRepositoryManager:
             "progress.contrib.repo.repository.analyze_releases",
             new_callable=AsyncMock,
             side_effect=[
-                ("**Summary of v1.2.0**", "**Detail of v1.2.0**"),
-                ("**Summary of v1.1.0**", "**Detail of v1.1.0**"),
-                ("**Summary of v1.0.0**", "**Detail of v1.0.0**"),
+                ("**Summary of v1.2.0**", "**Detail of v1.2.0**", False, 0, 0),
+                ("**Summary of v1.1.0**", "**Detail of v1.1.0**", False, 0, 0),
+                ("**Summary of v1.0.0**", "**Detail of v1.0.0**", False, 0, 0),
             ],
         ) as mock_analyze:
             result = await repo_manager._analyze_all_releases(
@@ -158,7 +158,7 @@ class TestRepositoryManager:
         with patch(
             "progress.contrib.repo.repository.analyze_releases",
             new_callable=AsyncMock,
-            return_value=("Summary", "Detail"),
+            return_value=("Summary", "Detail", False, 0, 0),
         ) as mock_analyze:
             await repo_manager._analyze_all_releases(
                 "test/repo",
@@ -200,8 +200,7 @@ class TestRepositoryManager:
             assert result[0]["title"] == "Release 1.0.0"
             assert "AI analysis unavailable" in result[0]["ai_summary"]
             assert "v1.0.0" in result[0]["ai_summary"]
-            assert "Release 1.0.0" in result[0]["ai_detail"]
-            assert "Important release notes" in result[0]["ai_detail"]
+            assert result[0]["ai_detail"] == ""
 
     async def test_release_analysis_failure_reports_error(self, repo_manager):
         """A swallowed release-analysis failure must still reach Bugsink."""
@@ -252,7 +251,7 @@ class TestRepositoryManager:
         with patch(
             "progress.contrib.repo.repository.analyze_releases",
             new_callable=AsyncMock,
-            return_value=("Summary", "Detail"),
+            return_value=("Summary", "Detail", False, 0, 0),
         ):
             result = await repo_manager._analyze_all_releases(
                 "test/repo", "main", release_data

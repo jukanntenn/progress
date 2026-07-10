@@ -318,11 +318,7 @@ class TestReleaseAnalysisFallback:
         assert len(result.releases) == 1
         assert "AI analysis unavailable" in result.releases[0]["ai_summary"]
         assert "v1.0.0" in result.releases[0]["ai_summary"]
-        assert result.releases[0]["ai_detail"] != ""
-        assert (
-            "Tag:" in result.releases[0]["ai_detail"]
-            or "tag" in result.releases[0]["ai_detail"].lower()
-        )
+        assert result.releases[0]["ai_detail"] == ""
 
     async def test_analysis_failure_with_no_notes(
         self, mock_repository, mock_git_client, mock_config, mock_github_client

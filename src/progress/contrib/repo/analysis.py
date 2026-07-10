@@ -102,7 +102,23 @@ async def analyze_releases(
     branch: str,
     release_data: dict[str, Any],
     language: str,
-) -> tuple[str, str]:
+    max_diff_length: int,
+) -> tuple[str, str, bool, int, int]:
+    diff_content = release_data.get("diff_content") or ""
+    original_length = len(diff_content)
+    truncated = False
+
+    if original_length > max_diff_length:
+        truncated = True
+        diff_content = diff_content[:max_diff_length]
+        release_data = {**release_data, "diff_content": diff_content}
+        logger.warning(
+            "Repository %s release diff length (%d chars) exceeds limit (%d chars), truncated",
+            repo_name,
+            original_length,
+            max_diff_length,
+        )
+
     releases = release_data.get("releases", [])
     is_first_check = len(releases) == 1
     prompt = render(
@@ -112,10 +128,14 @@ async def analyze_releases(
         release_data=release_data,
         is_first_check=is_first_check,
         language=language,
+        truncated=truncated,
+        original_diff_length=original_length,
+        analyzed_diff_length=len(diff_content),
     )
 
     logger.info("Analyzing releases for %s...", repo_name)
-    return await analyzer.analyze(content=prompt, parser=AnalysisResultParser())
+    summary, detail = await analyzer.analyze(content=prompt, parser=AnalysisResultParser())
+    return summary, detail, truncated, original_length, len(diff_content)
 
 
 async def analyze_readme(

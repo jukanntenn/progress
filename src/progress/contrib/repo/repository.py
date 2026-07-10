@@ -204,7 +204,7 @@ class RepositoryManager:
 
         analyzed_releases = []
 
-        for i, release in enumerate(releases):
+        for release in releases:
             diff_content = None
             if not is_first_check and repo_obj and previous_release_commit:
                 diff_content = await self._get_release_diff(
@@ -221,20 +221,19 @@ class RepositoryManager:
                     "published_at": release["published_at"],
                     "commit_hash": release.get("commit_hash"),
                 },
-                "intermediate_releases": releases[i + 1 :]
-                if i < len(releases) - 1
-                else [],
                 "diff_content": diff_content,
             }
 
             try:
-                summary, detail = await analyze_releases(
+                result = await analyze_releases(
                     self.analyzer,
                     repo_name,
                     branch,
                     single_release_data,
                     self.language,
+                    self.max_diff_length,
                 )
+                summary, detail = result[0], result[1]
             except Exception as e:
                 self.logger.warning(
                     f"Failed to analyze release {release['tag_name']}: {e}"
@@ -249,18 +248,7 @@ class RepositoryManager:
                 summary = _("**AI analysis unavailable for {tag_name}**").format(
                     tag_name=release["tag_name"]
                 )
-                detail = _(
-                    "**Release Information:**\n\n"
-                    "- **Tag:** {tag_name}\n"
-                    "- **Name:** {name}\n"
-                    "- **Published:** {published}\n\n"
-                    "{notes}"
-                ).format(
-                    tag_name=release["tag_name"],
-                    name=release.get("title", release["tag_name"]),
-                    published=release.get("published_at", "unknown"),
-                    notes=release.get("notes", ""),
-                )
+                detail = ""
 
             analyzed_releases.append(
                 {
