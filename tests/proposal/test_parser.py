@@ -107,16 +107,50 @@ class TestPEPParser:
 
 
 class TestRFCParser:
-    def test_parses_markdown(self, tmp_path: Path):
-        p = tmp_path / "1234-test.md"
+    _HEADER = (
+        "- Feature Name: `inherit_default_features`\n"
+        "- Start Date: 2026-04-06\n"
+        "- RFC PR: [rust-lang/rfcs#3945](https://github.com/rust-lang/rfcs/pull/3945)\n"
+        "\n"
+        "## Summary\n"
+        "Some summary text.\n"
+    )
+
+    def test_extracts_pr_number_and_fallback_title(self, tmp_path: Path):
+        p = tmp_path / "3945-inherit-default-features.md"
+        p.write_text(self._HEADER, encoding="utf-8")
+        data = RFCParser().parse(str(p))
+        assert data.number == "3945"
+        assert data.extra["pr_number"] == "3945"
+        assert data.extra["fallback_title"] == "Inherit Default Features"
+        assert data.title == "Inherit Default Features"
+        assert data.raw_status == ""
+
+    def test_feature_name_humanized(self, tmp_path: Path):
+        p = tmp_path / "3931-fund.md"
         p.write_text(
-            "# RFC Title\n\n- Feature Name: test\n- Start Date: 2024-01-01\n",
+            "- Feature Name: `rust_foundation_maintainer_fund`\n"
+            "- RFC PR: [rust-lang/rfcs#3931](https://github.com/rust-lang/rfcs/pull/3931)\n"
+            "\n## Summary\nbody\n",
             encoding="utf-8",
         )
         data = RFCParser().parse(str(p))
-        assert data.number == "1234"
-        assert data.title == "RFC Title"
-        assert data.raw_status == ""
+        assert data.title == "Rust Foundation Maintainer Fund"
+
+    def test_no_pr_line_omits_pr_number(self, tmp_path: Path):
+        p = tmp_path / "0001-abc.md"
+        p.write_text(
+            "- Feature Name: `some_feature`\n\n## Summary\nbody\n", encoding="utf-8"
+        )
+        data = RFCParser().parse(str(p))
+        assert "pr_number" not in data.extra
+        assert data.title == "Some Feature"
+
+    def test_no_feature_name_falls_back_to_filename(self, tmp_path: Path):
+        p = tmp_path / "3945-no-meta.md"
+        p.write_text("## Summary\nbody\n", encoding="utf-8")
+        data = RFCParser().parse(str(p))
+        assert data.title == "3945-no-meta"
 
     def test_no_status_raw_empty(self, tmp_path: Path):
         p = tmp_path / "0001-abc.md"

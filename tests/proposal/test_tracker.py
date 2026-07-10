@@ -53,11 +53,12 @@ def _mock_git(tmp_path, commit, **overrides):
     return git_client
 
 
-def _make_tracker(analyzer, git_client):
+def _make_tracker(analyzer, git_client, github_client=None):
     return ProposalTracker(
         analyzer=analyzer,
         git_client=git_client,
         clock=lambda: datetime.now(ZoneInfo("UTC")),
+        github_client=github_client,
     )
 
 
@@ -295,6 +296,71 @@ class TestErrorHandling:
         reports = await tracker.check(ProposalKind.EIP)
         assert len(reports) == 1
         assert reports[0].analysis_summary is None
+
+
+class TestRFCPRTitleResolution:
+    _RFC_FILE = (
+        "- Feature Name: `complex_numbers`\n"
+        "- RFC PR: [rust-lang/rfcs#3892](https://github.com/rust-lang/rfcs/pull/3892)\n"
+        "\n"
+        "## Summary\n"
+        "Add complex number support.\n"
+    )
+
+    def _make_rfc_repo(self, tmp_path: Path) -> Path:
+        return _make_repo(tmp_path, {"text/3892-complex-numbers.md": self._RFC_FILE})
+
+    async def test_uses_pr_title_when_available(self, db, tmp_path: Path):
+        repo_dir = self._make_rfc_repo(tmp_path)
+        commit = _git(repo_dir, "rev-parse", "HEAD")
+
+        github_client = Mock()
+        github_client.get_pr_title = AsyncMock(return_value="Complex number types")
+        tracker = _make_tracker(
+            _mock_analyzer(), _mock_git(tmp_path, commit), github_client
+        )
+        tracker._clone_or_update = _async_return(repo_dir)
+
+        reports = await tracker.check(ProposalKind.RFC)
+        assert len(reports) == 1
+        assert reports[0].title == "Complex number types"
+
+        from progress.contrib.proposal.models import Proposal
+
+        saved = await Proposal.get(tracker__kind="rfc", number="3892")
+        assert saved.title == "Complex number types"
+
+    async def test_falls_back_when_pr_title_unavailable(self, db, tmp_path: Path):
+        repo_dir = self._make_rfc_repo(tmp_path)
+        commit = _git(repo_dir, "rev-parse", "HEAD")
+
+        github_client = Mock()
+        github_client.get_pr_title = AsyncMock(return_value=None)
+        tracker = _make_tracker(
+            _mock_analyzer(), _mock_git(tmp_path, commit), github_client
+        )
+        tracker._clone_or_update = _async_return(repo_dir)
+
+        reports = await tracker.check(ProposalKind.RFC)
+        assert len(reports) == 1
+        assert reports[0].title == "Complex Numbers"
+
+    async def test_pr_title_error_does_not_block(self, db, tmp_path: Path):
+        repo_dir = self._make_rfc_repo(tmp_path)
+        commit = _git(repo_dir, "rev-parse", "HEAD")
+
+        github_client = Mock()
+        github_client.get_pr_title = AsyncMock(
+            side_effect=Exception("network failure")
+        )
+        tracker = _make_tracker(
+            _mock_analyzer(), _mock_git(tmp_path, commit), github_client
+        )
+        tracker._clone_or_update = _async_return(repo_dir)
+
+        reports = await tracker.check(ProposalKind.RFC)
+        assert len(reports) == 1
+        assert reports[0].title == "Complex Numbers"
 
 
 class TestLanguagePropagation:
