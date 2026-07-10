@@ -91,6 +91,55 @@ def test_multiline_commit_with_html_escaped(reporter):
     assert "<script>" not in rendered
 
 
+def test_mixed_single_and_multiline_commits_stack_as_blocks(reporter):
+    """Single-line and multi-line commits must each render as a block-level
+    HTML element and stack vertically, never as Markdown list items.
+
+    Regression guard: emitting single-line commits as Markdown ``- foo`` while
+    multi-line commits are bare ``<details>`` blocks lets the CommonMark HTML
+    block interrupt the list, so commits after a ``<details>`` render as literal
+    ``- foo`` text instead of stacked items.
+    """
+    report = RepositoryReport(
+        repo_name="test/repo",
+        repo_slug="test-repo",
+        repo_web_url="https://github.com/test/repo",
+        branch="main",
+        commit_count=4,
+        current_commit="abc123",
+        previous_commit="def456",
+        commit_messages=[
+            "Single line commit one",
+            "Multi line commit\n\nBody paragraph for the multi line commit",
+            "Single line commit two",
+            "Another multi\n\nSecond body",
+        ],
+        analysis_summary="Summary",
+        analysis_detail="Detail",
+        truncated=False,
+        original_diff_length=1000,
+        analyzed_diff_length=800,
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "<div>Single line commit one</div>" in rendered
+    assert "<div>Single line commit two</div>" in rendered
+
+    assert "<summary>Multi line commit</summary>" in rendered
+    assert "<summary>Another multi</summary>" in rendered
+
+    assert "Body paragraph for the multi line commit" in rendered
+    assert "Second body" in rendered
+    # The subject must not be duplicated into the body.
+    assert rendered.count("Multi line commit") == 1
+    assert rendered.count("Another multi") == 1
+
+    # No commit message may leak as a Markdown list item / literal text line.
+    for msg in ("Single line commit one", "Single line commit two"):
+        assert f"- {msg}" not in rendered
+
+
 def test_special_characters_in_commits(reporter):
     """Test that special characters are properly escaped."""
     report = RepositoryReport(

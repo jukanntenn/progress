@@ -36,10 +36,10 @@
 <details>
 <summary>{{ msg.split('\n')[0]|escape_html }}</summary>
 
-{{ msg|escape_html }}
+{{ msg.split('\n', 1)[1]|escape_html }}
 </details>
 {% else %}
-- {{ msg|escape_html }}
+<div>{{ msg|escape_html }}</div>
 {% endif %}
 {% endfor %}
 
