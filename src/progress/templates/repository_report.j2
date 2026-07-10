@@ -11,14 +11,16 @@
 
 </details>
 
-{{ release.ai_summary }}
+{{ release.ai_summary or _("**AI analysis unavailable for {tag}**").format(tag=release.tag_name) }}
 
+{% if release.ai_detail %}
 <details>
 <summary>{{ _("Click to view detailed release analysis") }}</summary>
 
 {{ release.ai_detail }}
 
 </details>
+{% endif %}
 
 {% endfor %}
 {% if report.commit_count > 0 %}
@@ -43,11 +45,13 @@
 {% endif %}
 {% endfor %}
 
-{{ report.analysis_summary }}
+{{ report.analysis_summary or _("**AI analysis unavailable**") }}
 
+{% if report.analysis_detail %}
 <details>
 <summary>{{ _("Click to view detailed analysis") }}</summary>
 
 {{ report.analysis_detail }}
 </details>
+{% endif %}
 {% endif %}

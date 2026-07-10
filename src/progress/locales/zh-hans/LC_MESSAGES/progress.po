@@ -130,3 +130,14 @@ msgstr "分支"
 
 msgid "commits"
 msgstr "次提交"
+
+msgid "**AI analysis unavailable**"
+msgstr "**AI 分析不可用**"
+
+#, python-brace-format
+msgid "**AI analysis unavailable for {tag}**"
+msgstr "**{tag} 的 AI 分析不可用**"
+
+#, python-brace-format
+msgid "**AI analysis unavailable for {tag_name}**"
+msgstr "**{tag_name} 的 AI 分析不可用**"

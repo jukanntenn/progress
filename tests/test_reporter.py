@@ -211,17 +211,24 @@ def test_generate_discovered_repos_report_empty(reporter):
     assert "## [" not in result  # No repo sections
 
 
-def _make_release(tag="v1.0.0"):
+def _make_release(tag="v1.0.0", ai_summary=None, ai_detail=None):
     return {
         "title": tag,
         "tag_name": tag,
         "notes": "Release notes for " + tag,
-        "ai_summary": "Summary for " + tag,
-        "ai_detail": "Detail for " + tag,
+        "ai_summary": ai_summary if ai_summary is not None else "Summary for " + tag,
+        "ai_detail": ai_detail if ai_detail is not None else "Detail for " + tag,
     }
 
 
-def _make_report(repo_name, commit_count=0, releases=None, commit_messages=None):
+def _make_report(
+    repo_name,
+    commit_count=0,
+    releases=None,
+    commit_messages=None,
+    analysis_summary="Summary",
+    analysis_detail="Detail",
+):
     return RepositoryReport(
         repo_name=repo_name,
         repo_slug=repo_name.replace("/", "-"),
@@ -231,8 +238,8 @@ def _make_report(repo_name, commit_count=0, releases=None, commit_messages=None)
         current_commit="abc123",
         previous_commit=None,
         commit_messages=commit_messages or [],
-        analysis_summary="Summary",
-        analysis_detail="Detail",
+        analysis_summary=analysis_summary,
+        analysis_detail=analysis_detail,
         truncated=False,
         original_diff_length=1000,
         analyzed_diff_length=800,
@@ -333,3 +340,62 @@ def test_render_aggregated_body_uses_pre_rendered_sections(reporter):
     assert result.count("RAW SECTION ONE") == 1
     # One separator between the two pre-rendered sections; none trailing.
     assert len(_separator_lines(result)) == 1
+
+
+def test_repository_report_hides_commit_detail_link_when_empty(reporter):
+    """An empty analysis_detail must not render the 'click to view' block."""
+    report = _make_report(
+        "owner/empty-detail",
+        commit_count=1,
+        commit_messages=["feat: x"],
+        analysis_summary="Summary",
+        analysis_detail="",
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "Click to view detailed analysis" not in rendered
+    assert "Summary" in rendered
+
+
+def test_repository_report_shows_fallback_when_commit_summary_empty(reporter):
+    """An empty analysis_summary surfaces an AI-unavailable notice."""
+    report = _make_report(
+        "owner/empty-summary",
+        commit_count=1,
+        commit_messages=["feat: x"],
+        analysis_summary="",
+        analysis_detail="Detail",
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "AI analysis unavailable" in rendered
+    assert "Click to view detailed analysis" in rendered
+
+
+def test_repository_report_hides_release_detail_link_when_empty(reporter):
+    """A release whose ai_detail is empty omits the release 'click to view' block."""
+    report = _make_report(
+        "owner/release-empty-detail",
+        releases=[_make_release(ai_summary="ok summary", ai_detail="")],
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "Click to view detailed release analysis" not in rendered
+    assert "ok summary" in rendered
+
+
+def test_repository_report_shows_release_fallback_when_summary_empty(reporter):
+    """A release whose ai_summary is empty surfaces an AI-unavailable notice."""
+    report = _make_report(
+        "owner/release-empty-summary",
+        releases=[_make_release(ai_summary="", ai_detail="some detail")],
+    )
+
+    rendered = reporter.generate_repository_report(report)
+
+    assert "AI analysis unavailable" in rendered
+    assert "v1.0.0" in rendered
+    assert "Click to view detailed release analysis" in rendered
