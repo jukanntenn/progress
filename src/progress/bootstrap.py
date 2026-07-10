@@ -7,7 +7,7 @@ from .contrib.repo.reporter import MarkdownReporter
 from .contrib.repo.repository import RepositoryManager
 from .contrib.proposal import ProposalTracker
 from .db import create_tables, init_db, log_db_state, resolve_db_path
-from .git import GitClient
+from .git import GitClient, GitHubClient
 from .ai import create_analyzer
 from .utils.markpost import MarkpostClient
 from .utils.timezone import get_now
@@ -31,6 +31,7 @@ async def initialize_components(cfg, config_path: str | None = None):
     analyzer = create_analyzer(config=cfg.analysis)
     reporter = MarkdownReporter()
     git_client = GitClient(timeout=cfg.github.git_timeout)
+    github_client = GitHubClient(token=cfg.github.gh_token, proxy=cfg.github.proxy)
 
     repo_manager = RepositoryManager(analyzer, reporter, cfg)
 
@@ -39,6 +40,7 @@ async def initialize_components(cfg, config_path: str | None = None):
         git_client=git_client,
         clock=lambda: get_now(cfg.get_timezone()),
         language=cfg.analysis.language,
+        github_client=github_client,
     )
 
     return cfg, markpost_client, repo_manager, proposal_tracker, reporter

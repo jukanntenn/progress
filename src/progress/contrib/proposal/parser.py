@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 _RST_UNDERLINE_RE = re.compile(r"^[=\-`~^+*#]{3,}$")
 _HEADER_RE = re.compile(r"^(?:\s*:\s*)?([A-Za-z][A-Za-z0-9\- ]+)\s*:\s*(.+)$")
+_RFC_PR_RE = re.compile(r"RFC PR.*?#(\d+)", re.IGNORECASE)
+_RFC_FEATURE_RE = re.compile(
+    r"^\s*-\s*Feature Name\s*:\s*`?([A-Za-z0-9_\- ]+)`?", re.IGNORECASE
+)
 
 
 class ParsedProposal(NamedTuple):
@@ -249,26 +253,44 @@ class RFCParser(ProposalParser):
         text = _read_text(file_path)
         number = self.extract_number(file_path)
 
-        title = None
+        pr_number = ""
+        feature_name = ""
         for raw in text.splitlines()[:200]:
-            line = raw.strip()
-            if not title and line.startswith("#"):
-                title = line.lstrip("#").strip()
-                break
+            line = raw.rstrip("\n")
+            if not pr_number:
+                m = _RFC_PR_RE.search(line)
+                if m:
+                    pr_number = m.group(1)
+            if not feature_name:
+                fm = _RFC_FEATURE_RE.match(line)
+                if fm:
+                    feature_name = fm.group(1).strip()
 
-        if not title:
-            title = Path(file_path).stem
+        fallback_title = self._humanize_feature_name(feature_name) or Path(
+            file_path
+        ).stem
 
-        logger.debug("RFCParser: %s number=%s", file_path, number)
+        extra: dict[str, str] = {"fallback_title": fallback_title}
+        if pr_number:
+            extra["pr_number"] = pr_number
+
+        logger.debug("RFCParser: %s number=%s pr=%s", file_path, number, pr_number)
 
         return ParsedProposal(
             number=number,
-            title=title,
+            title=fallback_title,
             raw_status="",
             file_path=file_path,
             full_text=text,
-            extra={},
+            extra=extra,
         )
+
+    @staticmethod
+    def _humanize_feature_name(name: str) -> str:
+        cleaned = name.strip()
+        if not cleaned:
+            return ""
+        return cleaned.replace("_", " ").replace("-", " ").strip().title()
 
     @override
     def extract_number(self, file_path: str) -> str:

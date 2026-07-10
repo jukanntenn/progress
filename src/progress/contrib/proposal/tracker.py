@@ -11,13 +11,13 @@ from zoneinfo import ZoneInfo
 
 from progress.ai import Analyzer
 from progress.errors import GitException, ProposalParseError
-from progress.git import GitClient, sanitize_repo_name
+from progress.git import GitClient, GitHubClient, sanitize_repo_name
 from progress.telemetry import report_error
 from progress.utils.process import arun_command
 
 from .analysis import run_analysis
 from .models import Proposal, ProposalTrackerState
-from .parser import get_parser
+from .parser import ParsedProposal, get_parser
 from .status import get_analysis_template, normalize
 from .types import (
     KIND_CONFIGS,
@@ -53,11 +53,13 @@ class ProposalTracker:
         git_client: GitClient,
         clock: Callable[[], datetime],
         language: str = "en",
+        github_client: GitHubClient | None = None,
     ):
         self.analyzer = analyzer
         self.git = git_client
         self.clock = clock
         self.language = language
+        self.github = github_client
 
     async def check(self, kind: ProposalKind) -> list[ProposalReport]:
         config = KIND_CONFIGS[kind]
@@ -434,6 +436,8 @@ class ProposalTracker:
             return []
 
         new_status = normalize(kind, parsed.raw_status)
+        parsed = await self._resolve_title(kind, config, parsed)
+        await self._upsert_proposal(state, parsed, new_status)
         summary, detail = await run_analysis(
             self.analyzer,
             "proposal_new_prompt.j2",
@@ -491,6 +495,7 @@ class ProposalTracker:
             logger.warning("Failed to parse proposal %s: %s", abs_path, e)
             return None
 
+        parsed = await self._resolve_title(kind, config, parsed)
         new_status = normalize(kind, parsed.raw_status)
 
         existing = await Proposal.get_or_none(
@@ -590,6 +595,63 @@ class ProposalTracker:
             analysis_summary=None,
             analysis_detail=None,
         )
+
+    async def _resolve_title(
+        self, kind: ProposalKind, config: KindConfig, parsed: ParsedProposal
+    ) -> ParsedProposal:
+        """Resolve the display title, preferring the GitHub PR title for RFCs.
+
+        Falls back to the parser-provided title (humanized Feature Name or
+        filename stem) when the PR title is unavailable. Never raises.
+        """
+        if kind != ProposalKind.RFC or self.github is None:
+            return parsed
+
+        pr_number_str = parsed.extra.get("pr_number")
+        if not pr_number_str:
+            return parsed
+
+        try:
+            owner, repo = self._owner_repo(config.repo_url)
+            pr_title = await self.github.get_pr_title(owner, repo, int(pr_number_str))
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Invalid PR number for %s #%s: %s", kind.value, parsed.number, e
+            )
+            return parsed
+        except Exception as e:
+            logger.warning(
+                "PR title lookup failed for %s #%s: %s",
+                kind.value,
+                parsed.number,
+                e,
+            )
+            return parsed
+
+        if pr_title:
+            logger.debug(
+                "Resolved RFC title from PR: kind=%s number=%s pr=%s",
+                kind.value,
+                parsed.number,
+                pr_number_str,
+            )
+            return parsed._replace(title=pr_title)
+
+        logger.debug(
+            "PR title unavailable, using fallback: kind=%s number=%s pr=%s",
+            kind.value,
+            parsed.number,
+            pr_number_str,
+        )
+        return parsed
+
+    @staticmethod
+    def _owner_repo(repo_url: str) -> tuple[str, str]:
+        slug = repo_url.removesuffix(".git")
+        if slug.startswith("https://github.com/"):
+            slug = slug[len("https://github.com/") :]
+        owner, _, repo = slug.partition("/")
+        return owner, repo
 
     @staticmethod
     def _build_file_url(config: KindConfig, commit_hash: str, rel_path: str) -> str:

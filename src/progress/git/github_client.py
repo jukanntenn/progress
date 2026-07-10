@@ -284,5 +284,30 @@ class GitHubClient:
     async def get_readme(self, owner: str, repo: str) -> str | None:
         return await asyncio.to_thread(self._get_readme_sync, owner, repo)
 
+    def _get_pr_title_sync(self, owner: str, repo: str, number: int) -> str | None:
+        try:
+            repo_obj = self.github.get_repo(f"{owner}/{repo}")
+            pull = repo_obj.get_pull(number)
+            title = pull.title
+            logger.debug(f"Found PR title for {owner}/{repo}#{number}: {title}")
+            return title
+        except UnknownObjectException:
+            logger.debug(f"PR {owner}/{repo}#{number} not found")
+            return None
+        except RateLimitExceededException as e:
+            logger.warning(f"GitHub API rate limit reached: {e}")
+            return None
+        except BadCredentialsException as e:
+            logger.warning(f"GitHub API authentication failed: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get PR title for {owner}/{repo}#{number}: {e}")
+            return None
+
+    async def get_pr_title(
+        self, owner: str, repo: str, number: int
+    ) -> str | None:
+        return await asyncio.to_thread(self._get_pr_title_sync, owner, repo, number)
+
 
 __all__ = ["GitHubClient"]
