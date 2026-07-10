@@ -230,6 +230,11 @@ def _register_business_metrics() -> None:
         unit="s",
         description="AI analyzer call wall-clock duration",
     )
+    _STATE.instruments["analysis_input_size"] = meter.create_histogram(
+        "progress.analysis.input_size",
+        unit="By",
+        description="Input payload size sent to the AI analyzer (UTF-8 bytes)",
+    )
     _STATE.instruments["analysis_failures"] = meter.create_counter(
         "progress.analysis.failures",
         unit="1",
@@ -355,11 +360,19 @@ def record_repo_checked(*, status: str) -> None:
 
 
 def record_analysis(
-    *, provider: str, duration_s: float, ok: bool, reason: str = ""
+    *,
+    provider: str,
+    duration_s: float,
+    ok: bool,
+    reason: str = "",
+    input_bytes: int | None = None,
 ) -> None:
     histogram = _STATE.instruments.get("analysis_duration")
     if histogram is not None:
         histogram.record(duration_s, {"provider": provider})
+    input_size = _STATE.instruments.get("analysis_input_size")
+    if input_size is not None and input_bytes is not None:
+        input_size.record(input_bytes, {"provider": provider})
     failures = _STATE.instruments.get("analysis_failures")
     if failures is not None and not ok:
         failures.add(1, {"provider": provider, "reason": reason or "error"})

@@ -61,6 +61,8 @@ class TransientAnalysisError(AnalysisException):
     ) -> None:
         super().__init__(message)
         self.returncode = returncode
+        # Best-available error preview: stderr when present, else stdout (the
+        # claude CLI emits API errors on stdout with an empty stderr).
         self.stderr_preview = stderr_preview
 
 
@@ -114,6 +116,7 @@ async def run_tool(
             duration_s=time.monotonic() - started,
             ok=ok,
             reason=failure_reason,
+            input_bytes=len(content.encode("utf-8")),
         )
 
 
@@ -164,22 +167,22 @@ async def _run_once(
     if returncode == 0:
         return stdout
 
-    stderr_preview = stderr.strip()[:_STDERR_PREVIEW_LIMIT]
-    if _is_transient(stderr_preview):
+    error_preview = (stderr.strip() or stdout.strip())[:_STDERR_PREVIEW_LIMIT]
+    if _is_transient(error_preview):
         raise TransientAnalysisError(
-            f"AI tool '{executable}' failed with exit code {returncode}: {stderr_preview}",
+            f"AI tool '{executable}' failed with exit code {returncode}: {error_preview}",
             returncode=returncode,
-            stderr_preview=stderr_preview,
+            stderr_preview=error_preview,
         )
 
     logger.error(
         "AI tool '%s' failed permanently with exit code %d: %s",
         executable,
         returncode,
-        stderr_preview,
+        error_preview,
     )
     raise AnalysisException(
-        f"AI tool '{executable}' failed with exit code {returncode}: {stderr_preview}"
+        f"AI tool '{executable}' failed with exit code {returncode}: {error_preview}"
     )
 
 

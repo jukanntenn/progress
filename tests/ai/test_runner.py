@@ -287,6 +287,34 @@ class TestStderrHandling:
             await _run_once(["claude", "-p", "x"], "claude", "", 10)
         assert len(exc_info.value.stderr_preview) <= 500
 
+    @patch("progress.ai.runner.asyncio.create_subprocess_exec", new_callable=AsyncMock)
+    async def test_permanent_error_falls_back_to_stdout_when_stderr_empty(self, mock_exec):
+        mock_exec.return_value = _fail(
+            returncode=1, stdout="API Error: 400 context too long", stderr=""
+        )
+        with pytest.raises(AnalysisException) as exc_info:
+            await _run_once(["claude", "-p", "x"], "claude", "", 10)
+        assert "API Error: 400" in str(exc_info.value)
+
+    @patch("progress.ai.runner.asyncio.create_subprocess_exec", new_callable=AsyncMock)
+    async def test_transient_error_falls_back_to_stdout_when_stderr_empty(self, mock_exec):
+        mock_exec.return_value = _fail(
+            returncode=1, stdout="overloaded, please retry", stderr=""
+        )
+        with pytest.raises(TransientAnalysisError) as exc_info:
+            await _run_once(["claude", "-p", "x"], "claude", "", 10)
+        assert "overloaded" in exc_info.value.stderr_preview
+
+    @patch("progress.ai.runner.asyncio.create_subprocess_exec", new_callable=AsyncMock)
+    async def test_stderr_preferred_over_stdout_when_both_present(self, mock_exec):
+        mock_exec.return_value = _fail(
+            returncode=2, stdout="should-not-appear", stderr="real stderr msg"
+        )
+        with pytest.raises(AnalysisException) as exc_info:
+            await _run_once(["claude", "-p", "x"], "claude", "", 10)
+        assert "real stderr msg" in str(exc_info.value)
+        assert "should-not-appear" not in str(exc_info.value)
+
 
 class TestExhaustionLogging:
     @patch("progress.utils.functional.asyncio.sleep", new_callable=AsyncMock)
