@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+import copy
 import gettext as _gettext
 from pathlib import Path
 
@@ -85,11 +86,16 @@ def _collect_all_translations(locale: str) -> _gettext.NullTranslations:
 
     Per spec 11, locales are distributed across packages.  This function
     chains them so ``gettext()`` searches all registered catalogs.
+
+    ``GNUTranslations.add_fallback`` mutates the receiver (it walks the
+    existing chain to append), so we must not call it on the cached objects —
+    repeated calls would stack duplicate fallbacks until the recursion limit
+    is hit. The primary translation is deep-copied so the chain mutation
+    never reaches the cache.
     """
-    translations = _get_translation(locale)
-    # Chain integration-specific translations
+    translations = copy.deepcopy(_get_translation(locale))
     for (cached_locale, cached_root), cached_trans in _translation_cache.items():
-        if cached_locale == locale and cached_root != _locales_root() and hasattr(translations, "add_fallback"):
+        if cached_locale == locale and cached_root != _locales_root():
             translations.add_fallback(cached_trans)
     return translations
 
