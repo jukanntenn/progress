@@ -51,8 +51,8 @@ jobs:
       - name: Install Playwright deps
         working-directory: web/e2e
         run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
+          pnpm install --frozen-lockfile --ignore-workspace
+          npx playwright install --with-deps chromium
 
       - name: Run e2e
         working-directory: web/e2e

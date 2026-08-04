@@ -67,7 +67,7 @@ test.describe('auth', () => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
     await page.getByLabel(/username/i).fill(ADMIN_USERNAME)
-    await page.getByLabel(/password/i).fill(ADMIN_PASSWORD)
+    await page.locator('#password').fill(ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(/\/reports/)
   })
