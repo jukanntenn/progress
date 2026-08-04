@@ -16,6 +16,7 @@ import json
 
 import pytest
 
+from progress.cli.notifications.status import status_color, status_icon, status_label
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
 
@@ -35,6 +36,10 @@ _SKIPPED_REPOS = ["r_s1"]
 def env():
     env = create_environment(_TEMPLATE_DIRS, autoescape=False)
     env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
+    # Mirror JinjaRenderer._get_env: templates resolve status color/icon/label
+    # from the single source (spec 10).
+
+    env.globals.update({"status_color": status_color, "status_icon": status_icon, "status_label": status_label})  # type: ignore
     return env
 
 

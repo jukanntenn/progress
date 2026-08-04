@@ -26,8 +26,10 @@ from progress.cli.notifications.events import (
     ReportRepo,
 )
 from progress.cli.notifications.renderer import JinjaRenderer
+from progress.cli.notifications.status import STATUS_SPEC, status_color, status_icon, status_label
 
 __all__ = [
+    "STATUS_SPEC",
     "ChangelogEvent",
     "Channel",
     "ChannelPayload",
@@ -47,4 +49,7 @@ __all__ = [
     "ReportRepo",
     "SendResult",
     "build_channels",
+    "status_color",
+    "status_icon",
+    "status_label",
 ]

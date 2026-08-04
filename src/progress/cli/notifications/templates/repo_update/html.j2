@@ -26,29 +26,24 @@
 {{ section_heading("⚠ " ~ _("Failed Repositories") ~ " (" ~ (failed_repos | length) ~ ")") }}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
   {% for name in failed_repos %}
-  {{ info_row(name, urls.get(name, ""), _("FAILED"), "red", urls.get(name, ""), _("View Details"), "red-50", accent) }}
+  {{ info_row(name, urls.get(name, ""), status_label("repo_status", "failed"), status_color("repo_status", "failed"), urls.get(name, ""), _("View Details"), "red-50", accent) }}
   {% endfor %}
 </table>
 {% else %}
 {{ section_heading("📦 " ~ _("Successful Repositories") ~ " (" ~ (success_repos | length) ~ ")") }}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
-  {% for name in success_repos[:5] %}
-  {{ info_row(name, urls.get(name, ""), _("SUCCESS"), "green", "", "", "green-50", accent) }}
+  {% for name in success_repos %}
+  {{ info_row(name, urls.get(name, ""), status_label("repo_status", "success"), status_color("repo_status", "success"), "", "", "green-50", accent) }}
   {% endfor %}
 </table>
-{% set rest_success = success_repos[5:] %}
-{% if rest_success %}
-<div style="background-color:#F7F8FA;border:1px solid #E5E6EB;border-radius:6px;padding:10px 12px;font-size:13px;color:#4E5969;">
-  <div style="font-weight:600;color:#86909C;margin-bottom:4px;">▸ {{ _("Expand remaining") }} {{ rest_success | length }} {{ _("repos") }}</div>
-  {% for name in rest_success %}<span style="margin-right:8px;">{{ name }}</span>{% endfor %}
-</div>
-{% endif %}
 {% endif %}
 {% if skipped_repos %}
-<div style="background-color:#F7F8FA;border:1px solid #E5E6EB;border-radius:6px;padding:10px 12px;font-size:13px;color:#4E5969;margin-top:6px;">
-  <div style="font-weight:600;color:#86909C;margin-bottom:4px;">▸ {{ _("Skipped Repositories") }} ({{ skipped_repos | length }})</div>
-  {% for name in skipped_repos %}<span style="margin-right:8px;">{{ badge(_("SKIPPED"), "grey") }} {{ name }}</span>{% endfor %}
-</div>
+{{ section_heading("➖ " ~ _("Skipped Repositories") ~ " (" ~ (skipped_repos | length) ~ ")") }}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
+  {% for name in skipped_repos %}
+  {{ info_row(name, urls.get(name, ""), status_label("repo_status", "skipped"), status_color("repo_status", "skipped"), "", "", "grey", accent) }}
+  {% endfor %}
+</table>
 {% endif %}
 {% if markpost_url %}
 {{ cta_button(markpost_url, _("View Detailed Report") ~ "（Markpost）", accent) }}

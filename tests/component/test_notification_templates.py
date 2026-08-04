@@ -11,10 +11,13 @@ and the console plain-text summary.
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import re
 
 import pytest
 
-from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
+from progress.cli.notifications.status import status_color, status_icon, status_label
+from progress.utils.i18n import gettext as _, ngettext, npgettext, override, pgettext
 from progress.utils.templating import create_environment
 
 _TEMPLATE_DIRS = [
@@ -30,6 +33,10 @@ _TEMPLATE_DIRS = [
 def env():
     env = create_environment(_TEMPLATE_DIRS, autoescape=False)
     env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
+    # Mirror JinjaRenderer._get_env: expose the status single-source lookups so
+    # templates resolve status color/icon/label from one place (spec 10).
+
+    env.globals.update({"status_color": status_color, "status_icon": status_icon, "status_label": status_label})  # type: ignore
     return env
 
 
@@ -278,7 +285,7 @@ class TestChangelogEmail:
 
 
 class TestDiscoveredRepoEmail:
-    def test_email_lists_top5_with_view_buttons_and_more(self, env) -> None:
+    def test_email_lists_all_repos_flat_with_view_links(self, env) -> None:
         html = env.get_template("discovered_repo/html.j2").render(
             title="Discovered Repos",
             markpost_url="https://markpost.example/d",
@@ -287,9 +294,11 @@ class TestDiscoveredRepoEmail:
         # turquoise header bar + NEW badge
         assert "background-color:#14C9C9" in html
         assert "NEW 7" in html
-        assert "📦 r0" in html
-        assert "📦 r4" in html
-        assert "Expand remaining" in html
+        # flat layout (spec 10): every repo renders, no [:5] fold, no fake
+        # "Expand remaining" marker in email (only Feishu keeps a real fold).
+        for i in range(7):
+            assert f"📦 r{i}" in html
+        assert "Expand remaining" not in html
         assert "View Discovery Details" in html
 
 
@@ -395,3 +404,232 @@ class TestFeedEmail:
         assert "Lobsters" in html
         assert "new articles" in html
         assert "View Full Digest" in html
+
+
+class TestStatusSingleSourceConsistency:
+    """The pre-refactor production bug was a status→label drift (``Successful
+    Repositories`` translated to ``失败的仓库``) that shipped because the status
+    mapping was duplicated across 6+ sites with nothing keeping them honest.
+    These tests make the single-source contract structural: templates must
+    resolve status color/icon/label from
+    :mod:`progress.cli.notifications.status`, not from a local dict."""
+
+    def test_repo_card_json_uses_canonical_status_color(self, env) -> None:
+        # failed-state card: the failed repo's text_tag color comes from the
+        # single source (red). Skipped repos fold into a collapsible_panel and
+        # carry the canonical grey. tojson escapes the single quotes, so we
+        # parse the JSON and walk the structure rather than substring-match.
+        rendered = env.get_template("repo_update/card_json.j2").render(
+            title="t",
+            summary="s",
+            markpost_url="",
+            repo_statuses={"bad/repo": "failed", "skip/repo": "skipped"},
+            repo_urls={"bad/repo": "", "skip/repo": ""},
+            total_commits=0,
+        )
+        blob = json.dumps(json.loads(rendered))
+        assert "color='red'" in blob.replace("\\u0027", "'")  # failed repo badge
+        assert "color='grey'" in blob.replace("\\u0027", "'")  # skipped repo badge
+
+    def test_repo_card_json_success_uses_green_from_single_source(self, env) -> None:
+        rendered = env.get_template("repo_update/card_json.j2").render(
+            title="t",
+            summary="s",
+            markpost_url="",
+            repo_statuses={"ok/repo": "success"},
+            repo_urls={"ok/repo": ""},
+            total_commits=0,
+        )
+        blob = json.dumps(json.loads(rendered))
+        assert "color='green'" in blob.replace("\\u0027", "'")  # success repo badge
+
+    def test_no_template_hardcodes_status_palette_dict(self) -> None:
+        """Structural guard: no .j2 template re-introduces a hardcoded
+        ``{"success": "green", ...}`` style palette dict. They must resolve
+        through the status_color() global."""
+
+        root = Path("src/progress")
+        templates = list(root.glob("cli/notifications/templates/**/*.j2"))
+        templates += list(root.glob("integrations/*/templates/notifications/**/*.j2"))
+        assert templates, "expected notification templates to be found"
+        offenders: list[str] = []
+        banned = [
+            '"success": "green"',
+            '"failed": "red"',
+            '"skipped": "grey"',
+            '"MAJOR": "red"',
+            '"Final": "green"',
+        ]
+        for tpl in templates:
+            text = tpl.read_text(encoding="utf-8")
+            offenders.extend(f"{tpl}: still contains `{sig}`" for sig in banned if sig in text)
+        assert not offenders, "templates must resolve status colors via status_color():\n" + "\n".join(offenders)
+
+
+class TestFlatListNoFakeCollapse:
+    """Email/console must render every item flat (no [:5] fold, no decorative
+    ``▸ Expand remaining`` marker) — only Feishu keeps a real
+    ``collapsible_panel``. This is the layout fix (spec 10): the ``▸`` marker
+    was a non-interactive lie in email/console since the content was already
+    listed below it."""
+
+    def test_repo_update_email_lists_all_success_repos_without_fold(self, env) -> None:
+        names = {f"ok/repo-{i}": "success" for i in range(8)}
+        html = env.get_template("repo_update/html.j2").render(
+            title="t",
+            summary="s",
+            markpost_url="",
+            repo_statuses=names,
+            repo_urls=dict.fromkeys(names, ""),
+            total_commits=0,
+        )
+        for i in range(8):
+            assert f"ok/repo-{i}" in html, f"success repo {i} was folded away"
+        assert "Expand remaining" not in html
+
+    def test_repo_update_email_lists_all_skipped_repos_without_fold(self, env) -> None:
+        names = {f"skip/repo-{i}": "skipped" for i in range(7)}
+        html = env.get_template("repo_update/html.j2").render(
+            title="t",
+            summary="s",
+            markpost_url="",
+            repo_statuses=names,
+            repo_urls=dict.fromkeys(names, ""),
+            total_commits=0,
+        )
+        for i in range(7):
+            assert f"skip/repo-{i}" in html
+
+    def test_proposal_email_lists_all_proposals_without_fold(self, env) -> None:
+        proposals = [
+            {
+                "kind": "EIP",
+                "number": str(i),
+                "title": f"T{i}",
+                "old_status": "",
+                "new_status": "Draft",
+                "file_url": "",
+                "file_name": f"eip-{i}.md",
+            }
+            for i in range(8)
+        ]
+        html = env.get_template("proposal/html.j2").render(
+            title="t",
+            markpost_url="",
+            proposals=proposals,
+        )
+        for i in range(8):
+            assert f"#{i} T{i}" in html
+        assert "Expand remaining" not in html
+
+    def test_changelog_email_lists_all_versions_without_fold(self, env) -> None:
+        entries = [{"name": f"pkg-{i}", "version": f"1.{i}.0", "url": "", "level": "PATCH"} for i in range(9)]
+        html = env.get_template("changelog/html.j2").render(
+            title="t",
+            markpost_url="",
+            entries=entries,
+        )
+        for i in range(9):
+            assert f"pkg-{i}" in html
+        assert "Expand remaining" not in html
+
+    def test_discovered_repo_email_lists_all_repos_without_fold(self, env) -> None:
+        repos = [{"name": f"r{i}", "url": ""} for i in range(6)]
+        html = env.get_template("discovered_repo/html.j2").render(
+            title="t",
+            markpost_url="",
+            repos=repos,
+        )
+        for i in range(6):
+            assert f"r{i}" in html
+        assert "Expand remaining" not in html
+
+    def test_feishu_card_keeps_real_collapsible_panel(self, env) -> None:
+        """Feishu is the one channel that should still fold (real
+        ``collapsible_panel``), because card width is constrained."""
+        card = json.loads(
+            env.get_template("repo_update/card_json.j2").render(
+                title="t",
+                summary="s",
+                markpost_url="",
+                repo_statuses={f"ok/r-{i}": "success" for i in range(8)},
+                repo_urls={f"ok/r-{i}": "" for i in range(8)},
+                total_commits=0,
+            )
+        )
+        panels = [e for e in card["body"]["elements"] if e.get("tag") == "collapsible_panel"]
+        assert panels, "Feishu card must keep its real collapsible_panel for overflow"
+
+
+class TestEmailLayoutNoButtonOverflow:
+    """The pre-refactor ``info_row`` used a fixed ``width="80%" / 6px /
+    width="20%"`` three-column split: the 20% button column (~109px) was
+    narrower than the ``View Details`` button needed (~116px), so the button
+    overflowed the right edge in narrow clients. After the refactor every row
+    is a single adaptive cell with an inline action link."""
+
+    def test_info_row_has_no_fixed_width_button_column(self) -> None:
+
+        macro = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "progress"
+            / "cli"
+            / "notifications"
+            / "templates"
+            / "_email.j2"
+        ).read_text(encoding="utf-8")
+        # The banned fixed-width split that caused overflow.
+        assert 'width="80%"' not in macro
+        assert 'width="20%"' not in macro
+        # The action is now an inline text link, not a bordered block button.
+
+        info_row_match = re.search(r"macro info_row.*?endmacro", macro, re.DOTALL)
+        assert info_row_match
+        assert "border:1px solid #E5E6EB" not in info_row_match.group(0)
+
+    def test_repo_update_email_renders_action_as_inline_link(self, env) -> None:
+        html = env.get_template("repo_update/html.j2").render(
+            title="t",
+            summary="s",
+            markpost_url="",
+            repo_statuses={"bad/repo": "failed"},
+            repo_urls={"bad/repo": "https://github.com/bad/repo"},
+            total_commits=1,
+        )
+        # The failed row shows an inline "View Details" link, not a fixed
+        # 20%-column bordered button.
+        assert "View Details" in html
+
+
+class TestChineseTranslationCorrectness:
+    """The pre-refactor production bug: ``Successful Repositories`` and
+    ``Newly Discovered Repositories`` were both mistranslated to
+    ``失败的仓库`` ("Failed Repositories"), and ``Success Rate`` was truncated
+    to ``成功``. These prove the catalogs are now correct in zh-Hans."""
+
+    def test_successful_repositories_translation(self, env) -> None:
+
+        with override("zh-hans"):
+            html = env.get_template("repo_update/html.j2").render(
+                title="t",
+                summary="s",
+                markpost_url="",
+                repo_statuses={"a/b": "success"},
+                repo_urls={"a/b": "u"},
+                total_commits=1,
+            )
+        assert "成功的仓库" in html
+        assert "失败的仓库" not in html  # the bug
+        assert "成功率" in html  # not the truncated "成功"
+
+    def test_newly_discovered_repositories_translation(self, env) -> None:
+
+        with override("zh-hans"):
+            html = env.get_template("discovered_repo/html.j2").render(
+                title="t",
+                markpost_url="",
+                repos=[{"name": "x", "url": ""}],
+            )
+        assert "新发现的仓库" in html
+        assert "失败的仓库" not in html  # the bug

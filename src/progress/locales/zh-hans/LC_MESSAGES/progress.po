@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-03 21:14+0800\n"
+"POT-Creation-Date: 2026-08-04 22:20+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -25,243 +25,204 @@ msgstr "Progress 报告"
 msgid "Tracked GitHub repository changes and analyses"
 msgstr "追踪的 GitHub 仓库变更与分析"
 
-#: src/progress/cli/notifications/renderer.py:144
+#: src/progress/cli/notifications/renderer.py:150
 #: src/progress/cli/notifications/templates/test/card_json.j2:10
 #: src/progress/cli/notifications/templates/test/html.j2:2
 msgid "Test Notification"
 msgstr "测试通知"
 
-#: src/progress/cli/notifications/renderer.py:154
+#: src/progress/cli/notifications/renderer.py:160
 #: src/progress/cli/notifications/templates/test/html.j2:4
 #: src/progress/cli/notifications/templates/test/plain_text.j2:1
 msgid "✅ Test Notification from Progress"
 msgstr "✅ Progress 测试通知"
 
-#: src/progress/cli/notifications/channels/console_card.py:131
-#: src/progress/cli/notifications/channels/console_card.py:154
+#: src/progress/cli/notifications/channels/console_card.py:153
+#: src/progress/cli/notifications/status.py:129
 #: src/progress/cli/notifications/templates/repo_update/card_json.j2:10
 #: src/progress/cli/notifications/templates/repo_update/html.j2:9
-#: src/progress/cli/notifications/templates/repo_update/html.j2:36
 msgid "SUCCESS"
 msgstr "成功"
 
-#: src/progress/cli/notifications/channels/console_card.py:131
-#: src/progress/cli/notifications/channels/console_card.py:154
+#: src/progress/cli/notifications/channels/console_card.py:153
+#: src/progress/cli/notifications/status.py:130
 #: src/progress/cli/notifications/templates/repo_update/card_json.j2:10
 #: src/progress/cli/notifications/templates/repo_update/html.j2:9
-#: src/progress/cli/notifications/templates/repo_update/html.j2:29
 msgid "FAILED"
 msgstr "失败"
 
-#: src/progress/cli/notifications/channels/console_card.py:131
-#: src/progress/cli/notifications/templates/repo_update/html.j2:50
+#: src/progress/cli/notifications/status.py:131
 msgid "SKIPPED"
 msgstr "已跳过"
 
-#: src/progress/cli/notifications/channels/console_card.py:156
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:13
+#: src/progress/cli/notifications/channels/console_card.py:155
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:17
 #: src/progress/cli/notifications/templates/repo_update/html.j2:11
 #: src/progress/cli/notifications/templates/repo_update/plain_text.j2:9
 msgid "Total Repositories"
 msgstr "总仓库数"
 
-#: src/progress/cli/notifications/channels/console_card.py:157
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:14
+#: src/progress/cli/notifications/channels/console_card.py:156
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:18
 #: src/progress/cli/notifications/templates/repo_update/html.j2:12
 msgid "Total Commits"
 msgstr "总提交数"
 
-#: src/progress/cli/notifications/channels/console_card.py:160
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:17
+#: src/progress/cli/notifications/channels/console_card.py:159
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:21
 #: src/progress/cli/notifications/templates/repo_update/html.j2:15
 msgid "Failed"
 msgstr "失败"
 
-#: src/progress/cli/notifications/channels/console_card.py:162
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:19
+#: src/progress/cli/notifications/channels/console_card.py:161
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:23
 #: src/progress/cli/notifications/templates/repo_update/html.j2:17
 msgid "Success Rate"
-msgstr "成功"
+msgstr "成功率"
 
-#: src/progress/cli/notifications/channels/console_card.py:166
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:35
+#: src/progress/cli/notifications/channels/console_card.py:165
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:39
 #: src/progress/cli/notifications/templates/repo_update/html.j2:21
 #: src/progress/cli/notifications/templates/repo_update/plain_text.j2:3
 msgid "Overview"
 msgstr "概览"
 
-#: src/progress/cli/notifications/channels/console_card.py:172
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:40
+#: src/progress/cli/notifications/channels/console_card.py:171
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:44
 #: src/progress/cli/notifications/templates/repo_update/html.j2:26
 msgid "Failed Repositories"
 msgstr "失败的仓库"
 
-#: src/progress/cli/notifications/channels/console_card.py:175
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:50
+#: src/progress/cli/notifications/channels/console_card.py:174
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:54
 #: src/progress/cli/notifications/templates/repo_update/html.j2:33
 msgid "Successful Repositories"
-msgstr "失败的仓库"
+msgstr "成功的仓库"
 
-#: src/progress/cli/notifications/channels/console_card.py:179
-#: src/progress/cli/notifications/channels/console_card.py:225
-#: src/progress/cli/notifications/channels/console_card.py:258
-#: src/progress/cli/notifications/channels/console_card.py:327
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:58
-#: src/progress/cli/notifications/templates/repo_update/html.j2:42
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:21
-#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:25
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:35
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:32
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:16
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:14
-msgid "Expand remaining"
-msgstr "展开剩余"
-
-#: src/progress/cli/notifications/channels/console_card.py:179
-#: src/progress/cli/notifications/channels/console_card.py:327
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:58
-#: src/progress/cli/notifications/templates/repo_update/html.j2:42
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:16
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:14
-msgid "repos"
-msgstr "个仓库"
-
-#: src/progress/cli/notifications/channels/console_card.py:181
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:64
-#: src/progress/cli/notifications/templates/repo_update/html.j2:49
+#: src/progress/cli/notifications/channels/console_card.py:178
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:68
+#: src/progress/cli/notifications/templates/repo_update/html.j2:41
 msgid "Skipped Repositories"
 msgstr "跳过的仓库"
 
-#: src/progress/cli/notifications/channels/console_card.py:185
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:68
-#: src/progress/cli/notifications/templates/repo_update/html.j2:54
+#: src/progress/cli/notifications/channels/console_card.py:182
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:72
+#: src/progress/cli/notifications/templates/repo_update/html.j2:49
 msgid "View Detailed Report"
 msgstr "查看详细报告"
 
-#: src/progress/cli/notifications/channels/console_card.py:206
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:26
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:11
+#: src/progress/cli/notifications/channels/console_card.py:190
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:23
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:7
 msgid "Proposal"
 msgstr "提案"
 
-#: src/progress/cli/notifications/channels/console_card.py:207
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:27
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:12
+#: src/progress/cli/notifications/channels/console_card.py:191
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:24
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:8
 msgid "Type"
 msgstr "类型"
 
-#: src/progress/cli/notifications/channels/console_card.py:208
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:28
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:13
+#: src/progress/cli/notifications/channels/console_card.py:192
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:25
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:9
 msgid "Status"
 msgstr "状态"
 
-#: src/progress/cli/notifications/channels/console_card.py:213
-#: src/progress/cli/notifications/channels/console_card.py:307
+#: src/progress/cli/notifications/channels/console_card.py:198
+#: src/progress/cli/notifications/channels/console_card.py:279
 #: src/progress/integrations/feed/templates/notifications/feed/card_json.j2:34
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:5
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:12
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:17
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:9
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:13
 #: src/progress/integrations/proposal/templates/proposal_report.j2:26
 msgid "new"
 msgstr "新建"
 
-#: src/progress/cli/notifications/channels/console_card.py:223
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:9
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:8
+#: src/progress/cli/notifications/channels/console_card.py:208
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:6
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:4
 msgid "Proposal List"
 msgstr "提案列表"
 
-#: src/progress/cli/notifications/channels/console_card.py:225
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:35
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:32
-msgid "proposals"
-msgstr "个提案"
-
-#: src/progress/cli/notifications/channels/console_card.py:234
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:39
-#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:37
+#: src/progress/cli/notifications/channels/console_card.py:211
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:36
+#: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:27
 msgid "View Proposal Details"
 msgstr "仓库明细"
 
-#: src/progress/cli/notifications/channels/console_card.py:244
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:7
-#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:7
+#: src/progress/cli/notifications/channels/console_card.py:218
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:6
+#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:4
 msgid "Version List"
 msgstr "版本列表"
 
-#: src/progress/cli/notifications/channels/console_card.py:255
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:15
-#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:18
+#: src/progress/cli/notifications/channels/console_card.py:230
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:14
+#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:12
 msgid "Release Note"
 msgstr "Release Note"
 
-#: src/progress/cli/notifications/channels/console_card.py:258
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:21
-#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:25
-msgid "versions"
-msgstr "个版本"
-
-#: src/progress/cli/notifications/channels/console_card.py:262
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:25
-#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:30
+#: src/progress/cli/notifications/channels/console_card.py:234
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:24
+#: src/progress/integrations/changelog/templates/notifications/changelog/html.j2:18
 msgid "View Full Changelog"
 msgstr "查看完整 Changelog"
 
-#: src/progress/cli/notifications/channels/console_card.py:270
+#: src/progress/cli/notifications/channels/console_card.py:242
 #: src/progress/integrations/feed/templates/notifications/feed/card_json.j2:6
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:7
 msgid "Feed Sources"
 msgstr "订阅源"
 
-#: src/progress/cli/notifications/channels/console_card.py:284
+#: src/progress/cli/notifications/channels/console_card.py:256
 #: src/progress/integrations/feed/templates/notifications/feed/card_json.j2:19
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:16
 msgid "new articles"
 msgstr "篇新文章"
 
-#: src/progress/cli/notifications/channels/console_card.py:300
+#: src/progress/cli/notifications/channels/console_card.py:272
 #: src/progress/integrations/feed/templates/notifications/feed/card_json.j2:29
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:27
 msgid "View Full Digest"
 msgstr "查看完整订阅摘要"
 
-#: src/progress/cli/notifications/channels/console_card.py:303
+#: src/progress/cli/notifications/channels/console_card.py:275
 #: src/progress/integrations/feed/templates/notifications/feed/card_json.j2:32
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:4
 msgid "Report tool: Progress @"
 msgstr "报告生成工具: Progress @"
 
-#: src/progress/cli/notifications/channels/console_card.py:318
+#: src/progress/cli/notifications/channels/console_card.py:288
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:6
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:6
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:4
 msgid "Newly Discovered Repositories"
-msgstr "失败的仓库"
+msgstr "新发现的仓库"
 
-#: src/progress/cli/notifications/channels/console_card.py:324
+#: src/progress/cli/notifications/channels/console_card.py:295
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:12
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:9
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:7
 msgid "View"
 msgstr "概览"
 
-#: src/progress/cli/notifications/channels/console_card.py:329
+#: src/progress/cli/notifications/channels/console_card.py:297
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:19
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:18
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:10
 msgid "New repos can be added under integrations.repo in config.toml"
 msgstr "新仓库可在 config.toml 的 integrations.repo 中加入"
 
-#: src/progress/cli/notifications/channels/console_card.py:332
+#: src/progress/cli/notifications/channels/console_card.py:300
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:22
-#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:20
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:12
 msgid "View Discovery Details"
 msgstr "仓库明细"
 
-#: src/progress/cli/notifications/channels/console_card.py:338
+#: src/progress/cli/notifications/channels/console_card.py:306
 #: src/progress/cli/notifications/templates/test/card_json.j2:3
 msgid "Notification channel configured correctly!"
 msgstr "通知渠道配置正确！"
 
-#: src/progress/cli/notifications/channels/console_card.py:340
+#: src/progress/cli/notifications/channels/console_card.py:308
 #: src/progress/cli/notifications/templates/test/html.j2:5
 #: src/progress/cli/notifications/templates/test/plain_text.j2:3
 msgid ""
@@ -269,18 +230,30 @@ msgid ""
 "channel is configured correctly."
 msgstr "这是一条测试通知。如果你收到了这条消息，说明通知通道已正确配置。"
 
-#: src/progress/cli/notifications/templates/_email.j2:127
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:71
-#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:28
-#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:42
+#: src/progress/cli/notifications/templates/_email.j2:124
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:75
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:27
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:39
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:25
 msgid "Generated by Progress"
 msgstr "生成工具"
 
-#: src/progress/cli/notifications/templates/repo_update/card_json.j2:46
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:50
 #: src/progress/cli/notifications/templates/repo_update/html.j2:29
 msgid "View Details"
 msgstr "查看详细报告"
+
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:62
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:20
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:32
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:16
+msgid "Expand remaining"
+msgstr "展开剩余"
+
+#: src/progress/cli/notifications/templates/repo_update/card_json.j2:62
+#: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:16
+msgid "repos"
+msgstr "个仓库"
 
 #: src/progress/cli/notifications/templates/test/card_json.j2:4
 msgid ""
@@ -336,6 +309,10 @@ msgstr "仓库明细"
 msgid "Generated by"
 msgstr "生成工具"
 
+#: src/progress/integrations/changelog/templates/notifications/changelog/card_json.j2:20
+msgid "versions"
+msgstr "个版本"
+
 #: src/progress/integrations/feed/tracker.py:191
 #: src/progress/integrations/feed/tracker.py:213
 #: src/progress/integrations/feed/tracker.py:220
@@ -370,6 +347,10 @@ msgstr "点击查看详细分析"
 #: src/progress/integrations/proposal/templates/proposal_report.j2:33
 msgid "No detailed analysis available."
 msgstr "暂无详细分析。"
+
+#: src/progress/integrations/proposal/templates/notifications/proposal/card_json.j2:32
+msgid "proposals"
+msgstr "个提案"
 
 #: src/progress/integrations/repo/templates/repo_new_report.j2:17
 msgid "Unknown"

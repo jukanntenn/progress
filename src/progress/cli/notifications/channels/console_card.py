@@ -26,6 +26,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from progress.cli.notifications.status import status_color, status_label
 from progress.utils.i18n import gettext as _
 
 if TYPE_CHECKING:
@@ -127,10 +128,8 @@ def _status_line(name: str, url: str, status: str) -> Text:
         line.append(name, style=f"link {url}")
     else:
         line.append(name, style="bold")
-    color_map = {"success": "green", "failed": "red", "skipped": "grey"}
-    label_map = {"success": _("SUCCESS"), "failed": _("FAILED"), "skipped": _("SKIPPED")}
     line.append("  ")
-    line.append_text(_badge(label_map.get(status, status.upper()), color_map.get(status, "grey")))
+    line.append_text(_badge(status_label("repo_status", status), status_color("repo_status", status)))
     return line
 
 
@@ -173,12 +172,10 @@ def _render_repo_update(ev: NotificationEvent) -> RenderableType:
         body_parts.extend(_status_line(name, urls.get(name, ""), "failed") for name in failed_repos)
     else:
         body_parts.append(_heading(f"📦 {_('Successful Repositories')} ({len(success_repos)})"))
-        body_parts.extend(_status_line(name, urls.get(name, ""), "success") for name in success_repos[:5])
-        rest = success_repos[5:]
-        if rest:
-            body_parts.append(Text(f"▸ {_('Expand remaining')} {len(rest)} {_('repos')}", style="dim italic"))
+        # Flat list (spec 10): console has enough width — no [:5]/rest fold.
+        body_parts.extend(_status_line(name, urls.get(name, ""), "success") for name in success_repos)
     if skipped_repos:
-        body_parts.append(Text(f"▸ {_('Skipped Repositories')} ({len(skipped_repos)})", style="dim italic"))
+        body_parts.append(_heading(f"➖ {_('Skipped Repositories')} ({len(skipped_repos)})"))
         body_parts.extend(_status_line(name, urls.get(name, ""), "skipped") for name in skipped_repos)
     if ev.markpost_url:
         body_parts.append(_divider())
@@ -189,31 +186,19 @@ def _render_repo_update(ev: NotificationEvent) -> RenderableType:
 def _render_proposal(ev: NotificationEvent) -> RenderableType:
     data = ev.data
     proposals: list[dict[str, str]] = data.get("proposals") or []
-    visible = proposals[:5]
-    rest = proposals[5:]
-    status_color = {
-        "Final": "green",
-        "Review": "orange",
-        "Draft": "grey",
-        "Idea": "grey",
-        "Withdrawn": "red",
-        "Rejected": "red",
-        "Stagnant": "grey",
-        "Living": "blue",
-    }
-    kind_color = {"EIP": "blue", "ERC": "purple", "PEP": "turquoise", "RFC": "indigo", "DEP": "orange"}
     table = Table(expand=True, width=54, show_edge=False, pad_edge=False, padding=(0, 1))
     table.add_column(_("Proposal"), ratio=55, overflow="fold")
     table.add_column(_("Type"), ratio=15)
     table.add_column(_("Status"), ratio=30, overflow="fold")
-    for p in visible:
+    # Flat list (spec 10): console has enough width — no [:5]/rest fold.
+    for p in proposals:
         status_text = (
             f"{p.get('old_status', '')} → {p.get('new_status', '')}".strip(" →")
             if p.get("old_status")
             else f"{p.get('new_status', '')} ({_('new')})"
         )
-        sc = status_color.get(p.get("new_status", ""), "grey")
-        kc = kind_color.get(p.get("kind", ""), "grey")
+        sc = status_color("proposal_status", p.get("new_status", ""))
+        kc = status_color("proposal_kind", p.get("kind", ""))
         prop_text = Text(f"#{p.get('number', '')} {p.get('title') or p.get('file_name', '')}")
         if p.get("file_url"):
             prop_text.stylize(f"link {p['file_url']}")
@@ -221,14 +206,6 @@ def _render_proposal(ev: NotificationEvent) -> RenderableType:
         status_cell = _badge(status_text, sc)
         table.add_row(prop_text, type_cell, status_cell)
     body_parts: list[RenderableType] = [_heading(f"📄 {_('Proposal List')}"), table]
-    if rest:
-        body_parts.append(Text(f"▸ {_('Expand remaining')} {len(rest)} {_('proposals')}", style="dim italic"))
-        body_parts.append(
-            Text(
-                "  " + "  ".join(f"#{p.get('number', '')} {p.get('title') or p.get('file_name', '')}" for p in rest),
-                style="#4E5969",
-            )
-        )
     if ev.markpost_url:
         body_parts.append(_divider())
         body_parts.append(_cta(ev.markpost_url, _("View Proposal Details")))
@@ -238,12 +215,10 @@ def _render_proposal(ev: NotificationEvent) -> RenderableType:
 def _render_changelog(ev: NotificationEvent) -> RenderableType:
     data = ev.data
     entries: list[dict[str, Any]] = data.get("entries") or []
-    visible = entries[:5]
-    rest = entries[5:]
-    level_color = {"MAJOR": "red", "MINOR": "blue", "PATCH": "grey"}
     body_parts: list[RenderableType] = [_heading(f"📦 {_('Version List')}")]
-    for e in visible:
-        lc = level_color.get(e.get("level", ""), "grey")
+    # Flat list (spec 10): console has enough width — no [:5]/rest fold.
+    for e in entries:
+        lc = status_color("changelog_level", e.get("level", ""))
         line = Text()
         line.append(f" • {e.get('name', '')} ", style="bold")
         line.append(e.get("version", ""), style="on #F2F3F5 #4E5969")
@@ -254,9 +229,6 @@ def _render_changelog(ev: NotificationEvent) -> RenderableType:
             line.append("    ")
             line.append_text(Text(f"{_('Release Note')}", style=f"link {e['url']}"))
         body_parts.append(line)
-    if rest:
-        body_parts.append(Text(f"▸ {_('Expand remaining')} {len(rest)} {_('versions')}", style="dim italic"))
-        body_parts.extend(Text(f"    {e.get('name', '')} {e.get('version', '')}", style="#4E5969") for e in rest)
     if ev.markpost_url:
         body_parts.append(_divider())
         body_parts.append(_cta(ev.markpost_url, _("View Full Changelog")))
@@ -313,19 +285,15 @@ def _render_feed(ev: NotificationEvent) -> RenderableType:
 def _render_discovered_repo(ev: NotificationEvent) -> RenderableType:
     data = ev.data
     repos: list[dict[str, str]] = data.get("repos") or []
-    visible = repos[:5]
-    rest = repos[5:]
     body_parts: list[RenderableType] = [_heading(f"📦 {_('Newly Discovered Repositories')}")]
-    for repo in visible:
+    # Flat list (spec 10): console has enough width — no [:5]/rest fold.
+    for repo in repos:
         line = Text(" • ")
         line.append(f"📦 {repo.get('name', '')}", style="bold")
         if repo.get("url"):
             line.append("    ")
             line.append_text(Text(f"{_('View')}", style=f"link {repo['url']}"))
         body_parts.append(line)
-    if rest:
-        body_parts.append(Text(f"▸ {_('Expand remaining')} {len(rest)} {_('repos')}", style="dim italic"))
-        body_parts.append(Text("  " + "  ".join(r.get("name", "") for r in rest), style="#4E5969"))
     body_parts.append(Text(f"💡 {_('New repos can be added under integrations.repo in config.toml')}", style="#3370FF"))
     if ev.markpost_url:
         body_parts.append(_divider())

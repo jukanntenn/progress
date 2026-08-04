@@ -8,7 +8,11 @@
 {% set header_template = "red" if has_failure else "green" %}
 {% set icon_token = "warning-outlined" if has_failure else "check-circle-outlined" %}
 {% set tag_text = _("FAILED") ~ " " ~ (failed_repos | length) if has_failure else _("SUCCESS") ~ " " ~ (success_repos | length) %}
-{% set badge_color = {"success": "green", "failed": "red", "skipped": "grey"} %}
+{% set badge_color = {
+  "success": status_color("repo_status", "success"),
+  "failed": status_color("repo_status", "failed"),
+  "skipped": status_color("repo_status", "skipped"),
+} %}
 {% set stats = [
   {"label": _("Total Repositories"), "value": (repos | length), "background": "grey-50", "value_color": ""},
   {"label": _("Total Commits"), "value": (total_commits | default(0)), "background": "grey-50", "value_color": ""}

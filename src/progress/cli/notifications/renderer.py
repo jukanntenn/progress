@@ -33,6 +33,7 @@ from progress.cli.notifications.events import (
     ReportEvent,
     TestNotificationEvent,
 )
+from progress.cli.notifications.status import status_color, status_icon, status_label
 from progress.integrations.registry import discover_integrations
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
@@ -79,6 +80,11 @@ def _get_env() -> Any:
     if _env is None:
         env = create_environment(_collect_integration_notification_dirs())
         env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # ty:ignore[no-matching-overload]
+        # Single source of truth for status→color/icon/label (spec 10): expose
+        # the status module's lookup functions to every template so no .j2
+        # hardcodes a status dict. Templates call status_color("repo_status",
+        # "failed") etc.
+        env.globals.update({"status_color": status_color, "status_icon": status_icon, "status_label": status_label})  # ty:ignore[no-matching-overload]
         _env = env
     return _env
 
