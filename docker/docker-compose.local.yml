@@ -1,0 +1,52 @@
+# Docker Compose for local acceptance + Playwright e2e.
+#
+# Brings up the production image (Caddy + FastAPI, single container) with no
+# host bind mounts: config is driven entirely by env vars and data lives in a
+# named Docker volume that `down -v` wipes clean. This is the target the
+# web/e2e Playwright suite runs against (see web/e2e/HANDBOOK.md).
+#
+# The container runs as the image's default user (progress, uid 100); the named
+# volume is owned by Docker, so no host chown is needed.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.local.yml up -d --build --wait
+#   curl -fsS http://localhost:5000/healthz      # {"status":"ok"}
+#   # ... run web/e2e or poke the UI at http://localhost:5000 ...
+#   docker compose -f docker/docker-compose.local.yml down -v
+
+services:
+  progress:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: progress:local
+    container_name: progress-local
+    ports:
+      - "5000:5000"
+    volumes:
+      - progress-local-data:/app/data
+    environment:
+      - TZ=UTC
+      - PYTHONUNBUFFERED=1
+      # Drive state_home via the BaseSettings env var (PROGRESS_ prefix). No
+      # config.toml is mounted — the app runs off defaults + env overrides.
+      - PROGRESS_STATE_HOME=/app/data
+      # Empty => the supercronic s6 longrun idles (sleep infinity). Acceptance
+      # and e2e are driven via the Web UI / API, not scheduled pipeline runs.
+      - PROGRESS_SCHEDULE_CRON=
+      # Deterministic admin credentials so the Playwright e2e suite can log in
+      # without scraping the random password the empty-config bootstrap prints.
+      # Nested via "__" (pydantic-settings env_nested_delimiter). Only used for
+      # the local/e2e image — production sets these via config.db.toml.
+      - PROGRESS_AUTH__INITIAL_ADMIN_USERNAME=admin
+      - PROGRESS_AUTH__INITIAL_ADMIN_PASSWORD=admin123
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  progress-local-data:

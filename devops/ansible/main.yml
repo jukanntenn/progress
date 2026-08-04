@@ -3,7 +3,7 @@
 # ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml --vault-password-file ~/.ansible-vault/progress.pwd
 
 - name: Deploy progress
-  hosts: oect
+  hosts: fn
   gather_facts: no
   vars_files:
     - vars/vault_main.yml
@@ -14,9 +14,6 @@
     app_path: "{{ apps_path }}/{{ app_name }}"
     compose_file: "{{ app_path }}/docker-compose.yml"
     config_file: "{{ app_path }}/config.toml"
-    claude_settings_file: "{{ app_path }}/claude_settings.json"
-    codex_config_file: "{{ app_path }}/codex_config.toml"
-    codex_auth_file: "{{ app_path }}/codex_auth.json"
     data_path: "{{ app_path }}/data"
 
   tasks:
@@ -25,7 +22,6 @@
         path: "{{ item }}"
         state: directory
       loop:
-        - "{{ apps_path }}"
         - "{{ app_path }}"
         - "{{ data_path }}"
 
@@ -35,29 +31,11 @@
         dest: "{{ compose_file }}"
         mode: "0644"
 
-    # - name: Copy config.toml
-    #   template:
-    #     src: config.toml.j2
-    #     dest: "{{ config_file }}"
-    #     mode: "0600"
-
-    - name: Copy claude_settings.json
+    - name: Copy config.toml
       template:
-        src: claude_settings.json.j2
-        dest: "{{ claude_settings_file }}"
-        mode: "0600"
-
-    - name: Copy codex_config.toml
-      template:
-        src: codex_config.toml
-        dest: "{{ codex_config_file }}"
-        mode: "0600"
-
-    - name: Copy codex_auth.json
-      template:
-        src: codex_auth.json.j2
-        dest: "{{ codex_auth_file }}"
-        mode: "0600"
+        src: config.toml.j2
+        dest: "{{ config_file }}"
+        mode: "0644"
 
     - name: Pull images
       community.docker.docker_compose_v2:

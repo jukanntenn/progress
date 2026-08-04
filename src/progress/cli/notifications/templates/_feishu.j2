@@ -1,0 +1,31 @@
+{# Feishu interactive-card helper macros (spec 10).
+
+Each ``card_json.j2`` template builds an ``elements`` list of Feishu element
+dicts directly (plain Python dicts accumulated via a ``namespace``), then calls
+``card()`` once to render the full card document as JSON via ``tojson``. The
+Feishu channel parses this JSON and POSTs it — the card has real ``hr`` /
+``fields`` / ``action`` / ``card_link`` elements, not a flattened single div.
+
+Element shapes (Feishu interactive card v1):
+- ``{"tag": "div", "text": {"tag": "lark_md", "content": "..."}}`` — markdown block
+- ``{"tag": "hr"}`` — horizontal rule
+- ``{"tag": "div", "fields": [{...}, ...]}`` — each field ``{"is_short": true, "text": {...}}``
+- ``{"tag": "action", "actions": [{"tag": "button", ...}]}`` — button row
+- top-level ``"card_link": {"url": "..."}`` — makes the whole card clickable
+#}
+
+{# Render the final card document. ``elements`` is a list of element dicts. #}
+{%- macro card(header_title, elements, markpost_url="") -%}
+{%- set doc = {"config": {"wide_screen_mode": true}, "header": {"template": "blue", "title": {"tag": "plain_text", "content": header_title}}, "elements": elements} -%}
+{%- if markpost_url -%}{%- set _ = doc.update({"card_link": {"url": markpost_url}}) -%}{%- endif -%}
+{{ doc | tojson }}
+{%- endmacro -%}
+
+{# Build the markdown body for a titled repo list (top-5 + "... and N more").
+   Returns a plain string, NOT JSON — wrap in a lark_md div by the caller. #}
+{%- macro repo_list_content(title, repos) -%}
+{%- set ns = namespace(lines=["**" ~ title ~ "**"]) -%}
+{%- for name in repos[:5] -%}{%- set ns.lines = ns.lines + ["- " ~ name] -%}{%- endfor -%}
+{%- if repos | length > 5 -%}{%- set ns.lines = ns.lines + ["- ... and " ~ (repos | length - 5) ~ " more"] -%}{%- endif -%}
+{{ ns.lines | join("\n") }}
+{%- endmacro -%}

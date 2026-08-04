@@ -1,10 +1,10 @@
 # 可观测性上线手册（OpenTelemetry + Bugsink）
 
-本手册指导如何在生产环境上线本次可观测性功能：OpenTelemetry traces/metrics 输出到容器内 `/app/data/telemetry/*.jsonl`（映射到宿主机 `./data/telemetry/`），错误/崩溃通过 `sentry-sdk` 上报到 Bugsink（`http://192.168.5.50:8770/`）。
+本手册指导如何在生产环境上线本次可观测性功能：OpenTelemetry traces/metrics 输出到容器内 `/app/data/observability/*.jsonl`（映射到宿主机 `./data/observability/`），错误/崩溃通过 `sentry-sdk` 上报到 Bugsink（`http://192.168.5.50:8770/`）。
 
-- **回滚成本：低**。功能默认关闭，纯增量；下线只需翻转开关并重新部署，无数据迁移、无 DB schema 变更。
+- **回滚成本：低**。OTel traces/metrics 始终开启（代码常量，无开关）；Bugsink 由 DSN 控制，清空即下线。
 - **影响面**：仅新增 2 个遥测文件与到 Bugsink 的出站错误上报；不改变任何业务逻辑。
-- 设计与实现记录见 [`observability.md`](./observability.md)，使用说明见 [`../guides/observability.md`](../guides/observability.md)。
+- 设计与实现记录见 [`observability.md`](./observability.md)。
 
 ---
 
@@ -39,7 +39,7 @@
 
 生产配置由 Ansible 渲染。DSN 是 secret，按本项目惯例放入 vault，并在 compose 模板中以环境变量引用。
 
-> 推荐用**环境变量**启用（DSN 不落配置文件、由 vault 管理、Ansible 全权托管）。`[observability]` 是**基础设施**配置，每次启动都会重新读取，因此无需 `progress config import`。
+> 推荐用**环境变量**启用（DSN 不落配置文件、由 vault 管理、Ansible 全权托管）。`[observability]` 是**基础设施**配置，每次启动都会重新读取，因此通过环境变量即可生效，无需编辑种子文件或重启服务。
 
 ### 2.1 把 DSN 写入 Vault
 
@@ -62,27 +62,20 @@ bugsink_dsn: "http://<public-key>@192.168.5.50:8770/<project-id>"
     environment:
       - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
       # —— 可观测性（新增）——
-      - PROGRESS_OBSERVABILITY__OTEL__ENABLED=true
-      - PROGRESS_OBSERVABILITY__OTEL__EXPORT_DIR=/app/data/telemetry
       - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
-      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=prod
+      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
 ```
 
-- 只想先开 OTel、暂不上报 Bugsink：只保留前两行（`OTEL__*`），删去 `BUGSINK__*`。
-- `EXPORT_DIR` 必须落在已挂载的 `./data` 卷内（即容器内 `/app/data/...`），否则文件会写进容器临时层、重启即丢。
+OTel traces/metrics 始终开启（写 `/app/data/observability/`，无需配置）。如需改走 OTLP collector，追加 `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector>:4318`。
 
-### 2.3（可选）改走 config.toml
+### 2.3（可选）改走 Web UI / DB config
 
-由于 `main.yml` 中 "Copy config.toml" 任务被注释，宿主机上的 `config.toml` 不会被覆盖。也可直接编辑生产机上的 `./config.toml` 追加：
+也可在 Web UI 的 Settings 页面或通过 API 设置 `core.observability.bugsink.dsn`（Web-class config，存 DB `config` 表）：
 
 ```toml
-[observability.otel]
-enabled = true
-export_dir = "data/telemetry"
-
-[observability.bugsink]
+[core.observability.bugsink]
 dsn = "http://<public-key>@192.168.5.50:8770/<project-id>"
-environment = "prod"
+environment = "production"
 ```
 
 > 建议优先用 §2.1/2.2 的 env+vault 方式（DSN 不进文件）。本节仅作备选。
@@ -126,29 +119,29 @@ docker compose logs app 2>&1 | grep -iE "Bugsink error reporting enabled|telemet
 ### 5.2 遥测文件已生成
 ```bash
 # API 服务（长驻）会持续写 traces（HTTP/DB span）
-docker exec progress ls -la /app/data/telemetry/
+docker exec progress ls -la /app/data/observability/
 ```
-期望出现 `traces.jsonl`、`metrics.jsonl`。也可在宿主机查看 `./data/telemetry/`。
+期望出现 `traces.jsonl`、`metrics.jsonl`。也可在宿主机查看 `./data/observability/`。
 
-### 5.3 触发一次 check，验证业务链路 span
+### 5.3 触发一次 run，验证业务链路 span
 ```bash
-# 手动跑一次 check（与 cron 同路径），随后检查 traces
-docker exec progress progress --config /app/config.toml check
-docker exec progress sh -c "tail -n 3 /app/data/telemetry/traces.jsonl"
+# 手动跑一次 run（与 cron 同路径），随后检查 traces
+docker exec progress progress run -c /app/config.toml
+docker exec progress sh -c "tail -n 3 /app/data/observability/traces.jsonl"
 ```
-期望看到 `progress.check`、`repo.sync`、`repo.analyze`、`ai.call` 等 span，且 `repo.sync`/`ai.call` 的 `parent_id` 指向 `progress.check`。
+期望看到 `progress.run`、`progress.integration.repo`、`progress.git.op`、`progress.ai.call` 等 span，且子 span 的 `parentSpanId` 指向 `progress.run`。
 
 ### 5.4 指标文件
 ```bash
-docker exec progress tail -n 1 /app/data/telemetry/metrics.jsonl | python3 -m json.tool
+docker exec progress tail -n 1 /app/data/observability/metrics.jsonl | python3 -m json.tool
 ```
-期望包含 `progress.repos.checked`、`progress.analysis.duration` 等指标。
+期望包含 `progress.repos.checked`、`progress.git.op.duration` 等指标。
 
 ### 5.5 日志 trace 关联
 ```bash
-docker exec progress tail -n 20 /app/data/progress.log
+docker exec progress tail -n 20 /app/data/logs/progress.log
 ```
-期望每行带 `[trace_id=0x… span_id=0x…]`（关闭态则为空，属正常）。
+期望 JSON 日志行带 `"trace_id": "…", "span_id": "…"` 字段。
 
 ### 5.6 Bugsink 收到事件
 - 等待一次真实的 check 报错（若有），或临时制造一个：在容器内 `python -c "import sentry_sdk; ..."` 仅限排障；
@@ -163,9 +156,9 @@ docker exec progress tail -n 20 /app/data/progress.log
 
 推荐在生产机上用 `logrotate` 的 `copytruncate`（导出器持有文件句柄追加写，`copytruncate` 可在不重启进程的前提下切割）：
 
-新增 `/etc/logrotate.d/progress-telemetry`：
+新增 `/etc/logrotate.d/progress-observability`：
 ```
-/path/to/data/telemetry/*.jsonl {
+/path/to/data/observability/*.jsonl {
     daily
     rotate 14
     compress
@@ -175,12 +168,12 @@ docker exec progress tail -n 20 /app/data/progress.log
     size 100M
 }
 ```
-（把路径替换为生产机上的实际 `data/telemetry` 绝对路径。）日常按 100M 或每日切割，保留 14 份压缩归档。
+（把路径替换为生产机上的实际 `data/observability` 绝对路径。）日常按 100M 或每日切割，保留 14 份压缩归档。
 
 ### 6.2 文件位置
-- 容器内：`/app/data/telemetry/{traces,metrics}.jsonl`
-- 宿主机：`<app_path>/data/telemetry/`（即 `./data/telemetry/`）
-- 人工/AI 检索：见 [`../guides/observability.md`](../guides/observability.md) 的 jq 示例。
+- 容器内：`/app/data/observability/{traces,metrics}.jsonl`
+- 宿主机：`<app_path>/data/observability/`（即 `./data/observability/`）
+- 人工/AI 检索：见 [`observability.md`](./observability.md) 的 jq 示例。
 
 ### 6.3 性能与配额
 - 100% 采样，内部低流量工具，开销可忽略；CLI（短驻）用同步 processor，API（长驻）批量导出。
@@ -190,10 +183,10 @@ docker exec progress tail -n 20 /app/data/progress.log
 
 ## 7. 回滚 / 关闭
 
-任选其一，**无需回滚镜像**（功能默认关闭，老镜像忽略这些 env 即可）：
+清空 DSN 即可关闭 Bugsink 上报，**无需回滚镜像**：
 
-**A. 仅关闭（保留镜像）**：编辑 `docker-compose.yml.j2`，将 `PROGRESS_OBSERVABILITY__OTEL__ENABLED` 改为 `false`、删除（或留空）`PROGRESS_OBSERVABILITY__BUGSINK__DSN`，重跑 §4 部署。重启后不写文件、不联网。
-**B. 完全回滚**：部署上一版镜像（`python docker/build.py` 旧 tag 或镜像仓库回退）并移除上述 env。
+**A. 仅关闭 Bugsink（保留镜像）**：编辑 `docker-compose.yml.j2`，删除（或留空）`PROGRESS_OBSERVABILITY__BUGSINK__DSN`，重跑 §4 部署。重启后不再联网上报（OTel 文件仍写本地）。
+**B. 完全回滚**：部署上一版镜像并移除上述 env。
 
 回滚后已写入的 `*.jsonl` 与 Bugsink 中已入库的事件保留，不影响业务。
 
@@ -203,10 +196,10 @@ docker exec progress tail -n 20 /app/data/progress.log
 
 | 现象 | 排查 |
 |---|---|
-| `data/telemetry/` 无文件 | 确认 `PROGRESS_OBSERVABILITY__OTEL__ENABLED=true`；确认 `EXPORT_DIR` 在挂载卷内；`docker compose logs app` 查看是否有 instrumentation 警告 |
-| traces.jsonl 为空 / span 缺失 | API 路径：发一个 HTTP 请求即可生成；CLI 路径：需等 cron 或手动 `progress check`（短驻进程在退出时 `force_flush`） |
-| Bugsink 收不到事件 | 在生产机 `curl` 验证连通；确认 DSN 公钥与 project-id 正确；查 Bugsink 是否返回 429（配额）；查 `progress.log` 是否有 `Bugsink initialization failed` |
-| 日志里 `trace_id=` 为空 | 正常——表示当前不在 span 上下文中或 OTel 未启用；确认 `otel.enabled=true` 后在 check 运行期间应有值 |
+| `data/observability/` 无文件 | OTel 始终开启，文件应自动生成；`docker compose logs app` 查看是否有 instrumentation 警告；确认 `/app/data/` 卷已挂载 |
+| traces.jsonl 为空 / span 缺失 | API 路径：发一个 HTTP 请求即可生成；CLI 路径：需等 cron 或手动 `progress run`（短驻进程在退出时 force_flush） |
+| Bugsink 收不到事件 | 确认 DSN 非空（`docker exec progress python3 -c "..."` 查 DB config）；在生产机 `curl` 验证连通；确认 DSN 公钥与 project-id 正确；查 Bugsink 是否返回 429（配额）；查 `progress.log` 是否有 `bugsink dsn empty` 警告 |
+| 日志里 `trace_id` 为空 | 正常——表示当前不在 span 上下文中；在 `progress run` 运行期间的业务日志应有值 |
 | 磁盘占用增长快 | 见 §6.1，配置 logrotate |
 
 ---

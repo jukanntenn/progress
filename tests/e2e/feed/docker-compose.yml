@@ -1,0 +1,56 @@
+# =============================================================================
+# feed integration e2e: Miniflux + PostgreSQL (spec feed §15.2).
+# =============================================================================
+#
+# INTENTIONAL EXCEPTION (spec feed §15.1, spec 15 §1.2):
+# This is the ONLY e2e in progress that spins up real docker containers. The
+# feed integration's whole value is talking to Miniflux, and a mock cannot
+# discover "real Miniflux entry JSON drifts from our assumptions". Every other
+# integration's e2e uses mocks (aioresponses / pytest-httpserver). feed needs a
+# real Miniflux 2.x to verify the integration contract. CI gating runs these
+# only when docker-in-docker is available (spec feed §15.7).
+#
+# Versions/ports/creds aligned with the feeber e2e harness (verified):
+#   - Miniflux 2.2.17 on host port 18080, admin/password via CREATE_ADMIN
+#   - PostgreSQL 17-alpine backing it
+services:
+  miniflux:
+    image: miniflux/miniflux:2.2.17
+    healthcheck:
+      test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "18080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://miniflux:password@db/miniflux?sslmode=disable
+      - RUN_MIGRATIONS=1
+      - CREATE_ADMIN=1
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=password
+    networks:
+      - feed-e2e-network
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=miniflux
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=miniflux
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "miniflux"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - feed-e2e-network
+
+networks:
+  feed-e2e-network:
+    driver: bridge

@@ -1,0 +1,37 @@
+{# feed integration report section (spec feed §7.2).
+
+Renders one feed's structured payload, restoring the legacy feeber format:
+- H2: feed title (linked to site_url when present)
+- AI summary paragraph (downgrade marker when AI failed)
+- ONE outer <details> per feed ("Click to read N entries") wrapping all entries;
+  each entry = linked title + per-entry AI analysis paragraph, separated by ---
+
+HTML escaping rules (security critical):
+- entry titles / urls are external data → MUST be HTML-escaped with ``| e``
+- AI summary / analysis are trusted output → rendered verbatim
+
+The footer is emitted once by the aggregator (``aggregated_report.j2``), not
+per section, so each feed does not repeat it.
+#}
+{% if site_url %}## [{{ feed_title | e }}]({{ site_url | e }})
+{% else %}## {{ feed_title | e }}
+{% endif %}
+{{ summary }}
+
+<details>
+<summary>{{ ngettext("Click to read %(count)s entry", "Click to read %(count)s entries", entries|length) % {"count": entries|length} }}</summary>
+
+{% for entry in entries %}
+{% if entry.url %}[{{ entry.title | e }}]({{ entry.url | e }})
+{% else %}{{ entry.title | e }}
+{% endif %}
+{% if entry.analysis %}{{ entry.analysis }}
+{% else %}{{ _("**AI analysis unavailable for this entry**") }}
+{% endif %}
+{% if not loop.last %}
+
+---
+
+{% endif %}
+{% endfor %}
+</details>

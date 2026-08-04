@@ -1,101 +1,116 @@
-from datetime import datetime
+"""Report endpoints (spec 12).
 
-import pytz
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+Read-only against the ``reports`` table:
 
-from ...db.models import Report
-from ..markdown import render_markdown
+- ``GET /api/v1/reports`` — paginated list of summaries.
+- ``GET /api/v1/reports/{id}`` — single report detail, with rendered HTML.
+- ``GET /api/v1/reports/{id}/raw`` — raw markdown body.
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+Per spec 12, every response declares a ``response_model`` so OpenAPI is the
+single source of truth for the frontend types. Rate limiting is wired through
+the shared ``limiter`` instance registered by :mod:`progress.api.routes`.
+"""
 
-PAGE_SIZE = 10
+from __future__ import annotations
 
+import logging
+from typing import Annotated
 
-class ReportResponse(BaseModel):
-    id: int
-    title: str | None
-    created_at: str
-    markpost_url: str | None
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from progress.api.auth import get_current_user
+from progress.api.markdown import render_markdown
+from progress.api.routes._limiter import limiter
+from progress.api.schemas import (
+    PaginatedResponse,
+    RawMarkdownResponse,
+    ReportDetail,
+    ReportSummary,
+)
+from progress.db.models.report import Report
 
-class ReportDetailResponse(BaseModel):
-    id: int
-    title: str | None
-    created_at: str
-    markpost_url: str | None
-    content: str
+logger = logging.getLogger(__name__)
 
-
-class PaginatedReportsResponse(BaseModel):
-    reports: list[ReportResponse]
-    page: int
-    total_pages: int
-    total: int
-    has_prev: bool
-    has_next: bool
+router = APIRouter(tags=["reports"], dependencies=[Depends(get_current_user)])
 
 
-def format_datetime(dt, timezone) -> str:
-    if dt is None:
-        return ""
-    if isinstance(dt, datetime):
-        return dt.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
-    if isinstance(dt, str):
-        try:
-            parsed = datetime.fromisoformat(dt)
-            return parsed.astimezone(timezone).strftime("%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            return dt
-    return str(dt)
-
-
-@router.get("", response_model=PaginatedReportsResponse)
-async def list_reports(page: int = 1, timezone_str: str = "UTC"):
-    timezone = pytz.timezone(timezone_str)
-
-    if page < 1:
-        page = 1
-
-    query = Report.filter(repo_id__isnull=True).order_by("-created_at")
-    total = await query.count()
-    # Preserve peewee's 1-indexed .paginate(page, size) semantics.
-    reports = await query.offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
-
-    report_list = [
-        ReportResponse(
-            id=report.id,
-            title=report.title,
-            created_at=format_datetime(report.created_at, timezone),
-            markpost_url=report.markpost_url,
-        )
-        for report in reports
-    ]
-
-    total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE or 1
-
-    return PaginatedReportsResponse(
-        reports=report_list,
+@router.get(
+    "/reports",
+    response_model=PaginatedResponse[ReportSummary],
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("60 per minute")
+async def list_reports(
+    request: Request,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    report_type: Annotated[str | None, Query()] = None,
+) -> PaginatedResponse[ReportSummary]:
+    """Paginated list of report summaries (newest first)."""
+    qs = Report.filter(repo_id__isnull=True).order_by("-created_at")
+    if report_type:
+        qs = qs.filter(report_type=report_type)
+    total = await qs.count()
+    offset = (page - 1) * page_size
+    rows = await qs.offset(offset).limit(page_size)
+    items = [ReportSummary.model_validate(_serialize_row(r)) for r in rows]
+    return PaginatedResponse[ReportSummary](
+        items=items,
         page=page,
-        total_pages=total_pages,
+        page_size=page_size,
         total=total,
-        has_prev=page > 1,
-        has_next=page < total_pages,
+        has_next=(offset + page_size) < total,
     )
 
 
-@router.get("/{report_id}", response_model=ReportDetailResponse)
-async def get_report(report_id: int, timezone_str: str = "UTC"):
-    timezone = pytz.timezone(timezone_str)
+@router.get(
+    "/reports/{report_id}",
+    response_model=ReportDetail,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("120 per minute")
+async def get_report(request: Request, report_id: int) -> ReportDetail:
+    """Single report detail with rendered HTML (spec 12)."""
+    row = await Report.get_or_none(id=report_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"report {report_id} not found")
+    payload = _serialize_row(row)
+    payload["content"] = row.content or ""
+    payload["rendered_html"] = render_markdown(row.content or "")
+    return ReportDetail.model_validate(payload)
 
-    report = await Report.get_or_none(id=report_id)
-    if report is None or report.repo_id is not None:  # ty: ignore[unresolved-attribute]  # tortoise exposes repo_id as the raw FK column; not in the model stubs
-        raise HTTPException(status_code=404, detail="Report not found")
 
-    return ReportDetailResponse(
-        id=report.id,
-        title=report.title,
-        created_at=format_datetime(report.created_at, timezone),
-        markpost_url=report.markpost_url,
-        content=render_markdown(report.content or ""),
+@router.get(
+    "/reports/{report_id}/raw",
+    response_model=RawMarkdownResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("120 per minute")
+async def get_report_raw(request: Request, report_id: int) -> RawMarkdownResponse:
+    """Raw markdown body for the report (spec 12)."""
+    row = await Report.get_or_none(id=report_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"report {report_id} not found")
+    return RawMarkdownResponse(
+        id=row.id,
+        report_type=row.report_type,
+        title=row.title,
+        markdown=row.content or "",
     )
+
+
+def _serialize_row(row: Report) -> dict:  # ty:ignore[missing-type-argument]
+    """Flatten a Report row into a JSON-friendly dict (no content — summary only)."""
+    return {
+        "id": row.id,
+        "report_type": row.report_type,
+        "title": row.title,
+        "commit_hash": row.commit_hash,
+        "previous_commit_hash": row.previous_commit_hash,
+        "commit_count": row.commit_count,
+        "markpost_url": row.markpost_url,
+        "created_at": row.created_at.isoformat() if row.created_at else "",
+    }
+
+
+__all__ = ["router"]

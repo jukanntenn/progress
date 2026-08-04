@@ -1,0 +1,54 @@
+{# Feishu interactive-card v2 helper macros (spec 10).
+
+Each ``card_json.j2`` template builds an ``elements`` list of Feishu v2
+component dicts (plain Python dicts appended to a list via ``namespace`` or
+``{% set _ = elements.append({...}) %}``), then calls ``card()`` once to render
+the full card document as JSON via ``tojson``. The Feishu channel parses this
+JSON and POSTs it — the card has real v2 components (``column_set`` color-block
+stat cards / ``collapsible_panel`` folded lists / ``button`` CTA / ``markdown``
+rich text), not a flattened single div.
+
+Why component dicts are built inline in each template (not via macros that
+return dicts): Jinja2 macros always return a *string*, so a macro ending in
+``{{ {...} }}`` yields the dict's repr as text rather than the dict itself.
+Building dicts inline with ``{% set _ = elements.append({...}) %}`` keeps them
+as real Python objects the final ``tojson`` serializes correctly. Only the
+``card()`` wrapper (a single ``tojson`` call) and small string-emitting macros
+(``repo_line``) live here.
+
+v2 invariants (vs the retired v1 macros in ``_feishu.j2``):
+- top-level ``schema: "2.0"``, ``elements`` live inside ``body.elements``
+- ``config.width_mode`` replaces the dropped ``wide_screen_mode``
+- the v1 ``action`` wrapper and ``note`` element are removed in v2 — buttons
+  go straight into ``body.elements``, footer uses ``markdown`` + ``<font>``
+- ``column_set`` has no ``padding``; padding goes on each ``column``
+- ``div`` has no ``text_color``; colored text uses ``markdown`` + ``<font color>``
+#}
+
+{# Render the final v2 card document. ``elements`` is a list of element dicts.
+   ``template`` is the header color theme; ``header_icon_token``/``header_icon_color``
+   optional standard-icon prefix; ``text_tags`` optional list of {tag,text,color} dicts
+   rendered as header suffix tags; ``subtitle`` optional header subtitle string. #}
+{%- macro card(header_title, elements, markpost_url="", template="blue", subtitle="", header_icon_token="", header_icon_color="", text_tags=[]) -%}
+{%- set doc = {"schema": "2.0",
+               "config": {"width_mode": "fill", "update_multi": true},
+               "header": {"template": template,
+                          "title": {"tag": "plain_text", "content": header_title}},
+               "body": {"elements": elements}} -%}
+{%- if subtitle -%}{%- set _ = doc.header.update({"subtitle": {"tag": "plain_text", "content": subtitle}}) -%}{%- endif -%}
+{%- if header_icon_token -%}{%- set _ = doc.header.update({"icon": {"tag": "standard_icon", "token": header_icon_token, "color": header_icon_color or template}}) -%}{%- endif -%}
+{%- if text_tags -%}{%- set _ = doc.header.update({"text_tag_list": text_tags}) -%}{%- endif -%}
+{%- if markpost_url -%}{%- set _ = doc.update({"card_link": {"url": markpost_url}}) -%}{%- endif -%}
+{{- doc | tojson -}}
+{%- endmacro -%}
+
+{# Build a markdown list line for a repo with a colored status badge.
+   Returns a string (markdown), to be wrapped by the caller.
+   ``badge_color`` is an optional {status: color} mapping resolved in the
+   caller's context to avoid import-without-context pitfalls. #}
+{%- macro repo_line(name, status, url="", badge_color=None) -%}
+{%- set color_map = badge_color if badge_color else {"success": "green", "failed": "red", "skipped": "grey"} -%}
+{%- set badge_color = color_map.get(status, "grey") -%}
+{%- set name_md = "[" ~ name ~ "](" ~ url ~ ")" if url else name -%}
+• {{ name_md }}　<text_tag color='{{ badge_color }}'>{{ status | upper }}</text_tag>
+{%- endmacro -%}

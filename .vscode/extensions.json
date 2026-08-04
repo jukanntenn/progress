@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.mypy-type-checker",
+    "ms-python.isort"
+  ]
+}

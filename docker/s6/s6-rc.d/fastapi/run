@@ -1,6 +1,14 @@
 #!/bin/sh
+# FastAPI / uvicorn longrun service (spec 14).
+#
+# uvicorn is invoked directly (not via `fastapi run`) so the entry point and
+# reload behaviour are explicit. The ASGI module is `progress.api.main:app`
+# (deferred-construction app factory — see src/progress/api/main.py).
+#
+# Runs as the non-root `progress` user (set via Dockerfile USER directive).
+
 export CONFIG_FILE="${CONFIG_FILE:-/app/config.toml}"
 export PYTHONPATH=/app/src
 export PYTHONUNBUFFERED=1
 cd /app
-exec fastapi run --host 127.0.0.1 --port 8000
+exec uvicorn progress.api.main:app --host 127.0.0.1 --port 8000

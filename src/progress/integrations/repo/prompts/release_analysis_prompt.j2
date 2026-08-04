@@ -1,0 +1,70 @@
+You are analyzing a GitHub release for a repository.
+
+**Repository**: {{ repo_name }}
+**Branch**: {{ branch }}
+
+**Release**: {{ release_tag }}
+{% if release_name %}**Name**: {{ release_name }}{% endif %}
+**Published**: {{ release_published_at }}
+
+### Release Notes
+
+{{ release_notes if release_notes else "No release notes provided." }}
+
+{% if diff_content %}
+{% if truncated %}
+**WARNING**: The diff was truncated due to size limitations (original: {{ original_diff_length }} chars, analyzed: {{ analyzed_diff_length }} chars). Analysis is based on partial diff.
+{% endif %}
+### Code Changes
+
+The following diff shows code changes related to this release:
+
+```
+{{ diff_content }}
+```
+{% endif %}
+
+## Your Task
+
+Analyze this release and provide:
+
+1. **Executive Summary** (2-3 sentences): What's the main purpose of this release?
+
+2. **Key Changes**: Categorize changes into:
+   - 🎁 **New Features**: What new capabilities are added?
+   - 🐛 **Bug Fixes**: What issues are resolved?
+   - ⚠️ **Breaking Changes**: What changes could break existing functionality?
+   - 🔧 **Improvements**: What has been improved?
+   - 📚 **Documentation**: What documentation changes are included?
+
+3. **Upgrade Guidance**:
+   - Should users upgrade? Why/why not?
+   - Are there any migration steps needed?
+   - What are the risks or concerns?
+
+4. **Impact Assessment**: Low/Medium/High impact for users depending on this project.
+
+{% if language %}
+**Important**: Write your analysis in {{ language }}.
+{% endif %}
+
+## Output Format
+
+**CRITICAL**: You MUST respond with a valid JSON object only. Do not include any markdown formatting, code blocks, or explanatory text outside the JSON structure.
+
+Your response must be in this exact JSON format:
+
+```json
+{
+  "summary": "A 2-3 sentence executive summary of the release",
+  "detail": "Full detailed analysis including key changes, upgrade guidance, and impact assessment in markdown format"
+}
+```
+
+Requirements:
+- `summary`: A concise 2-3 sentence overview suitable for quick reading
+- `detail`: Comprehensive markdown analysis with all sections (key changes categorized with emojis, upgrade guidance, impact assessment, etc.)
+- Both fields must be non-empty strings
+- Output ONLY the JSON object, nothing else
+- Do not wrap the JSON in markdown code blocks
+- Do not add any explanatory text before or after the JSON

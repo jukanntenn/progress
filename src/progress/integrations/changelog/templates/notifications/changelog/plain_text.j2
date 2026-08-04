@@ -1,0 +1,8 @@
+{{ title }}
+
+{% for e in entries %}
+• {{ e.name }} {{ e.version }} - {{ e.url }}
+{% endfor %}
+{% if markpost_url %}
+
+{{ markpost_url }}{% endif %}

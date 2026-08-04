@@ -1,0 +1,46 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bandit:
+    name: Bandit (Python SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --frozen --extra dev
+      # HIGH/CRITICAL 阻断 CI(-lll 仅保留 high+critical,-q 安静模式)。
+      - name: Run bandit (gate on HIGH/CRITICAL)
+        run: uv run bandit -c pyproject.toml -r src/ -lll -q
+      # 全量扫描导出 SARIF,上传到 Security tab(含 Medium/Low,仅可视不阻断)。
+      # 用项目自带的 JSON→SARIF 转换器(scripts/bandit_to_sarif.py),避免引入
+      # 已归档的 bandit-sarif-formatter 依赖(它拖入 pbr/setuptools/sarif-om 且
+      # 与 bandit 的 pyproject 配置读取器冲突)。
+      - name: Run bandit (full JSON)
+        run: uv run bandit -c pyproject.toml -r src/ -f json -o bandit.json || true
+      - name: Convert JSON to SARIF
+        run: uv run python scripts/bandit_to_sarif.py bandit.json bandit.sarif
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
+        with:
+          sarif_file: bandit.sarif

@@ -2,94 +2,79 @@
 
 ## Prerequisites
 
-| Tool                    | Version  | Description                                     | Install                                                        |
-| ----------------------- | -------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| Python                  | 3.12+    | Backend language                                | [python.org/downloads](https://www.python.org/downloads/)      |
-| uv                      | 0.9+     | Python package / project manager                | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| Node.js                 | 22+      | Frontend runtime                                | [nodejs.org](https://nodejs.org/)                              |
-| pnpm                    | 11+      | Frontend package manager                        | [pnpm.io/installation](https://pnpm.io/installation)           |
-| pre-commit              | latest   | Git pre-commit hooks (ruff, uv-lock)            | [pre-commit.com#install](https://pre-commit.com/#install)      |
-| GitHub CLI (`gh`)       | latest   | Initial repository clone                        | [cli.github.com](https://cli.github.com/)                      |
-| Claude Code CLI         | latest   | AI analysis provider (`provider = "claude_code"`) | [claude.com/product/claude-code](https://claude.com/product/claude-code) |
-| Codex CLI (optional)    | latest   | Alternative AI provider (`provider = "codex"`)  | [developers.openai.com/codex](https://developers.openai.com/codex/) |
+| Tool              | Version | Description                                     | Install                                                                                             |
+| ----------------- | ------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Python            | 3.12+   | Backend language                                | [python.org/downloads](https://www.python.org/downloads/)                                           |
+| uv                | 0.9+    | Python package / project manager                | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/)                        |
+| Node.js           | 22+     | Frontend runtime                                | [nodejs.org](https://nodejs.org/)                                                                   |
+| pnpm              | 11+     | Frontend package manager                        | [pnpm.io/installation](https://pnpm.io/installation/)                                               |
+| prek              | latest  | Git pre-commit hooks (ruff/ty/eslint)           | `uv tool install prek` ([j178/prek](https://github.com/j178/prek))                                  |
+| GitHub CLI (`gh`) | latest  | Initial repository clone                        | [cli.github.com](https://cli.github.com/)                                                           |
 
 ## Quick Start
 
-### Option 1 — `dev.py` (recommended)
-
-Starts the FastAPI backend and the Next.js frontend together, installing frontend dependencies on first run:
+### Install dependencies
 
 ```bash
-python3 devops/dev.py start   # start all services
-python3 devops/dev.py stop    # stop all services
+uv sync --extra dev   # backend (includes dev/test tooling)
+cd web && pnpm install && cd ..   # frontend
+prek install          # git pre-commit hooks (once per clone)
 ```
 
-- **Backend API:** [http://localhost:5000/api/v1](http://localhost:5000/api/v1)
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
+### Option 1 — VS Code tasks (recommended)
 
-Logs are written to `devops/backend.log` and `devops/frontend.log`.
-
-### Option 2 — VS Code / Cursor / compatible IDEs
-
-The project ships `.vscode/tasks.json` with three tasks:
+The project ships `.vscode/tasks.json`. Open the Command Palette
+(`Ctrl+Shift+P`) → **Tasks: Run Task** → pick one:
 
 - **Start All** — runs backend and frontend in parallel
-- **Start Backend** — launches `fastapi dev` with `PYTHONPATH=src` and `CONFIG_FILE=config.toml`
-- **Start Frontend** — launches `pnpm dev` in `web/`
+- **Start Backend** — `uv run fastapi dev` on port 8000 (hot reload)
+- **Start Frontend** — `pnpm dev` in `web/` (Vite HMR) on port 5173
 
-Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task** → pick a task.
-
-### Option 3 — Manual
+### Option 2 — Manual
 
 **Backend** (FastAPI with hot reload):
 
 ```bash
-PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev --port 5000
+uv run fastapi dev
 ```
 
-**Frontend** (Next.js with Turbopack):
+**Frontend** (Vite HMR):
 
 ```bash
 cd web
 pnpm dev
 ```
 
-The dev server starts at [http://localhost:3000](http://localhost:3000).
+The Vite dev server runs on [http://localhost:5173](http://localhost:5173) and
+proxies `/api/*`, `/healthz`, `/readyz` to the backend at
+`http://127.0.0.1:8000` (see `web/vite.config.ts`).
 
-> The frontend proxies `/api/*` to `BACKEND_URL`, which defaults to `http://127.0.0.1:5000` (see the rewrite in `web/next.config.ts`). That is why the backend above is started on port `5000`. To use a different backend port, create `web/.env.local` (gitignored) with `BACKEND_URL=http://127.0.0.1:8000`.
+> No `config.toml` is needed for local dev. The backend reads `state_home` from
+> the `PROGRESS_STATE_HOME` env var (default `"data"` relative to the cwd). The
+> VS Code tasks set `PROGRESS_STATE_HOME` to `${workspaceFolder}/data`.
 
-## Install Dependencies
+### Debug (VS Code)
 
-`python3 devops/dev.py start` auto-installs frontend dependencies on first run. To install manually:
+`.vscode/launch.json` provides **FastAPI (debug)** — F5 to start uvicorn under
+debugpy with breakpoints and `--reload`. There is also an **Attach** config for
+connecting to a debugpy session on port 5678.
 
-**Backend:**
-
-```bash
-uv sync                   # includes dev/test extras
-```
-
-**Frontend:**
-
-```bash
-cd web
-pnpm install
-```
-
-## Lint
-
-**Backend** (via pre-commit / ruff):
+## Lint & Format
 
 ```bash
-uv run ruff check .       # linter
-uv run ruff format .      # formatter
-pre-commit run --all-files
+uv run ruff check .       # backend linter
+uv run ruff format .      # backend formatter
+uv run ty check           # backend type checker
+prek run --all-files      # everything (ruff + ty + eslint + prettier + hygiene)
 ```
 
-**Frontend:**
+Frontend:
 
 ```bash
 cd web
 pnpm lint                 # ESLint
+pnpm format               # Prettier
+pnpm typecheck            # tsc --noEmit
 ```
 
 ## Run Tests
@@ -105,67 +90,99 @@ uv run pytest tests/test_repo.py -v       # single file
 
 ```bash
 cd web
-pnpm test           # Vitest, single run (CI)
-pnpm test:watch     # Vitest in watch mode
-pnpm test:coverage  # with coverage
+pnpm test                 # Vitest, single run (CI)
+pnpm test:watch           # Vitest in watch mode
 ```
 
-See [guides/testing.md](../guides/testing.md) for conventions.
+**End-to-end (Playwright, requires Docker):**
+
+```bash
+docker compose -f docker/docker-compose.local.yml up -d --build --wait
+cd web/e2e && pnpm install && pnpm exec playwright install chromium && pnpm test
+docker compose -f docker/docker-compose.local.yml down -v
+```
+
+See [docs/testing.md](testing.md) for test-layer conventions.
 
 ## Configuration
 
-A working `config.toml` (next to the repo root) is required to start the backend. Copy the example and edit the required fields:
+Local dev needs **no** `config.toml`. `state_home` is taken from the
+`PROGRESS_STATE_HOME` env var (set by the VS Code tasks, defaults to `"data"`).
+
+Application config (language, credentials, business tuning) lives in the
+**database** `config` table — edit it via the web UI (`/config`) or
+`PUT /api/v1/config/{section}`. A `config.db.toml` seed file next to your config
+is re-imported on every startup if present.
+
+Env-var overrides use the `PROGRESS_` prefix with `__` for nesting:
 
 ```bash
-cp config.example.toml config.toml
-```
-
-- **Infrastructure** (`data_dir`, `workspace_dir`, db path): resolved every startup as **Environment Variables > config file > defaults**.
-- **Application config**: the **database** is the source of truth. The file seeds it on first run; thereafter edit via the web UI (`/config`) or `progress config import` / `export`.
-
-See [guides/config.md](../guides/config.md) for the full model and [docs/deployment.md](deployment.md) for runtime/Docker configuration.
-
-### Environment Variables
-
-Format: `PROGRESS_<SECTION>__<KEY>` — `PROGRESS_` prefix, `__` separates nested levels.
-
-```bash
+PROGRESS_STATE_HOME="/app/data"
 PROGRESS_TIMEZONE="Asia/Shanghai"
 PROGRESS_LANGUAGE="en"
 PROGRESS_GITHUB__GH_TOKEN="ghp_your_token_here"
-PROGRESS_ANALYSIS__PROVIDER="claude_code"
-PROGRESS_DATA_DIR="/app/data"
 ```
 
-List/array values are not well supported via env vars — use `config.toml` or the web UI for those.
+See [docs/config.md](config.md) for the full model and
+[docs/deployment.md](deployment.md) for runtime/Docker configuration.
+
+## Database Migrations
+
+See [docs/migrations.md](migrations.md). The wrapper `scripts/migration.py`
+covers generate/apply/preview/rollback/drift-check.
+
+## Drift Checks
+
+`scripts/check_drift.py` is the single source of truth for every drift /
+regression check that CI runs. Run it locally before pushing to catch what CI
+will catch — local and CI invoke the same script, so the two paths can never
+drift apart.
+
+```bash
+uv run python scripts/check_drift.py
+```
+
+It runs the seven checks from CI's `drift-checks` job, each with a banner and
+`[OK]` / `[FAIL]` summary:
+
+1. **deptry** — declared-but-unused / used-but-undeclared dependencies.
+2. **import-linter** — forbidden cross-layer imports ([tool.importlinter]).
+3. **OpenAPI drift** — `web/openapi.json` matches what FastAPI produces.
+4. **Frontend type drift** — `web/src/api/schema.ts` matches `openapi.json`.
+5. **i18n .pot drift** — `src/progress/locales/progress.pot` matches freshly
+   extracted strings (POT-Creation-Date is stripped — non-deterministic).
+6. **i18n catalog lint** — no fuzzy / empty / obsolete `.po` entries.
+7. **Migration drift** — every model change has a matching migration file.
+
+Prerequisites: `uv sync --extra dev` and `pnpm --dir web install` (the latter
+for the frontend type-drift check). A clean working tree is **not** required —
+the checks diff against `HEAD`, so uncommitted source changes surface as drift
+(intentional; commit or stash first if you want to isolate a single check).
+
+The OpenAPI and `.pot` checks leave their freshly regenerated artifacts on
+disk after running (mirroring CI). Re-commit them if the regeneration is the
+intended update, otherwise `git checkout -- <path>` to discard.
 
 ## CLI
 
-Progress exposes a Click CLI (`uv run progress ...`):
-
 ```bash
-uv run progress -c config.toml                    # run the full pipeline (default command)
-uv run progress check                             # repository + proposal + changelog checks
-uv run progress check --trackers-only             # proposal/changelog only, skip repos
-uv run progress track-proposals                   # proposal trackers only
-uv run progress config import                     # seed the DB blob from config.toml (file → DB)
-uv run progress config import --force             # overwrite an already-seeded blob
-uv run progress config export -o config.toml      # dump the DB blob to a file (DB → file)
+uv run progress run -c config.toml       # run the full pipeline
+uv run progress serve -c config.toml     # serve the API
 ```
 
 ## Internationalization
 
-Generate and compile gettext messages:
-
 ```bash
-scripts/makemessages.sh      # extract strings → locales/*.pot
-scripts/compilemessages.sh   # compile *.po → *.mo
+uv run python scripts/makemessages.py      # extract strings → locales/*.pot + update .po
+uv run python scripts/compile_messages.py  # compile *.po → *.mo
 ```
 
-See [guides/i18n.md](../guides/i18n.md) for details.
+See [docs/i18n.md](i18n.md) for details.
 
 ## Observability
 
-OpenTelemetry traces/metrics export to local JSON-Lines files, and crashes are forwarded to a Bugsink (Sentry-compatible) server. Configure under `[observability.otel]` and `[observability.bugsink]` in `config.toml`.
+OpenTelemetry traces/metrics export to local JSON-Lines files, and crashes are
+forwarded to a Bugsink (Sentry-compatible) server. Configure under
+`[observability]` in the DB config table.
 
-See [guides/observability.md](../guides/observability.md) for setup.
+See [docs/observability.md](observability.md) for setup.

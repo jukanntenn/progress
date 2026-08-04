@@ -1,0 +1,31 @@
+Your task: Analyze the unread entries of a single RSS feed and produce a concise feed-level summary plus a per-entry analysis.
+
+Respond in {{ language }}.
+
+Feed: {{ feed_title }}
+{% if site_url %}Site: {{ site_url }}
+{% endif %}
+Entries to analyze (newest first):
+{% for e in entries %}
+- Index: {{ loop.index0 }}
+  Title: {{ e.title }}
+  URL: {{ e.url }}
+  Published: {{ e.published_at }}
+  Content: {{ e.content }}
+{% endfor %}
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST output ONLY a valid JSON object (no markdown, no code fences, no explanations, no text before or after the JSON).
+2. The JSON MUST contain exactly two keys: "summary" and "entries".
+3. This is a fully autonomous, non-interactive task. You MUST NOT ask questions, request permission, seek clarification, propose to write to files, invoke tools, or wait for user input. Produce the JSON immediately and exit.
+
+Required JSON structure:
+{
+  "summary": "[1-3 paragraph plain-text summary that synthesises the entries of this feed]",
+  "entries": [
+    {"entry_index": 0, "analysis": "[1-2 sentence plain-text analysis of this entry]"}
+  ]
+}
+
+Content requirements:
+- summary: 1-3 paragraphs, plain text; combine the titles and content of all entries into a coherent feed-level overview.
+- entries: one object per entry above, keyed by that entry's "Index" (0-based position in the list above); each "analysis" is 1-2 sentences capturing the key point of that entry.

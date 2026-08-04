@@ -1,0 +1,11 @@
+{{ title }}
+
+{% for fname in filenames %}
+📄 {{ fname }}
+{% endfor %}
+{% if more_count %}
+... and {{ more_count }} more
+{% endif %}
+{% if markpost_url %}
+
+{{ markpost_url }}{% endif %}

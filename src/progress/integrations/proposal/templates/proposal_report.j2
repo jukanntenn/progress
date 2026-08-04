@@ -1,0 +1,41 @@
+{# proposal integration report section (spec proposal §14.2).
+
+Renders notifiable proposals grouped by kind, sorted by number within kind.
+- H2 per kind: kind name (linked to tracker repo if tracker_url given)
+- H3 per proposal: 4-level title fallback
+- Small badge with number / status transition / file name
+- AI summary (or fallback text)
+- Detail block ALWAYS rendered (with fallback text if detail empty)
+- `---` separator between reports within a kind and between kinds
+
+Footer is emitted once by the aggregator (``aggregated_report.j2``), not per
+section, to avoid repeating it for every kind.
+#}
+## [{% if tracker_url %}{{ kind | upper }}]({{ tracker_url }}){% else %}{{ kind | upper }}{% endif %}
+
+{% for report in reports %}
+{% if report.title and report.file_url %}
+### [{{ report.title }}]({{ report.file_url }})
+{% elif report.title %}
+### {{ report.title }}
+{% elif report.file_url %}
+### [#{{ report.number }} {{ report.file_path | basename }}]({{ report.file_url }})
+{% else %}
+### #{{ report.number }} {{ report.file_path | basename }}
+{% endif %}
+<small>#️⃣ #{{ report.number }} · 📌 {% if report.old_status %}{{ report.old_status }} → {{ report.new_status }}{% else %}{{ report.new_status }} ({{ _("new") }}){% endif %} · 📄 {{ report.file_path | basename }}</small>
+
+{{ report.analysis_summary or _("No summary available.") }}
+
+<details>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
+
+{{ report.analysis_detail or _("No detailed analysis available.") }}
+
+</details>
+{% if not loop.last %}
+
+---
+
+{% endif %}
+{% endfor %}

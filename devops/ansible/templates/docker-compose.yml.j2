@@ -1,20 +1,20 @@
 services:
-  app:
-    image: 192.168.5.50:5000/progress:latest
+  progress:
+    image: 192.168.5.50:5000/progress:next
     container_name: progress
     ports:
       - "5053:5000"
     volumes:
-      - ./config.toml:/app/config.toml:rw
+      - ./config.toml:/app/config.toml:ro
       - ./data:/app/data
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./codex_config.toml:/root/.codex/config.toml:ro
-      - ./codex_auth.json:/root/.codex/auth.json:ro
     environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
       - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
-      - PROGRESS_OBSERVABILITY__OTEL__ENABLED=true
-      - PROGRESS_OBSERVABILITY__OTEL__EXPORT_DIR=/app/data/telemetry
-      - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
-      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=prod
-      - PROGRESS_WEB__BASE_URL=http://192.168.5.50:5053
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     restart: always

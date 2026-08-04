@@ -1,0 +1,73 @@
+{% from "_feishu_v2.j2" import card, repo_line %}
+{% set repos = repo_statuses or {} %}
+{% set urls = repo_urls or {} %}
+{% set success_repos = repos.items() | selectattr("1", "equalto", "success") | map(attribute="0") | list %}
+{% set failed_repos = repos.items() | selectattr("1", "equalto", "failed") | map(attribute="0") | list %}
+{% set skipped_repos = repos.items() | rejectattr("1", "equalto", "success") | rejectattr("1", "equalto", "failed") | map(attribute="0") | list %}
+{% set has_failure = (failed_repos | length) > 0 %}
+{% set header_template = "red" if has_failure else "green" %}
+{% set icon_token = "warning-outlined" if has_failure else "check-circle-outlined" %}
+{% set tag_text = _("FAILED") ~ " " ~ (failed_repos | length) if has_failure else _("SUCCESS") ~ " " ~ (success_repos | length) %}
+{% set badge_color = {"success": "green", "failed": "red", "skipped": "grey"} %}
+{% set stats = [
+  {"label": _("Total Repositories"), "value": (repos | length), "background": "grey-50", "value_color": ""},
+  {"label": _("Total Commits"), "value": (total_commits | default(0)), "background": "grey-50", "value_color": ""}
+] %}
+{% if has_failure %}
+{% set stats = stats + [{"label": _("Failed"), "value": (failed_repos | length), "background": "red-50", "value_color": "red"}] %}
+{% else %}
+{% set stats = stats + [{"label": _("Success Rate"), "value": "100%", "background": "green-50", "value_color": "green"}] %}
+{% endif %}
+{% set ns = namespace(stat_columns=[], elements=[]) %}
+{% for s in stats %}
+{%- set label_md = "<font color='" ~ s.value_color ~ "'>" ~ s.label ~ "</font>" if s.value_color else s.label -%}
+{%- set value_md = "<font color='" ~ s.value_color ~ "'>" ~ s.value ~ "</font>" if s.value_color else "**" ~ s.value ~ "**" -%}
+{%- set ns.stat_columns = ns.stat_columns + [{
+  "tag": "column", "width": "weighted", "weight": 1,
+  "background_style": s.background, "padding": "12px",
+  "horizontal_align": "center", "vertical_align": "center",
+  "elements": [
+    {"tag": "markdown", "content": label_md, "text_align": "center", "text_size": "notation"},
+    {"tag": "markdown", "content": value_md, "text_align": "center", "text_size": "heading-1"}
+  ]
+}] -%}
+{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "📝 **" ~ _("Overview") ~ "**\n" ~ summary}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "column_set", "flex_mode": "trisect", "horizontal_align": "center", "columns": ns.stat_columns}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% if has_failure %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "⚠ **" ~ _("Failed Repositories") ~ " (" ~ (failed_repos | length) ~ ")**", "text_size": "heading-4"}] -%}
+{% for name in failed_repos %}
+{%- set ns.elements = ns.elements + [{"tag": "column_set", "flex_mode": "none", "background_style": "red-50", "columns": [
+  {"tag": "column", "width": "weighted", "weight": 4, "vertical_align": "center", "padding": "8px 12px",
+   "elements": [{"tag": "markdown", "content": repo_line(name, "failed", urls.get(name, ""), badge_color)}]},
+  {"tag": "column", "width": "weighted", "weight": 1, "horizontal_align": "right", "vertical_align": "center", "padding": "8px 12px",
+   "elements": [{"tag": "button", "text": {"tag": "plain_text", "content": _("View Details")}, "type": "text", "size": "small", "behaviors": [{"type": "open_url", "default_url": urls.get(name, "")}]}]}
+]}] -%}
+{% endfor %}
+{% else %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "📦 **" ~ _("Successful Repositories") ~ " (" ~ (success_repos | length) ~ ")**", "text_size": "heading-4"}] -%}
+{% for name in success_repos[:5] %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": repo_line(name, "success", urls.get(name, ""), badge_color)}] -%}
+{% endfor %}
+{% set rest_success = success_repos[5:] %}
+{% if rest_success %}
+{%- set rest_lines = namespace(items=[]) -%}
+{% for name in rest_success %}{% set rest_lines.items = rest_lines.items + [repo_line(name, "success", urls.get(name, ""), badge_color)] %}{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "collapsible_panel", "background_color": "grey-50", "border": {"color": "grey-200", "corner_radius": "6px"}, "header": {"title": {"tag": "markdown", "content": "▸ " ~ _("Expand remaining") ~ " " ~ (rest_success | length) ~ " " ~ _("repos")}, "background_color": "grey-50"}, "elements": [{"tag": "markdown", "content": rest_lines.items | join("\n")}]}] -%}
+{% endif %}
+{% endif %}
+{% if skipped_repos %}
+{%- set skip_lines = namespace(items=[]) -%}
+{% for name in skipped_repos %}{% set skip_lines.items = skip_lines.items + [repo_line(name, "skipped", urls.get(name, ""), badge_color)] %}{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "collapsible_panel", "background_color": "grey-50", "border": {"color": "grey-200", "corner_radius": "6px"}, "header": {"title": {"tag": "markdown", "content": "▸ " ~ _("Skipped Repositories") ~ " (" ~ (skipped_repos | length) ~ ")"}, "background_color": "grey-50"}, "elements": [{"tag": "markdown", "content": skip_lines.items | join("\n")}]}] -%}
+{% endif %}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% if markpost_url %}
+{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("View Detailed Report") ~ "（Markpost）"}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": markpost_url}]}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% endif %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>⏱ " ~ _("Generated by Progress") ~ "</font>", "text_size": "notation"}] -%}
+{% set text_tags = [{"tag": "text_tag", "text": {"tag": "plain_text", "content": tag_text}, "color": ("red" if has_failure else "green")}] %}
+{{ card(title, ns.elements, markpost_url, header_template, "", icon_token, header_template, text_tags) }}

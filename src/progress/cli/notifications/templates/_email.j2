@@ -1,0 +1,153 @@
+{# Email HTML helper macros — the email counterpart of ``_feishu_v2.j2``.
+
+Every ``html.j2`` template ``{% from "_email.j2" import ... %}`` the shared
+shell + building blocks it needs, then ``{% call email_shell(...) %}`` injects
+its body via ``caller()``. This mirrors how Feishu templates call ``card()``:
+the macro owns the visual frame, the template owns the per-kind content.
+
+Why all styles are INLINE (``style="..."`` on every element) and the layout is
+``<table>``-based: email clients (notably Gmail and legacy Outlook) strip
+``<style>`` blocks and ignore ``display:flex``/CSS grid. Table layout + inline
+styles are the only universally supported approach. This is the documented
+trade-off vs the Feishu card, where a single ``<style>`` would suffice.
+
+Shared palette (kept in lock-step with the Feishu v2 header themes and
+``console_card.py``):
+
+  accent (header bar / CTA / link):
+    red #F53F3F  green #00B42A  blue #3370FF  indigo #4080FF
+    wathet #0091FF  turquoise #14C9C9
+  tile background (light tints):
+    grey #F7F8FA  red-50 #FFECE8  green-50 #E8FFEA  blue-50 #E8F3FF
+  badge foreground (status / level / kind text):
+    green #00B42A  red #F53F3F  blue #3370FF  orange #FF7D00
+    purple #722ED1  turquoise #14C9C9  indigo #4080FF  grey #86909C
+
+Light-tint background for a badge foreground color is looked up by name via
+``BG_FOR_COLOR`` so a green badge sits on green-50, etc.
+#}
+
+{%- set BG_FOR_COLOR = {
+  "green": "#E8FFEA", "red": "#FFECE8", "blue": "#E8F3FF",
+  "orange": "#FFF7E8", "purple": "#F5E8FF", "turquoise": "#E8FFFB",
+  "indigo": "#E8F3FF", "grey": "#F2F3F5"
+} -%}
+{%- set ACCENT = {
+  "red": "#F53F3F", "green": "#00B42A", "blue": "#3370FF", "indigo": "#4080FF",
+  "wathet": "#0091FF", "turquoise": "#14C9C9"
+} -%}
+
+{# Resolve an accent/theme name to its hex (passthrough if already a hex). #}
+{%- macro _accent(theme) -%}
+{{ ACCENT.get(theme, theme if theme.startswith("#") else "#3370FF") }}
+{%- endmacro -%}
+
+{# A colored pill badge (status / level / kind). ``color`` is a palette name. #}
+{%- macro badge(text, color="grey") -%}
+{%- set fg = {"green": "#00B42A", "red": "#F53F3F", "blue": "#3370FF", "orange": "#FF7D00", "purple": "#722ED1", "turquoise": "#14C9C9", "indigo": "#4080FF", "grey": "#86909C"}.get(color, "#86909C") -%}
+{%- set bg = BG_FOR_COLOR.get(color, "#F2F3F5") -%}
+<span style="display:inline-block;padding:2px 8px;border-radius:9px;background-color:{{ bg }};color:{{ fg }};font-size:11px;font-weight:600;line-height:1.4;white-space:nowrap;">{{ text }}</span>
+{%- endmacro -%}
+
+{# A single statistic tile: label on top, large value below, on a tinted block. #}
+{%- macro stat_tile(label, value, bg="grey", value_color="") -%}
+{%- set tile_bg = BG_FOR_COLOR.get(bg, "#F7F8FA") if bg != "grey" else "#F7F8FA" -%}
+{%- set vc = {"green": "#00B42A", "red": "#F53F3F", "blue": "#3370FF"}.get(value_color, "#1D2129") -%}
+<td width="33%" valign="top" style="background-color:{{ tile_bg }};border-radius:8px;padding:14px 10px;text-align:center;">
+  <div style="font-size:12px;color:#86909C;margin-bottom:6px;">{{ label }}</div>
+  <div style="font-size:26px;font-weight:700;color:{{ vc }};line-height:1.1;">{{ value }}</div>
+</td>
+{%- endmacro -%}
+
+{# A 3-tile stats row. ``stats`` is a list of {label,value,bg,value_color}. #}
+{%- macro stats_row(stats) -%}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:6px;margin:16px 0;">
+  <tr>
+  {%- for s in stats -%}
+  {{ stat_tile(s.label, s.value, s.bg|default("grey"), s.value_color|default("")) }}
+  {%- endfor -%}
+  </tr>
+</table>
+{%- endmacro -%}
+
+{# A list row: left weighted column (name + optional badge) + right small button.
+   Mirrors the Feishu ``column_set`` row (4:1 weight) with per-row background. #}
+{%- macro info_row(name, url="", badge_text="", badge_color="grey", action_url="", action_label="", row_bg="grey", link_color="") -%}
+{%- set rbg = BG_FOR_COLOR.get(row_bg, "#F7F8FA") if row_bg != "grey" else "#F7F8FA" -%}
+{%- set lc = ACCENT.get(link_color, link_color) if link_color else "#3370FF" -%}
+<tr>
+  <td width="80%" valign="middle" style="background-color:{{ rbg }};border-radius:8px;padding:10px 12px;font-size:14px;color:#1D2129;">
+    {%- if url -%}<a href="{{ url }}" style="color:{{ lc }};text-decoration:none;font-weight:600;">{{ name }}</a>{%- else -%}<span style="font-weight:600;">{{ name }}</span>{%- endif -%}
+    {%- if badge_text %}　{{ badge(badge_text, badge_color) }}{% endif -%}
+  </td>
+  <td width="6"></td>
+  <td width="20%" valign="middle" align="right" style="background-color:{{ rbg }};border-radius:8px;padding:10px 12px;">
+    {%- if action_url and action_label -%}
+    <a href="{{ action_url }}" style="display:inline-block;padding:4px 12px;border-radius:5px;background-color:#FFFFFF;color:#3370FF;font-size:12px;text-decoration:none;border:1px solid #E5E6EB;">{{ action_label }}</a>
+    {%- endif -%}
+  </td>
+</tr>
+{%- endmacro -%}
+
+{# The full email document shell. ``caller()`` injects the body content.
+   ``accent`` is a theme name (red/green/blue/indigo/wathet/turquoise).
+   ``badge_text``/``badge_color`` render a header pill (e.g. FAILED 2, NEW 5). #}
+{%- macro email_shell(title, accent="blue", badge_text="", badge_color="blue", footer=None) -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{{ title }}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F2F3F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F2F3F5;">
+  <tr><td align="center" style="padding:24px 12px;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      {# Header bar #}
+      <tr>
+        <td style="background-color:{{ _accent(accent) }};padding:20px 24px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td align="left" style="font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">{{ title }}</td>
+              {%- if badge_text -%}
+              <td align="right" valign="middle">{{ badge(badge_text, badge_color) }}</td>
+              {%- endif -%}
+            </tr>
+          </table>
+        </td>
+      </tr>
+      {# Body #}
+      <tr><td style="padding:20px 24px;font-size:14px;line-height:1.6;color:#1D2129;">
+        {{ caller() }}
+      </td></tr>
+      {# Footer #}
+      <tr><td style="padding:14px 24px;border-top:1px solid #F2F3F5;background-color:#FAFBFC;">
+        <div style="font-size:12px;color:#86909C;">{{ footer if footer is not none else "⏱ " ~ _("Generated by Progress") }}</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
+{%- endmacro -%}
+
+{# A primary filled CTA button, full-width like the Feishu ``primary_filled`` button. #}
+{%- macro cta_button(url, label, accent="blue") -%}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0;">
+  <tr><td align="center">
+    <a href="{{ url }}" style="display:block;width:100%;padding:12px 24px;border-radius:6px;background-color:{{ _accent(accent) }};color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;text-align:center;">{{ label }}</a>
+  </td></tr>
+</table>
+{%- endmacro -%}
+
+{# A horizontal divider (Feishu ``hr`` equivalent). #}
+{%- macro hr() -%}
+<div style="height:0;border-top:1px solid #F2F3F5;margin:18px 0;line-height:0;font-size:0;">&nbsp;</div>
+{%- endmacro -%}
+
+{# A section heading (Feishu ``heading-4`` markdown equivalent). #}
+{%- macro section_heading(text) -%}
+<div style="font-size:15px;font-weight:700;color:#1D2129;margin:4px 0 10px 0;">{{ text }}</div>
+{%- endmacro -%}

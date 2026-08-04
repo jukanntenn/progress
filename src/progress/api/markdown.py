@@ -1,15 +1,12 @@
-from markdown_it import MarkdownIt
-from mdit_py_plugins.footnote import footnote_plugin
-from mdit_py_plugins.front_matter import front_matter_plugin
+"""Markdown rendering for the API layer (spec 09 + 12).
 
-mdit = (
-    MarkdownIt("commonmark", {"breaks": True, "html": True})
-    .use(front_matter_plugin)
-    .use(footnote_plugin)
-)
+Thin facade over :mod:`progress.utils.markdown` so API routes don't reach
+across layer boundaries. The implementation lives in ``utils/`` because both
+the CLI (report pipeline) and the API need to render markdown identically.
+"""
 
+from __future__ import annotations
 
-def render_markdown(content: str | None) -> str:
-    if not content:
-        return ""
-    return mdit.render(content)
+from progress.utils.markdown import render_inline, render_markdown
+
+__all__ = ["render_inline", "render_markdown"]

@@ -1,0 +1,30 @@
+{% block task %}{% endblock %}
+
+Language requirement: The user-configured output language is "{{ language }}". Use this language for ALL your output.
+
+Proposal context:
+- Kind: {{ kind }}
+- Number: {{ number }}
+- Title: {{ title }}
+{% block status_context %}{% if old_status %}
+- Old status: {{ old_status }}
+- New status: {{ new_status }}
+{% endif %}{% endblock %}
+
+Proposal text:
+
+{{ proposal_text }}
+
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST output ONLY a valid JSON object (no markdown, no code fences, no explanations, no text before or after the JSON).
+2. The JSON MUST contain exactly two keys: "summary" and "detail".
+3. This is a fully autonomous, non-interactive task. You MUST NOT ask questions, request permission, seek clarification, propose to write to files, invoke tools, or wait for user input. Produce the JSON immediately and exit.
+
+Required JSON structure:
+{
+  "summary": "[2-4 sentence plain-text summary]",
+  "detail": "[1-3 paragraph detailed explanation, plain text]"
+}
+
+Content requirements:
+{% block content_requirements %}{% endblock %}

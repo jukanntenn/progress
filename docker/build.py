@@ -2,8 +2,8 @@
 """Build multi-architecture Docker images for Progress using Docker buildx.
 
 Builds a single unified image containing:
-  - FastAPI backend (API, CLI, scheduler)
-  - Next.js frontend (standalone)
+  - FastAPI backend (API, CLI)
+  - Vite static SPA (served by Caddy, no node runtime)
   - Caddy reverse proxy
   - s6-overlay process manager
 
@@ -24,8 +24,9 @@ Exit codes:
 
 import argparse
 import logging
-import os
+from pathlib import Path
 import platform
+import re as _re
 import subprocess
 import sys
 
@@ -35,6 +36,12 @@ ALL_PLATFORMS = ("linux/amd64", "linux/arm64")
 PLATFORM_ALIASES = {
     "amd64": "linux/amd64",
     "arm64": "linux/arm64",
+}
+
+REGISTRY_ALIASES = {
+    "ghcr": ("ghcr.io", True),
+    "dockerhub": ("docker.io", True),
+    "docker": ("docker.io", True),
 }
 
 QEMU_ARCH_MAP = {
@@ -74,7 +81,7 @@ def parse_args():
     parser.add_argument(
         "--registry",
         default=DEFAULT_REGISTRY,
-        help=f"Container registry (default: {DEFAULT_REGISTRY})",
+        help="Container registry for --push. Aliases: ghcr, dockerhub, docker. Or a host (ghcr.io, registry.local:5000). Required for push, ignored for local load.",
     )
     parser.add_argument(
         "--tags",
@@ -87,7 +94,13 @@ def parse_args():
         "--platform",
         action="append",
         default=[],
-        help="Target platform (amd64 or arm64). Repeatable. Defaults to all platforms.",
+        help="Target platform (amd64 or arm64). Repeatable.",
+    )
+    parser.add_argument(
+        "--all-platforms",
+        action="store_true",
+        default=False,
+        help="Build all target platforms (amd64+arm64).",
     )
     parser.add_argument(
         "--no-cache",
@@ -112,20 +125,67 @@ def env_error(msg, hint=None):
     sys.exit(2)
 
 
-def resolve_platforms(platform_args):
-    resolved = []
-    for p in platform_args:
-        if p in PLATFORM_ALIASES:
-            resolved.append(PLATFORM_ALIASES[p])
-        elif p in ALL_PLATFORMS:
-            resolved.append(p)
-        else:
-            env_error(
-                f"Unknown platform: {p}",
-                f"Supported platforms: {', '.join(PLATFORM_ALIASES.keys())}",
-            )
-    resolved = list(dict.fromkeys(resolved))
-    return resolved if resolved else list(ALL_PLATFORMS)
+def _resolve_registry(value: str) -> tuple[str, bool]:
+    """Resolve --registry into (full_registry, needs_owner).
+
+    Returns (host, needs_owner). When needs_owner is True the caller must append
+    the git-derived owner; when False the value is a flat host or already
+    carries a namespace.
+    """
+    if value in REGISTRY_ALIASES:
+        host, needs_owner = REGISTRY_ALIASES[value]
+        return host, needs_owner
+    if "/" in value:
+        return value, False
+    if ":" in value or "." in value or value == "localhost":
+        return value, False
+    env_error(
+        f"Unknown registry alias or host: {value!r}",
+        "Use an alias (ghcr/dockerhub/docker), a host (ghcr.io, registry.local:5000), "
+        "or a full path with namespace (ghcr.io/owner).",
+    )
+    sys.exit(2)
+
+
+def _resolve_owner_from_git() -> str:
+
+    url = ""
+    try:
+        url = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception as e:
+        env_error(
+            f"Could not derive owner from git remote: {e}",
+            "Pass --registry with a full path (e.g. --registry ghcr.io/youruser).",
+        )
+    m = _re.match(r"git@github\.com:([^/]+)/", url) or _re.match(r"https://github\.com/([^/]+)/", url)
+    if not m:
+        env_error(
+            f"git remote {url!r} is not a GitHub repo; cannot derive owner",
+            "Pass --registry with a full path.",
+        )
+        sys.exit(2)
+    return m.group(1)
+
+
+def resolve_platforms(args) -> list[str]:
+    if getattr(args, "all_platforms", False):
+        return list(ALL_PLATFORMS)
+    if args.platform:
+        resolved = []
+        for p in args.platform:
+            if p in PLATFORM_ALIASES:
+                resolved.append(PLATFORM_ALIASES[p])
+            elif p in ALL_PLATFORMS:
+                resolved.append(p)
+            else:
+                env_error(
+                    f"Unsupported platform: {p!r}",
+                    f"Supported: {', '.join(PLATFORM_ALIASES.keys())}",
+                )
+        return resolved
+    return [detect_host_platform()]
 
 
 def detect_host_platform():
@@ -184,9 +244,7 @@ def check_builder_platforms(target_platforms):
         if stripped.startswith("Name:"):
             builder_name = stripped.split(":", 1)[1].strip()
         elif stripped.startswith("Platforms:"):
-            builder_platforms = [
-                p.strip() for p in stripped.split(":", 1)[1].split(",")
-            ]
+            builder_platforms = [p.strip() for p in stripped.split(":", 1)[1].split(",")]
 
     host_platform = detect_host_platform()
     missing = [p for p in target_platforms if p not in builder_platforms]
@@ -196,7 +254,7 @@ def check_builder_platforms(target_platforms):
     if foreign_platforms:
         for p in foreign_platforms:
             arch = QEMU_ARCH_MAP.get(p)
-            if arch and not os.path.exists(f"/proc/sys/fs/binfmt_misc/qemu-{arch}"):
+            if arch and not Path(f"/proc/sys/fs/binfmt_misc/qemu-{arch}").exists():
                 env_error(
                     f"QEMU binfmt for {arch} is not registered — required for cross-platform build ({p}).",
                     f"Run: docker run --rm --privileged tonistiigi/binfmt --install {arch}",
@@ -222,9 +280,7 @@ def check_builder_platforms(target_platforms):
         for line in result.stdout.splitlines():
             stripped = line.strip()
             if stripped.startswith("Platforms:"):
-                builder_platforms = [
-                    p.strip() for p in stripped.split(":", 1)[1].split(",")
-                ]
+                builder_platforms = [p.strip() for p in stripped.split(":", 1)[1].split(",")]
         missing = [p for p in target_platforms if p not in builder_platforms]
 
     if missing:
@@ -246,30 +302,36 @@ def check_environment(target_platforms):
 
 
 def build_image(args):
-    target_platforms = resolve_platforms(args.platform)
+    if args.push and not args.registry:
+        env_error(
+            "--registry is required when using --push.",
+            "Example: --push --registry ghcr.io/youruser",
+        )
+    target_platforms = resolve_platforms(args)
 
     if args.push:
         platforms_to_build = target_platforms
     else:
         host_platform = detect_host_platform()
-        if host_platform in target_platforms:
-            platforms_to_build = [host_platform]
-        else:
-            platforms_to_build = [target_platforms[0]]
+        platforms_to_build = [host_platform] if host_platform in target_platforms else [target_platforms[0]]
 
     builder_name = check_environment(platforms_to_build)
 
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    dockerfile_path = os.path.join(project_root, DOCKERFILE)
+    project_root = Path(__file__).resolve().parent.parent
+    dockerfile_path = project_root / DOCKERFILE
+
+    registry, needs_owner = _resolve_registry(args.registry)
+    if needs_owner:
+        owner = _resolve_owner_from_git()
+        registry_prefix = f"{registry}/{owner}"
+    else:
+        registry_prefix = registry
 
     all_tags = args.tags or ["latest"]
     full_image_names = []
     cmd = ["docker", "buildx", "build"]
     for tag in all_tags:
-        if args.push:
-            full_tag = f"{args.registry}/{IMAGE_NAME}:{tag}"
-        else:
-            full_tag = f"{IMAGE_NAME}:{tag}"
+        full_tag = f"{registry_prefix}/{IMAGE_NAME}:{tag}"
         full_image_names.append(full_tag)
         cmd.extend(["--tag", full_tag])
 
@@ -277,7 +339,7 @@ def build_image(args):
 
     if args.push:
         cmd.append("--push")
-        cache_ref = f"{args.registry}/{IMAGE_NAME}:cache"
+        cache_ref = f"{registry_prefix}/{IMAGE_NAME}:cache"
         if not args.no_cache:
             cmd.extend(["--cache-from", f"type=registry,ref={cache_ref}"])
             cmd.extend(["--cache-to", f"type=registry,ref={cache_ref},mode=max"])

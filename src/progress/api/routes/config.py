@@ -1,141 +1,267 @@
-"""Config API routes — backed by the database config blob.
+"""Config endpoints (spec 12).
 
-The TOML file seeds the blob on first run; thereafter the blob is the single
-source of truth and these endpoints read/write it. Writes are guarded by
-optimistic locking (``version``) and secrets are masked in every GET response.
+Three Web-class concerns surfaced over HTTP:
+
+- ``GET /api/v1/config`` — full config dump with secrets masked (SecretStr
+  serializes to ``********``).
+- ``GET /api/v1/config/schema`` — per-section JSON Schemas for the frontend
+  config editor.
+- ``PUT /api/v1/config/{section}`` — write a section's payload after schema
+  validation (atomic single-row upsert; legacy ``replace_*`` endpoints gone).
+- ``POST /api/v1/config/reload`` — re-read DB config into ``app.state.cfg``
+  so config edits take effect without a restart.
+
+Per spec 02, SecretStr fields are automatically masked via ``model_dump(mode="json")``
+when the data is round-tripped through a Pydantic model. No hand-written masking.
 """
 
-from typing import Any
-import pytz
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from __future__ import annotations
 
-from ...config import OwnerConfig, RepositoryConfig
-from ...config_store import (
-    ConfigVersionConflict,
-    get_config_json_schema,
-    load_app_config,
-    mask_secrets,
-    save_app_config,
-    validate_app_config,
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from progress.api.auth import get_current_user
+from progress.api.routes._limiter import limiter
+from progress.api.schemas import (
+    AllConfigResponse,
+    ConfigReloadResponse,
+    ConfigSchemaResponse,
+    ConfigSectionResponse,
+    ConfigUpdateRequest,
+    LanguageResponse,
+    LanguageUpdateRequest,
+    TestChannelResult,
+    TestNotificationResponse,
 )
-from ...contrib.repo.models import GitHubOwner
-from ...contrib.repo.owner import replace_owners
-from ...contrib.repo.repository import replace_repositories
-from ...db.models import Repository
-from ...errors import ConfigException
+from progress.cli.notifications.config import build_channels
+from progress.cli.notifications.dispatcher import Dispatcher
+from progress.cli.notifications.events import TestNotificationEvent
+from progress.cli.notifications.renderer import JinjaRenderer
+from progress.config.loader import merge_db_config
+from progress.config.root import CoreConfig, _normalize_bcp47
+from progress.config.schema import get_config_json_schema
+from progress.db import get_all_config, get_config, set_config
+from progress.errors import ConfigException
+from progress.integrations.registry import discover_integrations
+from progress.observability import record_business_event
 
-router = APIRouter(prefix="/config", tags=["config"])
+logger = logging.getLogger(__name__)
 
-
-class ConfigResponse(BaseModel):
-    data: dict[str, Any]
-    version: int
-
-
-class ConfigSaveRequest(BaseModel):
-    config: dict[str, Any]
-    version: int
+router = APIRouter(tags=["config"], dependencies=[Depends(get_current_user)])
 
 
-class ConfigValidateRequest(BaseModel):
-    config: dict[str, Any]
+@router.get(
+    "/config",
+    response_model=AllConfigResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_all_sections() -> AllConfigResponse:
+    """Return ``{core, plugins}`` with secrets masked (spec 02)."""
+    all_cfg = await get_all_config()
+    core_raw = all_cfg.get("core", {})
+    plugins = {k: v for k, v in all_cfg.items() if k != "core"}
+
+    core_masked = _mask_core_section(core_raw)
+    for name, plugin_data in plugins.items():
+        plugins[name] = _mask_plugin_section(name, plugin_data)
+    return AllConfigResponse(core=core_masked, plugins=plugins)
 
 
-class ConfigValidateResponse(BaseModel):
-    success: bool
-    error: str | None = None
+@router.get(
+    "/config/language",
+    response_model=LanguageResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_language(request: Request) -> LanguageResponse:
+    """Return the configured UI/notifications language (``core.language``).
+
+    The SPA fetches this on boot so its initial locale matches the server
+    config, closing the gap where the web UI stayed English even though
+    ``core.language = zh-Hans`` was set (the SPA previously only honoured
+    localStorage / the browser's Accept-Language).
+    """
+    cfg: CoreConfig = request.app.state.cfg
+    return LanguageResponse(language=cfg.language)
 
 
-class TimezonesResponse(BaseModel):
-    timezones: list[str]
+@router.put(
+    "/config/language",
+    response_model=LanguageResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("30 per minute")
+async def set_language(body: LanguageUpdateRequest, request: Request) -> LanguageResponse:
+    """Update ``core.language`` atomically (used by the language switcher).
+
+    Merges the new value into the existing ``[core]`` section so the rest of
+    the core config (tokens, markpost url, …) is preserved, then refreshes
+    ``app.state.cfg`` so the LocaleMiddleware picks up the new language on the
+    very next request — no restart needed.
+    """
+    new_language = _normalize_bcp47(body.language.strip()) if body.language else "en"
+    core = await get_config("core")
+    core = core or {}
+    if core.get("language") == new_language:
+        return LanguageResponse(language=new_language)
+    core["language"] = new_language
+    try:
+        await set_config("core", core)
+    except ConfigException as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    cfg: CoreConfig = request.app.state.cfg
+    try:
+        # Update only the language field on the live config — a full
+        # ``merge_db_config(cfg, core)`` rebuild would overwrite any runtime-only
+        # cfg state with DB defaults, and the old partial merge masked SecretStr
+        # fields (model_dump mode="json"). ``model_copy(update=...)`` touches
+        # only language, leaving secrets (and test-time overrides) intact.
+        request.app.state.cfg = cfg.model_copy(update={"language": new_language})
+    except Exception as e:
+        logger.warning("language update merge failed; keeping current cfg: %s", e)
+    record_business_event(
+        "progress.config.language_changed",
+        attributes={"language": new_language},
+    )
+    return LanguageResponse(language=new_language)
 
 
-@router.get("", response_model=ConfigResponse)
-async def get_config():
-    loaded = await load_app_config()
-    if loaded is None:
+@router.get(
+    "/config/schema",
+    response_model=ConfigSchemaResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_schema() -> ConfigSchemaResponse:
+    """Return per-section JSON Schemas for the frontend config editor."""
+    return ConfigSchemaResponse(schemas=get_config_json_schema())
+
+
+@router.put(
+    "/config/{section}",
+    response_model=ConfigSectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("30 per minute")
+async def put_section(
+    section: str,
+    body: ConfigUpdateRequest,
+    request: Request,
+) -> ConfigSectionResponse:
+    """Validate ``data`` against the section's schema and upsert it."""
+    if not _is_known_section(section):
         raise HTTPException(
-            status_code=409,
-            detail="Application config has not been seeded.",
+            status_code=404,
+            detail=f"unknown config section: {section}",
         )
-    data, version = loaded
-    return ConfigResponse(data=mask_secrets(data), version=version)
-
-
-@router.post("", response_model=ConfigResponse)
-async def save_config(request: ConfigSaveRequest):
     try:
-        merged, version = await save_app_config(request.config, request.version)
-    except ConfigVersionConflict as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        await set_config(section, body.data)
     except ConfigException as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return ConfigResponse(data=mask_secrets(merged), version=version)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    fresh = await get_config(section)
+    masked = _mask_plugin_section(section, fresh) if section != "core" else _mask_core_section(fresh)
+    return ConfigSectionResponse(section=section, data=masked)
 
 
-@router.post("/validate", response_model=ConfigValidateResponse)
-async def validate_config(request: ConfigValidateRequest):
+@router.post(
+    "/config/reload",
+    response_model=ConfigReloadResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("30 per minute")
+async def reload_config(request: Request) -> ConfigReloadResponse:
+    """Re-read DB-stored core config and refresh ``app.state.cfg``."""
+    cfg: CoreConfig = request.app.state.cfg
+    db_core = await get_config("core")
+    if db_core:
+        try:
+            request.app.state.cfg = merge_db_config(cfg, db_core)
+        except Exception as e:
+            logger.warning("config reload merge failed; keeping current cfg: %s", e)
+            return ConfigReloadResponse(status="noop", section="core")
+    return ConfigReloadResponse(status="ok", section="core")
+
+
+@router.post(
+    "/config/notifications/test",
+    response_model=TestNotificationResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("3 per minute")
+async def test_notifications(request: Request) -> TestNotificationResponse:
+    """Send a test notification to all enabled channels; report per-channel results.
+
+    Used by the config console to verify channel reachability. Renders a fixed
+    i18n test message (localized per the request's Accept-Language via
+    ``LocaleMiddleware``) and dispatches via the same ``Dispatcher`` the report
+    pipeline uses.
+    """
+    cfg: CoreConfig = request.app.state.cfg
+    session = getattr(request.app.state, "session", None)
+    channels = build_channels(cfg.notification, session=session)
+    if not channels:
+        return TestNotificationResponse(results=[], summary="no_channels")
+    event = TestNotificationEvent()
+    renderer = JinjaRenderer()
+    dispatcher = Dispatcher(channels, renderer)
+    outcome = await dispatcher.dispatch(event)
+    for r in outcome.results:
+        record_business_event(
+            "progress.notifications.test",
+            attributes={"channel": r.channel, "ok": str(r.ok)},
+        )
+    results = [TestChannelResult(channel=r.channel, ok=r.ok, error=r.error) for r in outcome.results]
+    summary = "ok" if outcome.ok else "partial_failure"
+    return TestNotificationResponse(results=results, summary=summary)
+
+
+def _is_known_section(section: str) -> bool:
+    if section == "core":
+        return True
+    return section in discover_integrations()
+
+
+def _mask_core_section(data: dict) -> dict:  # ty:ignore[missing-type-argument]
+    """Validate ``data`` through ``CoreConfig`` so SecretStr fields auto-mask.
+
+    Per spec 02, ``SecretStr.model_dump(mode="json")`` emits ``**********``
+    automatically. We merge the DB data into a default CoreConfig dump first
+    so that any missing keys get their defaults, then validate the result.
+    """
+    if not data:
+        return CoreConfig().model_dump(mode="json")
+    merged = _deep_merge(CoreConfig().model_dump(mode="json"), data)
     try:
-        await validate_app_config(request.config)
-    except ConfigException as e:
-        return ConfigValidateResponse(success=False, error=str(e))
-    return ConfigValidateResponse(success=True)
+        return CoreConfig.model_validate(merged).model_dump(mode="json")
+    except Exception as e:
+        logger.warning("core config validation failed; returning raw data: %s", e)
+        return data
 
 
-@router.get("/schema")
-def get_schema():
-    return get_config_json_schema()
+def _mask_plugin_section(name: str, data: dict) -> dict:  # ty:ignore[missing-type-argument]
+    """Mask secrets in a plugin section using its registered config schema."""
+    integration_cls = discover_integrations().get(name)
+    if integration_cls is None:
+        return data
+    schema = getattr(integration_cls, "config_schema", None)
+    if schema is None:
+        return data
+    try:
+        validated = schema.model_validate(data)
+        return validated.model_dump(mode="json")
+    except Exception as e:
+        logger.warning("plugin %s payload failed schema validation; returning raw: %s", name, e)
+        return data
 
 
-@router.get("/timezones", response_model=TimezonesResponse)
-def get_timezones():
-    return TimezonesResponse(timezones=sorted(pytz.all_timezones))
+def _deep_merge(base: dict, overlay: dict) -> dict:  # ty:ignore[missing-type-argument]
+    out = dict(base)
+    for k, v in overlay.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
 
 
-# --- table-backed lists (repos / owners) ----------------------------------
-# These live in the repositories/github_owners tables, not the config blob, so
-# they have their own read/replace endpoints separate from the blob above.
-
-
-class RepoView(BaseModel):
-    id: int
-    name: str
-    url: str
-    branch: str
-    enabled: bool
-
-
-class OwnerView(BaseModel):
-    id: int
-    owner_type: str
-    name: str
-    enabled: bool
-
-
-@router.get("/repos", response_model=list[RepoView])
-async def list_repos():
-    return [
-        RepoView(id=r.id, name=r.name, url=r.url, branch=r.branch, enabled=r.enabled)
-        for r in await Repository.all().order_by("id")
-    ]
-
-
-@router.put("/repos", response_model=list[RepoView])
-async def replace_repos_route(request: Request, repos: list[RepositoryConfig]):
-    await replace_repositories(repos, request.app.state.config.github.protocol)
-    return await list_repos()
-
-
-@router.get("/owners", response_model=list[OwnerView])
-async def list_owners():
-    return [
-        OwnerView(id=o.id, owner_type=o.owner_type, name=o.name, enabled=o.enabled)
-        for o in await GitHubOwner.all().order_by("id")
-    ]
-
-
-@router.put("/owners", response_model=list[OwnerView])
-async def replace_owners_route(owners: list[OwnerConfig]):
-    await replace_owners(owners)
-    return await list_owners()
+__all__ = ["router"]

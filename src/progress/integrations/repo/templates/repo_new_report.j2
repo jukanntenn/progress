@@ -1,0 +1,37 @@
+{# repo discovery report section (spec repo §10.2 / spec 09 landing matrix).
+
+Renders newly discovered repositories under a tracked owner. This is the
+``report_type=repo_new`` variant of the repo integration section, distinct from
+the per-repo update section (``repo_report.j2``): there are no commits/releases,
+only an owner heading and the discovered repos with their README AI analysis.
+
+This template produces **markdown** rendered with ``autoescape=False``: the
+output is later sanitized by nh3 (backend) and rehype-sanitize (frontend),
+so external text (description) and trusted AI output (readme_summary/detail)
+are inserted verbatim as markdown content. Literal HTML (``<details>``) stays
+intact as markdown-native HTML.
+#}
+{% for repo in new_repos %}
+### [{{ repo.name }}]({{ repo.url }})
+
+<small>🗓️ {{ repo.discovered_at or _("Unknown") }}</small>
+
+{% if repo.description %}> {{ repo.description }}
+
+{% endif %}
+{% if repo.readme_summary %}{{ repo.readme_summary }}
+
+{% endif %}
+{% if repo.readme_detail %}<details>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
+
+{{ repo.readme_detail }}
+
+</details>
+{% endif %}
+{% if not loop.last %}
+
+---
+
+{% endif %}
+{% endfor %}

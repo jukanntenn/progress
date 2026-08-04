@@ -46,7 +46,6 @@ layer); a regression test was added.**
   web UI; `sqlite3` (read-only) for the DB; `curl` for direct API probes; the
   CLI's own `_resolve_runtime_config()` to exercise the CLI code path
   network-free (the seed happens there, before any GitHub access).
-- **Screenshots:** `docs/verification-assets/01–08*.png`.
 
 ### Seed file initial values (`verification-config.toml`)
 
@@ -96,8 +95,6 @@ The blob correctly **excludes** `data_dir`/`workspace_dir`/`repos`/`owners`
 ran `create_app()`, whose seed was a no-op (already seeded), and `GET
 /api/v1/config` returned the same values with `version=1`.
 
-![Initial seeded config page](verification-assets/01-initial-seeded.png)
-
 ### Scenario 3–4 — Web edit persists; file untouched (Claims 2 & 3) ✅
 
 Via the web UI, `analysis.timeout` was changed `555 → 777` and saved.
@@ -106,9 +103,6 @@ Via the web UI, `analysis.timeout` was changed `555 → 777` and saved.
 |---|---|---|
 | File (`verification-config.toml`) | **555** (unchanged) | — |
 | DB blob | **777** | 1 → **2** |
-
-![Mid-edit, unsaved indicator](verification-assets/02-mid-edit-unsaved.png)
-![Post-save, version 2](verification-assets/03-post-save-v2.png)
 
 The web write went to the DB and bumped the version; the file was not modified.
 
@@ -122,8 +116,6 @@ table and the section's Save (PUT `/api/v1/config/repos`). The seed repo was
 id=1 verif-org/seed-repo   (preserved)
 id=2 verif-org/second-repo (added via web)
 ```
-
-![Repos/owners modified](verification-assets/06-repos-owners-modified.png)
 
 ### Scenario 6 — Web edit owners ✅ PASS (defect found, then fixed)
 
@@ -175,9 +167,6 @@ version=4 | gh_token = ghp_ROTATED_TOKEN_BBBB (preserved) | timeout = 778
 GET gh_token = ********   # still masked
 ```
 
-![Masked password field](verification-assets/04-secret-masked-field.png)
-![Save toast](verification-assets/05-save-toast.png)
-
 ### Scenario 9–10 — Optimistic lock & validation ✅
 
 ```
@@ -221,8 +210,6 @@ an admin export.
 
 After the CLI import changed the DB to `version=5 / timeout=999`, reloading the
 web UI showed exactly those DB values — the web reads the DB, not the file.
-
-![Web reflects DB after CLI import](verification-assets/08-web-reflects-db-after-import.png)
 
 `version` monotonically incremented on every successful write: **1 → 2 → 3 →
 4 → 5** (three web saves, one CLI import).

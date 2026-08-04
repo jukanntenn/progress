@@ -1,0 +1,119 @@
+# =============================================================================
+# Progress Web-class + Plugin Configuration Seed (spec 02)
+# =============================================================================
+#
+# This is the Web-class configuration SEED file (spec 02). It mirrors the DB
+# ``config`` table layout: every top-level table here is one ``section`` row.
+#
+# Copy this to ``config.db.toml`` (next to your ``config.toml``) for first
+# deploy or testing. On startup it is imported into the DB:
+#   - DB > seed > code defaults (DB values win over the seed).
+#   - In production, operators must ensure ``config.db.toml`` does NOT exist
+#     (the DB is the single source of truth; the Web UI edits it).
+#   - ``config.db.toml`` is gitignored.
+#
+# All secret fields (``gh_token``, ``api_key``, ``password``, ``webhook_url``,
+# ``dsn``, markpost ``url``) are ``pydantic.SecretStr``: write the real value
+# here; the Web UI and ``GET /api/v1/config`` serialize them to ``**********``
+# automatically.
+#
+# Env-var overrides (prefix ``PROGRESS_``, separator ``__``) still apply on top.
+
+# -----------------------------------------------------------------------------
+# [core] — user preferences, credentials, business tuning (spec 02)
+# -----------------------------------------------------------------------------
+[core]
+language = "en"                       # app language for reports/notifications/UI
+timezone = "UTC"                      # IANA timezone
+
+[core.github]
+gh_token = ""                         # SecretStr; empty → GitHub tracking disabled + warning
+
+[core.analysis]
+provider = ""                         # Pydantic AI provider, e.g. "anthropic" / "openai"
+model = ""                            # e.g. "claude-sonnet-4"; empty → provider default
+api_key = ""                          # SecretStr; empty → AI analysis disabled (truncation fallback)
+base_url = ""                         # custom endpoint for OpenAI-compatible services; empty → provider default
+language = "en"                       # AI output language
+
+[core.markpost]
+enabled = false                       # explicit on/off
+url = ""                              # SecretStr; enabled=true but empty → disabled + warning
+max_batch_size = 1048576              # upstream MarkPost size limit
+
+# Notification channels — classic discriminated union (spec 10).
+# Each entry has a ``type`` discriminator; secrets are SecretStr.
+[[core.notification.channels]]
+type = "console"
+enabled = true
+
+[[core.notification.channels]]
+type = "email"
+enabled = false
+host = "smtp.example.com"
+port = 465
+user = "sender@example.com"
+password = ""                         # SecretStr
+from_addr = "progress@example.com"
+recipient = ["alice@example.com", "bob@example.com"]  # multiple recipients
+starttls = false
+ssl = true
+
+[[core.notification.channels]]
+type = "feishu"
+enabled = false
+webhook_url = ""                      # SecretStr
+
+[core.observability.bugsink]
+dsn = ""                              # SecretStr; empty → error capture disabled + warning
+environment = "production"
+
+[core.web]
+base_url = ""                         # public base URL for report back-links
+
+# -----------------------------------------------------------------------------
+# [repo] — repo integration plugin config (spec 02/06)
+# -----------------------------------------------------------------------------
+[repo]
+first_run_lookback_commits = 3        # commits to look back on first run of a repo
+
+[[repo.repos]]
+url = "vitejs/vite"
+branch = "main"
+enabled = true
+
+[[repo.repos]]
+url = "facebook/react"
+
+[[repo.owners]]
+type = "organization"                 # "organization" | "user"
+name = "bytedance"
+
+[[repo.owners]]
+type = "user"
+name = "torvalds"
+
+# -----------------------------------------------------------------------------
+# [changelog] — changelog integration plugin config (spec 02/06)
+# -----------------------------------------------------------------------------
+[[changelog.trackers]]
+name = "Vite"
+url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
+parser_type = "markdown_heading"      # "markdown_heading" | "html_chinese_version"
+enabled = true
+
+# -----------------------------------------------------------------------------
+# [proposal] — proposal integration plugin config (spec 02/06)
+# -----------------------------------------------------------------------------
+# ``trackers`` is the set of built-in proposal kinds to enable.
+[proposal]
+trackers = ["eip", "erc", "pep", "rfc", "dep"]
+
+# -----------------------------------------------------------------------------
+# [feed] — feed integration plugin config (spec 02/06)
+# -----------------------------------------------------------------------------
+# Miniflux RSS reader connection. Empty ``base_url`` → feed integration
+# disabled + warning (zero config). See specs/integrations/feed.md.
+[feed]
+base_url = ""                         # Miniflux instance URL; empty → disabled
+api_key = ""                          # SecretStr; base_url set but empty → disabled

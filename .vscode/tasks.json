@@ -10,7 +10,7 @@
         "cwd": "${workspaceFolder}",
         "env": {
           "PYTHONPATH": "${workspaceFolder}/src",
-          "CONFIG_FILE": "${workspaceFolder}/config.toml"
+          "PROGRESS_STATE_HOME": "${workspaceFolder}/data"
         }
       },
       "presentation": {

@@ -1,0 +1,39 @@
+{% from "_email.j2" import email_shell, badge, cta_button, hr, section_heading %}
+{% set proposals = proposals or [] %}
+{% set visible = proposals[:5] %}
+{% set rest = proposals[5:] %}
+{% set status_color = {"Final": "green", "Review": "orange", "Draft": "grey", "Idea": "grey", "Withdrawn": "red", "Rejected": "red", "Stagnant": "grey", "Living": "blue"} %}
+{% set kind_color = {"EIP": "blue", "ERC": "purple", "PEP": "turquoise", "RFC": "indigo", "DEP": "orange"} %}
+{% call email_shell(title, "blue", "NEW " ~ (proposals | length), "blue") %}
+{{ section_heading("📄 " ~ _("Proposal List")) }}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:13px;margin:4px 0;">
+  <thead><tr>
+    <th width="55%" align="left" style="background-color:#F7F8FA;color:#86909C;font-weight:600;padding:10px 12px;border-radius:6px 0 0 6px;">{{ _("Proposal") }}</th>
+    <th width="15%" align="left" style="background-color:#F7F8FA;color:#86909C;font-weight:600;padding:10px 12px;">{{ _("Type") }}</th>
+    <th width="30%" align="left" style="background-color:#F7F8FA;color:#86909C;font-weight:600;padding:10px 12px;border-radius:0 6px 6px 0;">{{ _("Status") }}</th>
+  </tr></thead>
+  <tbody>
+  {% for p in visible %}
+  {%- set status_text = (p.old_status ~ " → " ~ p.new_status) if p.old_status else (p.new_status ~ " (" ~ _("new") ~ ")") -%}
+  {%- set sc = status_color.get(p.new_status, "grey") -%}
+  {%- set kc = kind_color.get(p.kind, "grey") -%}
+  <tr>
+    <td width="55%" valign="middle" style="padding:10px 12px;border-bottom:1px solid #F2F3F5;color:#1D2129;">
+      {%- if p.file_url -%}<a href="{{ p.file_url }}" style="color:#3370FF;text-decoration:none;">#{{ p.number }} {{ p.title or p.file_name }}</a>{%- else -%}#{{ p.number }} {{ p.title or p.file_name }}{%- endif -%}
+    </td>
+    <td width="15%" valign="middle" style="padding:10px 12px;border-bottom:1px solid #F2F3F5;">{{ badge(p.kind, kc) }}</td>
+    <td width="30%" valign="middle" style="padding:10px 12px;border-bottom:1px solid #F2F3F5;">{{ badge(status_text, sc) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if rest %}
+<div style="background-color:#F7F8FA;border:1px solid #E5E6EB;border-radius:6px;padding:10px 12px;font-size:13px;color:#4E5969;margin-top:8px;">
+  <div style="font-weight:600;color:#86909C;margin-bottom:4px;">▸ {{ _("Expand remaining") }} {{ rest | length }} {{ _("proposals") }}</div>
+  {% for p in rest %}<span style="margin-right:8px;">#{{ p.number }} {{ p.title or p.file_name }}</span>{% endfor %}
+</div>
+{% endif %}
+{% if markpost_url %}
+{{ cta_button(markpost_url, _("View Proposal Details") ~ "（Markpost）", "blue") }}
+{% endif %}
+{% endcall %}

@@ -1,91 +1,147 @@
+"""FastAPI app factory + lifespan + middleware registration (spec 12).
+
+The api package is the symmetric HTTP entry point alongside ``cli/``. It is
+**self-contained**: lifespan owns DB / observability / aiohttp session; no
+application-layer auth (per spec 12, network boundary is trusted).
+
+``create_app(config_path)`` is the only public entry; ``api/main.py`` calls it
+at ASGI load time. Importing this module does NOT construct the app — that
+fixes the legacy bug where ``main.py:3 app = create_app()`` would raise at
+import time when the config file was missing or invalid.
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+import logging
 import os
-from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+import aiohttp
+from fastapi import FastAPI
+import sentry_sdk
+
+from progress import __version__
+from progress.api.auth_bootstrap import bootstrap_auth
+from progress.api.errors import register_exception_handlers
+from progress.api.middleware import register_middleware
+from progress.api.routes import register_routers
+from progress.cli.git.local import set_git_proxy
+from progress.config.loader import apply_db_and_seed, load_config
+from progress.config.root import CoreConfig
+from progress.db import close_db, init_db
+from progress.observability import (
+    instrument_fastapi_app,
+    setup_observability,
+    shutdown_observability,
+)
+from progress.utils.http import session_factory
+
+logger = logging.getLogger(__name__)
+
+DEV_CORS_ENV = "PROGRESS_DEV_CORS"
+CONFIG_PATH_ENV = "PROGRESS_CONFIG"
 
 
-@asynccontextmanager
-async def _lifespan(app: FastAPI):
-    """Application lifespan: initialize DB, seed config, and tear down on exit.
+def _config_path_from_env() -> str | None:
+    """The Ansible-class config path handed to a uvicorn worker process.
 
-    DB init/seeding runs here (inside the running event loop) so tortoise-orm
-    binds its connections to the serving loop. The prior code did this work
-    eagerly at app construction; the observable ordering is preserved — the DB
-    is ready before any request is served, and closed on shutdown.
+    ``progress serve`` runs uvicorn by import string
+    (``uvicorn.run("progress.api.main:app")``), so the worker is a fresh
+    process that re-imports ``main.py`` and calls ``create_app()`` with no
+    arguments. The ``-c`` value from the serve command would otherwise be
+    lost and the app would fall back to the zero-config default
+    ``state_home="data"``. The serve command exports it through this env var
+    so the worker reconstructs the same app.
     """
-    from ..config import Config
-    from ..config_store import (
-        build_runtime_config,
-        load_app_config,
-        migrate_blob_schema,
-        seed_app_config_if_needed,
-        seed_lists_if_needed,
+    value = os.environ.get(CONFIG_PATH_ENV, "").strip()
+    return value or None
+
+
+def create_app(config_path: str | None = None) -> FastAPI:
+    """Build a FastAPI app. Construction is deferred — no import-time crashes.
+
+    The app's lifespan wires up DB / observability / aiohttp session in the
+    right order (spec 12): observability BEFORE the aiohttp session so OTel's
+    aiohttp instrumentor attaches a TraceConfig to the session.
+
+    ``config_path`` defaults to the ``PROGRESS_CONFIG`` env var so the
+    ``progress serve`` uvicorn worker picks up the ``-c`` value from the
+    command line (the worker re-imports ``main.py`` and cannot receive the
+    arg directly).
+    """
+    if config_path is None:
+        config_path = _config_path_from_env()
+    app = FastAPI(
+        title="Progress API",
+        description="GitHub multi-repo project tracking tool.",
+        version=_progress_version(),
+        lifespan=_lifespan_factory(config_path),
     )
-    from ..db import close_db, create_tables, init_db, resolve_db_path
-    from ..telemetry import setup_observability
-
-    config_obj = app.state.config
-    config_file = app.state.config_file
-    db_path = resolve_db_path(config_obj.data_dir, config_file)
-    await init_db(db_path)
-    await create_tables()
-    await seed_app_config_if_needed(config_obj.model_dump(mode="json"))
-    await migrate_blob_schema()
-    await seed_lists_if_needed(config_obj)
-    loaded = await load_app_config()
-    if loaded is not None:
-        blob_data, _ = loaded
-        app.state.config = build_runtime_config(
-            blob_data,
-            {
-                "data_dir": config_obj.data_dir,
-                "workspace_dir": config_obj.workspace_dir,
-                "observability": config_obj.observability.model_dump(mode="json"),
-            },
-        )
-        app.state.timezone = app.state.config.get_timezone()
-
-    setup_observability(config_obj.observability, component="api")
-
-    try:
-        yield
-    finally:
-        from ..telemetry import shutdown_observability
-
-        shutdown_observability()
-        await close_db()
-
-
-def create_app(config_obj=None) -> FastAPI:
-    """Build the FastAPI app.
-
-    DB initialization and config seeding run in the lifespan (on startup),
-    preserving the prior behavior where they completed before the first
-    request. The app object itself is constructed synchronously here; the
-    ``config_obj`` is stashed on ``app.state`` for the lifespan to consume.
-    """
-    from ..config import Config
-    from ..telemetry import instrument_fastapi_app
-
-    if config_obj is None:
-        config_file = os.environ.get("CONFIG_FILE", "/app/config.toml")
-        config_obj = Config.load_from_file(config_file)
-    else:
-        config_file = None
-
-    app = FastAPI(title="Progress API", lifespan=_lifespan)
-    app.state.config = config_obj
-    app.state.config_file = config_file
-    app.state.timezone = config_obj.get_timezone()
-
-    api_router = APIRouter(prefix="/api/v1")
-    from .routes import config, reports, rss
-
-    api_router.include_router(reports.router)
-    api_router.include_router(config.router)
-    api_router.include_router(rss.router)
-    app.include_router(api_router)
-
-    instrument_fastapi_app(app)
-
+    register_middleware(app, dev_cors=_dev_cors_enabled())
+    register_exception_handlers(app)
+    register_routers(app)
     return app
+
+
+def _dev_cors_enabled() -> bool:
+    """CORS is dev-only (spec 12). Toggled by ``PROGRESS_DEV_CORS=1``."""
+    return os.environ.get(DEV_CORS_ENV, "").strip() in {"1", "true", "yes"}
+
+
+def _progress_version() -> str:
+
+    return __version__
+
+
+def _lifespan_factory(config_path: str | None):
+    """Build a lifespan that closes over ``config_path``."""
+
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+        cfg: CoreConfig | None = None
+        session: aiohttp.ClientSession | None = None
+        try:
+            cfg = load_config(config_path)
+            await init_db(cfg.state_home)
+            cfg = await apply_db_and_seed(cfg, config_path)
+
+            cfg = await bootstrap_auth(cfg)
+            setup_observability(
+                cfg.state_home,
+                component="api",
+                bugsink_dsn=cfg.observability.bugsink.dsn.get_secret_value(),
+                bugsink_environment=cfg.observability.bugsink.environment,
+                version=_progress_version(),
+            )
+            instrument_fastapi_app(app)
+            app.state.cfg = cfg
+
+            set_git_proxy(cfg.github.proxy)
+            session_ctx = session_factory(proxy=cfg.github.proxy or None)
+            session = await session_ctx.__aenter__()
+            app.state.session = session
+            app.state.session_ctx = session_ctx
+        except Exception as e:
+            logger.exception("api lifespan startup failed")
+            with suppress(Exception):
+                sentry_sdk.capture_exception(e)
+            if session is not None:
+                await session.close()
+            await close_db()
+            raise
+        try:
+            yield
+        finally:
+            if session is not None:
+                try:
+                    await app.state.session_ctx.__aexit__(None, None, None)
+                except Exception as e:
+                    logger.warning("api session close failed: %s", e)
+            shutdown_observability()
+            await close_db()
+
+    return _lifespan
+
+
+__all__ = ["create_app"]

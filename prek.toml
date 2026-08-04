@@ -1,0 +1,131 @@
+# prek configuration — native prek format (https://github.com/j178/prek).
+# Run `prek install` once per clone to wire the hooks into `git commit`.
+
+# Out of scope for every hook: AI-agent config dirs, the local contexts cache,
+# the venv, runtime data, and worktrees. prek uses `git ls-files` so it already
+# honors .gitignore; this exclude covers untracked-but-present working dirs that
+# gitignore alone wouldn't suppress.
+exclude = '^(\.agents|\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/'
+
+# ---- ruff (backend lint + format) ----------------------------------------
+# Local hooks calling `uv run ruff` so the version is pinned by pyproject's
+# dev extra (no separate `rev` to drift out of sync).
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "ruff-check"
+name = "ruff check --fix"
+language = "system"
+entry = "uv run ruff check --fix"
+files = "\\.py$"
+
+[[repos.hooks]]
+id = "ruff-format"
+name = "ruff format"
+language = "system"
+entry = "uv run ruff format"
+files = "\\.py$"
+
+# ---- ty (backend type check) ---------------------------------------------
+[[repos.hooks]]
+id = "ty-check"
+name = "ty check"
+language = "system"
+entry = "uv run ty check"
+files = "\\.py$"
+pass_filenames = false
+
+# ---- frontend (eslint + prettier) ----------------------------------------
+# Scoped to web/ so backend-only commits skip them. web/run-hook.sh cd's into
+# web/ and strips the "web/" prefix from prek-supplied paths, so eslint's flat
+# config and prettier's plugins resolve against web/. Calls the locally
+# installed binaries directly (no pnpm/corepack version negotiation per commit).
+[[repos.hooks]]
+id = "eslint"
+name = "eslint --fix"
+language = "system"
+entry = "bash web/run-hook.sh eslint --fix --max-warnings 0"
+files = "^web/.*\\.(ts|tsx|js|jsx)$"
+pass_filenames = true
+
+[[repos.hooks]]
+id = "prettier"
+name = "prettier --write"
+language = "system"
+entry = "bash web/run-hook.sh prettier --write"
+files = "^web/.*\\.(ts|tsx|js|jsx|json|css|md)$"
+pass_filenames = true
+
+# ---- builtin hygiene (Rust-native, zero network) -------------------------
+[[repos]]
+repo = "builtin"
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "check-yaml"
+
+[[repos.hooks]]
+id = "check-toml"
+
+[[repos.hooks]]
+id = "check-json"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+
+[[repos.hooks]]
+id = "check-added-large-files"
+
+# Secret content scan (filename protection is handled by .gitignore).
+[[repos.hooks]]
+id = "detect-private-key"
+
+# ---- bandit (SAST) --------------------------------------------------------
+# Gates on HIGH/CRITICAL only (-lll); Medium/Low surface in CI SARIF for the
+# Security tab but don't block local commits. Config lives in pyproject.toml.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "bandit"
+name = "bandit (src/)"
+language = "system"
+entry = "uv run bandit -c pyproject.toml -r src/ -lll -q"
+files = "\\.py$"
+pass_filenames = false
+
+# ---- translation catalog check ------------------------------------------
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "check-translations"
+name = "check-translations (no fuzzy / empty / obsolete)"
+entry = "uv run python scripts/check_translations.py"
+language = "system"
+pass_filenames = false
+files = "src/progress/locales/.*\\.po$"
+
+# ---- import layering / cycle guard (import-linter) -----------------------
+# Guards the layered architecture and the cycle fixes (e.g. parse_created_at
+# moved to utils.timezone, _NotFoundException lifted to errors.py). Runs on any
+# src/ change since import edges shift across the whole tree.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "import-linter"
+name = "import-linter (no forbidden cross-layer imports)"
+entry = "uv run lint-imports --no-cache"
+language = "system"
+pass_filenames = false
+files = "^src/progress/.*\\.py$"

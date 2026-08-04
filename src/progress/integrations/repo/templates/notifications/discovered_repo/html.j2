@@ -1,0 +1,22 @@
+{% from "_email.j2" import email_shell, info_row, badge, cta_button, hr, section_heading %}
+{% set repos = repos or [] %}
+{% set visible = repos[:5] %}
+{% set rest = repos[5:] %}
+{% call email_shell(title, "turquoise", "NEW " ~ (repos | length), "turquoise") %}
+{{ section_heading("📦 " ~ _("Newly Discovered Repositories")) }}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
+  {% for repo in visible %}
+  {{ info_row("📦 " ~ repo.name, repo.url, "", "", repo.url, _("View"), "grey", "turquoise") }}
+  {% endfor %}
+</table>
+{% if rest %}
+<div style="background-color:#F7F8FA;border:1px solid #E5E6EB;border-radius:6px;padding:10px 12px;font-size:13px;color:#4E5969;margin-top:8px;">
+  <div style="font-weight:600;color:#86909C;margin-bottom:4px;">▸ {{ _("Expand remaining") }} {{ rest | length }} {{ _("repos") }}</div>
+  {% for repo in rest %}<span style="margin-right:6px;">{{ repo.name }}</span>{% endfor %}
+</div>
+{% endif %}
+<div style="background-color:#E8F3FF;border-radius:6px;padding:10px 12px;font-size:13px;color:#3370FF;margin-top:10px;">💡 {{ _("New repos can be added under integrations.repo in config.toml") }}</div>
+{% if markpost_url %}
+{{ cta_button(markpost_url, _("View Discovery Details") ~ "（Markpost）", "turquoise") }}
+{% endif %}
+{% endcall %}

@@ -1,0 +1,11 @@
+{{ title }}
+
+{% for repo in repos[:5] %}
+{{ repo.name }} - {{ repo.url }}
+{% endfor %}
+{% if repos | length > 5 %}
+... and {{ repos | length - 5 }} more
+{% endif %}
+{% if markpost_url %}
+
+{{ markpost_url }}{% endif %}

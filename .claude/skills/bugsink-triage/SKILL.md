@@ -56,6 +56,7 @@ Pull the decisive evidence with a small Python snippet instead of eyeballing 100
 
 ```python
 import json
+
 data = json.load(open("/tmp/event.json"))["data"]
 for f in data["exception"]["values"][0]["stacktrace"]["frames"]:
     print(f["filename"], f["lineno"], f.get("function"), "vars:", f.get("vars"))
@@ -80,8 +81,9 @@ Before declaring done, feed the genuine captured payload through the fixed code 
 
 ```python
 from progress.contrib.repo.analysis import AnalysisResultParser
+
 real_output = ...  # extract from /tmp/event.json as in step 3
-summary, detail = AnalysisResultParser().parse(real_output)   # previously raised
+summary, detail = AnalysisResultParser().parse(real_output)  # previously raised
 ```
 
 ### 6. Resolve the Bugsink issue (after deploy)

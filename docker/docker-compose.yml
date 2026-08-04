@@ -1,17 +1,32 @@
+# Docker Compose for Progress — self-hosted deployment template
+#
+# Quick start:
+#   1. Copy this file and config.example.db.toml to your server
+#   2. Rename config.example.db.toml to config.toml and edit as needed
+#   3. mkdir -p data && sudo chown 100:1001 data
+#   4. docker compose up -d
+#
+# Docs: https://github.com/jukanntenn/progress/blob/main/docs/deployment.md
+
 services:
-  app:
-    image: 192.168.5.50:5000/progress:latest
+  progress:
+    image: jukanntenn/progress:latest
     container_name: progress
     ports:
       - "5000:5000"
     volumes:
       - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json
-      - ./codex_config.toml:/root/.codex/config.toml:ro
-      - ./codex_auth.json:/root/.codex/auth.json:ro
       - ./data:/app/data
-
     environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-
-    restart: always
+      - TZ=UTC
+      - PYTHONUNBUFFERED=1
+      # Cron schedule for automatic pipeline runs (empty = disabled).
+      # Example: "30 8,22 * * *" runs at 08:30 and 22:30 daily.
+      - PROGRESS_SCHEDULE_CRON=
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    restart: unless-stopped

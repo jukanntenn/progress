@@ -1,92 +1,53 @@
-"""Exception definitions for Progress application"""
+"""Structured exception hierarchy for Progress."""
 
 
-class ProgressException(Exception):
-    """Base exception for all Progress application errors.
-
-    All custom exceptions in the Progress application inherit from this class.
-    Use this as a catch-all for Progress-specific errors when you don't need
-    to handle specific exception types.
-    """
-
-    pass
+class ProgressException(Exception):  # noqa: N818
+    """Base exception for all Progress application errors."""
 
 
 class ConfigException(ProgressException):
-    """Raised when configuration validation or loading fails.
-
-    Use this exception when:
-    - The configuration file cannot be found
-    - The TOML syntax is invalid
-    - Configuration validation fails (missing required fields, invalid values)
-    - Type conversion of config values fails
-    """
-
-    pass
+    """Raised when configuration loading or validation fails."""
 
 
 class GitException(ProgressException):
-    """Raised when GitHub/Git operations fail.
+    """Raised when git operations (clone/fetch/diff) fail."""
 
-    Use this exception when:
-    - Git command execution fails (clone, fetch, checkout, etc.)
-    - GitHub API calls fail
-    - Repository operations encounter errors
-    - Git authentication fails
-    """
 
-    pass
+class GitHubAPIException(ProgressException):
+    """Raised when GitHub API calls fail."""
+
+
+class GitHubNotFoundException(GitHubAPIException):
+    """Raised when GitHub API returns HTTP 404."""
 
 
 class AnalysisException(ProgressException):
-    """Raised when code analysis operations fail.
-
-    Use this exception when:
-    - AI analysis requests fail or timeout
-    - JSON parsing of AI responses fails
-    - Response validation fails (missing required fields)
-    - Analysis output cannot be extracted or processed
-    """
-
-    pass
+    """Raised when AI analysis operations fail."""
 
 
-class ProposalParseError(ProgressException):
-    pass
+class ProposalParseException(ProgressException):
+    """Raised when proposal parsing fails."""
 
 
-class ChangelogParseError(ProgressException):
-    pass
+class ChangelogParseException(ProgressException):
+    """Raised when changelog parsing fails."""
 
 
 class CommandException(ProgressException):
-    """Raised when external command execution fails.
-
-    Use this exception when:
-    - Shell commands return non-zero exit codes
-    - Command execution times out
-    - Command cannot be found or executed
-    - Any subprocess operation fails
-    """
-
-    pass
+    """Raised when subprocess command execution fails."""
 
 
-class ClientError(ProgressException):
-    """Raised when HTTP 4XX client errors occur and should not be retried.
-
-    Use this exception when:
-    - HTTP requests return 4xx status codes (400-499)
-    - The error indicates a client-side problem (authentication, invalid request, etc.)
-    - Retrying the request would not succeed without changes
-
-    This exception is distinct from transient 5xx errors or network issues.
-    """
-
-    pass
+class ClientException(ProgressException):
+    """Raised when HTTP 4XX client errors occur (non-retryable)."""
 
 
 class ExternalServiceException(ProgressException):
     """Raised when an external service call fails."""
 
-    pass
+
+class ReportException(ProgressException):
+    """Raised when report generation fails."""
+
+
+class NotificationException(ProgressException):
+    """Raised when notification dispatch fails."""

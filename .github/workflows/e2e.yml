@@ -1,0 +1,61 @@
+name: E2E (web)
+
+# Browser e2e against the real production container. Heavy (builds the image +
+# installs Playwright browsers), so it only fires when source the e2e actually
+# exercise changes — never on docs-only edits.
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/src/**'
+      - 'web/package.json'
+      - 'web/pnpm-lock.yaml'
+      - 'docker/Dockerfile'
+      - 'docker/Caddyfile'
+      - 'docker/docker-compose.local.yml'
+      - 'web/e2e/**'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Build & start the container
+        run: docker compose -f docker/docker-compose.local.yml up -d --build --wait
+
+      - name: Sanity-check healthz
+        run: curl -fsS http://localhost:5000/healthz
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/e2e/pnpm-lock.yaml
+
+      - name: Install Playwright deps
+        working-directory: web/e2e
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Run e2e
+        working-directory: web/e2e
+        run: pnpm test
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker/docker-compose.local.yml down -v

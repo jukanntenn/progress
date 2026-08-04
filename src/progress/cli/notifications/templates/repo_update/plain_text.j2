@@ -1,0 +1,19 @@
+{{ title }}
+
+{{ _("Overview") }}: {{ summary }}
+
+{% set repos = repo_statuses or {} %}
+{% set success_count = repos.values() | select("equalto", "success") | list | length %}
+{% set failed_count = repos.values() | select("equalto", "failed") | list | length %}
+{% set skipped_count = repos.values() | reject("equalto", "success") | reject("equalto", "failed") | list | length %}
+{{ _("Total Repositories") }}: {{ repos | length }}  ✅ {{ success_count }}  ❌ {{ failed_count }}{% if skipped_count > 0 %}  ➖ {{ skipped_count }}{% endif %}
+
+{% for name in (repos.keys() | list)[:5] %}
+- {{ name }}
+{% endfor %}
+{% if repos | length > 5 %}
+... and {{ repos | length - 5 }} more
+{% endif %}
+{% if markpost_url %}
+
+{{ markpost_url }}{% endif %}

@@ -1,0 +1,92 @@
+{# repo integration report section (spec repo §9.2).
+
+Renders one repository's structured payload:
+- H2: repo name with GitHub link
+- failure banner (only when status == "failed"): a ❌ blockquote with the
+  failure_reason, so a repo whose diff failed (e.g. a GC'd checkpoint
+  'bad object') is not silently rendered as a bare heading
+- small badge: 🌿 branch + ✏️ commit count (separate line, like ffd9d3c)
+- release block (only when releases present): each release as a <details> block
+  with 🚀 title 🏷️ tag summary, notes, AI summary (with fallback) and a nested
+  detail block labelled "Click to view detailed release analysis"
+- single `---` separator (only when both release AND commit blocks present)
+- commit block (only when commits present): truncation warning + commits + analysis
+
+Commit rendering (Feature 2 & 3):
+- ``commits`` is a list of {subject, body} dicts. A commit with a non-empty body
+  renders as a <details> block (subject in <summary>, body inside); a bodyless
+  commit renders as a flat <div>. Squash-duplicated bodies (body == subject) are
+  already collapsed to "" by _split_commit_message, so the subject shows once.
+
+HTML escaping rules (security critical):
+- commit subject/body MUST be HTML-escaped (external data)
+- AI summary/detail are NOT escaped (trusted output, may contain formatted HTML)
+#}
+## [{{ repo_name }}]({{ repo_web_url }})
+
+{% if status == "failed" %}
+> ❌ {{ _("Tracking failed") }}{% if failure_reason %}: {{ failure_reason }}{% endif %}
+
+{% endif %}
+{% if releases %}
+{% for release in releases %}
+{% if not loop.first %}
+<br>
+
+{% endif %}
+<details>
+<summary>🚀 {{ release.name or release.tag }} 🏷️ {{ release.tag }}</summary>
+
+{% if release.notes_html %}{{ release.notes_html | safe }}
+
+{% endif %}
+</details>
+{{ release.ai_summary or _("**AI analysis unavailable for {tag}**").format(tag=release.tag) }}
+{% if release.ai_detail %}<details>
+<summary>{{ _("Click to view detailed release analysis") }}</summary>
+
+{{ release.ai_detail }}
+
+</details>
+{% endif %}
+
+{% endfor %}
+{% if releases_truncated and releases_total_available > 0 %}
+<small>⚠️ {{ _("More releases exist; showing the latest {shown} of {total}").format(shown=releases | length, total=releases_total_available) }}</small>
+
+{% endif %}
+{% if commit_count > 0 %}
+
+---
+
+{% endif %}
+{% endif %}
+{% if commit_count > 0 %}
+<small>🌿 `{{ branch }}` · ✏️ {{ commit_count }} {{ ngettext("commit", "commits", commit_count) }}</small>
+
+{% if truncated %}
+<small>⚠️ {{ _("Diff truncated") }} ({{ original_diff_length }} → {{ analyzed_diff_length }} {{ _("chars") }})</small>
+
+{% endif %}
+{% for c in commits %}
+{% if c.body %}
+<details>
+<summary>{{ c.subject | e }}</summary>
+
+{{ c.body | e }}
+
+</details>
+{% else %}
+<div>{{ c.subject | e }}</div>
+{% endif %}
+{% endfor %}
+
+{{ analysis_summary or _("**AI analysis unavailable**") }}
+{% if analysis_detail %}<details>
+<summary>{{ _("Click to view detailed analysis") }}</summary>
+
+{{ analysis_detail }}
+
+</details>
+{% endif %}
+{% endif %}

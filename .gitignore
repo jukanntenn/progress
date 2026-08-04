@@ -17,8 +17,11 @@ eggs/
 lib/
 lib64/
 # Keep frontend source under web/src/lib tracked (the Python `lib/` pattern above
-# would otherwise ignore it).
+# would otherwise ignore it). The same exception applies to web/e2e/lib (the
+# Playwright fixtures/helpers), which were silently dropped by the git mv from
+# e2e/web until the negation was added.
 !web/src/lib/
+!web/e2e/lib/
 parts/
 sdist/
 var/
@@ -56,7 +59,10 @@ cover/
 
 # Translations
 *.mo
+# progress.pot is the committed Babel extraction source (drift-checked in CI);
+# only the per-locale *.po templates and the compiled *.mo are gitignored.
 *.pot
+!src/progress/locales/progress.pot
 
 # Django stuff:
 *.log
@@ -198,9 +204,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #   that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#   and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#   and can be added to the global gitignore or merged into this file. However, if you prefer,
 #   you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 
@@ -232,19 +238,20 @@ repos/
 **/*.po~
 **/*.pot~
 
-openspec/
-
 # Git worktrees for isolated development
 .worktrees/
-docs/plans/
 
-# Frontend build
-src/progress/web/dist/
-src/progress/web/node_modules/
-web/node_modules/
-web/.next/
+# Frontend workspaces own their own deps/build/test artifacts — see
+# web/.gitignore and web/e2e/.gitignore. The root .gitignore only carries the
+# cross-cutting AI-tool state below.
 
 .local/
 .fa/
 .playwright-cli/
 .zcode/plans/
+
+# Local acceptance fixtures (docker/docker-compose.local.yml): data lives in a
+# named Docker volume, but any stray host-side state stays out of git.
+docker/local/
+
+.trae/specs/

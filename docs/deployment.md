@@ -1,122 +1,102 @@
 # Deployment Guide
 
+Progress ships as a single hardened container: a static Vite SPA served by Caddy, a FastAPI backend, and a supercronic scheduler, all supervised by s6-overlay. This guide covers the Docker deployment and the one-time migration from the legacy (pre-redesign) build.
+
 ## Docker Quick Start
 
 ### Docker Compose (Recommended)
 
-1. Create a project directory and download the example config:
+1. Pull or build the image (see [Building the Image](#building-the-image)).
 
-   ```bash
-   mkdir -p ~/docker/progress && cd ~/docker/progress
-   curl -fsSL https://raw.githubusercontent.com/jukanntenn/progress/refs/heads/main/config.example.toml -o config.toml
-   ```
-
-2. Edit `config.toml` — the following values **must** be changed before the first run:
+2. Create a minimal `config.toml` (Ansible-class). It carries only the data root — all other settings live in the database and are edited via the Web UI:
 
    ```toml
-   [github]
-   gh_token = "ghp_your_github_token"          # required
-
-   [analysis]
-   provider = "claude_code"                    # "claude_code" | "codex" | "truncate"
-
-   [[repos]]
-   url = "owner/repo"                          # at least one repository
+   state_home = "/app/data"
    ```
 
-3. Provide AI provider credentials. For Claude Code, copy your local Claude Code settings into the project:
-
-   ```bash
-   cp ~/.claude/settings.json ./claude_settings.json
-   ```
-
-   Minimal `claude_settings.json`:
-
-   ```json
-   {
-     "env": {
-       "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
-       "ANTHROPIC_AUTH_TOKEN": "xxxxxxxx",
-       "API_TIMEOUT_MS": "3000000"
-     }
-   }
-   ```
-
-   For Codex instead, mount `codex_config.toml` → `/root/.codex/config.toml` and `codex_auth.json` → `/root/.codex/auth.json` (see [AI Providers](#ai-providers)).
-
-4. Create `docker-compose.yml`:
+3. Create `docker-compose.yml`:
 
    ```yaml
    services:
      progress:
-       image: jukanntenn/progress:latest
-       container_name: progress
-       ports:
-         - "5000:5000"
-       volumes:
-         - ./config.toml:/app/config.toml:ro
-         - ./claude_settings.json:/root/.claude/settings.json:ro
-         - ./data:/app/data
-       environment:
-         - PROGRESS_SCHEDULE_CRON=0 8 * * *     # daily at 08:00
-       healthcheck:
-         test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/api/v1/reports"]
-         interval: 30s
-         timeout: 5s
-         retries: 3
-         start_period: 30s
-       restart: always
+      image: progress:latest
+      container_name: progress
+      ports:
+        - "5000:5000"
+      read_only: true
+      tmpfs:
+        - /tmp
+      cap_drop:
+        - ALL
+      security_opt:
+        - no-new-privileges:true
+      volumes:
+        - ./config.toml:/app/config.toml:ro
+        - ./data:/app/data
+      environment:
+        # supercronic reads this to schedule periodic pipeline runs.
+        # Empty/unset => the cron service idles (no scheduled runs).
+        - PROGRESS_SCHEDULE_CRON=0 8 * * *     # daily at 08:00
+      healthcheck:
+        test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/healthz"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 30s
+      restart: always
    ```
 
-5. Start the container:
+   The `data/` directory must be writable by the container's non-root `progress` user — ensure the host directory is owned or chmod'd accordingly (`chown 1000:1000 ./data` or `chmod 777 ./data`).
+
+4. Start the container:
 
    ```bash
    docker compose up -d
    docker compose logs -f
    ```
 
-   Open the web UI at `http://<your-host>:5000`.
+   The first startup takes ~15s (DB schema creation + migrations + observability init); subsequent restarts are faster. Open the web UI at `http://<your-host>:5000`.
 
 ### Single Container
 
 For quick evaluation only — use Docker Compose for long-term deployments.
 
 ```bash
+mkdir -p data && chown 1000:1000 data
 docker run -d \
   --name progress \
   -p 5000:5000 \
   -e PROGRESS_SCHEDULE_CRON="0 8 * * *" \
   -v "$PWD/config.toml:/app/config.toml:ro" \
-  -v "$PWD/claude_settings.json:/root/.claude/settings.json:ro" \
   -v "$PWD/data:/app/data" \
-  jukanntenn/progress:latest
+  progress:latest
 ```
 
 ## Container Architecture
 
-Progress runs as a single container with four internal services managed by [s6-overlay](https://github.com/just-containers/s6-overlay):
+Progress runs as a single non-root container with three internal services managed by [s6-overlay](https://github.com/just-containers/s6-overlay):
 
-- **Caddy** — reverse proxy on port `5000` (external entry point)
+- **Caddy** — reverse proxy + static SPA server on port `5000` (external entry point)
 - **FastAPI** — backend API on `127.0.0.1:8000` (internal)
-- **Next.js** — frontend server on `127.0.0.1:3000` (internal)
-- **Cron** — [supercronic](https://github.com/aptible/supercronic) scheduler for `PROGRESS_SCHEDULE_CRON`
+- **Cron** — [supercronic](https://github.com/aptible/supercronic) scheduler running `progress run` per `PROGRESS_SCHEDULE_CRON`
 
-```
+```text
                     ┌───────────────────────────────────────────────┐
                     │           progress container (:5000)          │
                     │                                               │
   External ────────►│  Caddy (0.0.0.0:5000)                        │
-  :5000             │    ├ /api/v1/*  ──► FastAPI (127.0.0.1:8000)  │
-                    │    └ rest        ──► Next.js  (127.0.0.1:3000)│
+  :5000             │    ├ /api/v1/*   ──► FastAPI (127.0.0.1:8000) │
+                    │    ├ /healthz    ──► FastAPI                  │
+                    │    ├ /readyz     ──► FastAPI                  │
+                    │    └ rest        ──► Vite SPA (static dist/)  │
                     │                                               │
-                    │  supercronic ──► progress check (on schedule) │
+                    │  supercronic ──► progress run (on schedule)   │
                     │                                               │
-                    │  s6-overlay manages: caddy, fastapi, nextjs,  │
-                    │                      cron                     │
+                    │  s6-overlay manages: caddy, fastapi, cron     │
                     └───────────────────────────────────────────────┘
 ```
 
-Caddy handles TLS termination, logging, and request routing (see `docker/Caddyfile`). s6-overlay starts FastAPI and Next.js before Caddy and restarts crashed processes.
+Caddy handles TLS termination, security headers, and request routing (see `docker/Caddyfile`). The `/healthz` and `/readyz` probes are reverse-proxied to FastAPI (not served as SPA fallback) so the Docker `HEALTHCHECK` reflects real backend health — `/readyz` additionally pings the database.
 
 ## Scheduled Runs
 
@@ -126,11 +106,11 @@ The pipeline runs on the schedule defined by `PROGRESS_SCHEDULE_CRON`:
 PROGRESS_SCHEDULE_CRON="0 8 * * *"     # daily at 08:00
 ```
 
-- **When set:** Progress runs the pipeline **once on startup**, then on the cron schedule.
-- **When unset:** the cron service idles — no scheduled runs. Trigger a run manually with:
+- **When set:** supercronic runs `progress run -c /app/config.toml` on the cron schedule. The service does **not** run once on startup (no duplicate runs during parallel operation with the legacy build).
+- **When unset:** the cron service idles (`sleep infinity`). Trigger a run manually:
 
   ```bash
-  docker compose exec progress progress check
+  docker compose exec progress progress run -c /app/config.toml
   ```
 
 The cron expression follows standard 5-field syntax:
@@ -145,68 +125,60 @@ The cron expression follows standard 5-field syntax:
 * * * * *
 ```
 
-## AI Providers
+## AI Analysis
 
-Progress needs an AI provider to generate analysis. Set `[analysis].provider` in `config.toml` and mount the matching credentials.
+Progress uses [Pydantic AI](https://ai.pydantic.dev/) for diff analysis. Configure it through the Web UI (`/config` → `core.analysis`) or the config API after first boot — it is **not** set via `config.toml` or environment variables:
 
-### Claude Code (`provider = "claude_code"`)
+- `provider` + `model` — a Pydantic AI model string, e.g. `model = "anthropic:claude-sonnet-4"`.
+- `api_key` — provider API key (stored as a `SecretStr`).
+- `base_url` — optional, for OpenAI-compatible self-hosted endpoints.
+- `language` — output language for analysis results.
+- `concurrency` — per-integration analysis parallelism.
 
-Mount your Claude Code settings file:
-
-```yaml
-volumes:
-  - ./claude_settings.json:/root/.claude/settings.json:ro
-```
-
-### Codex (`provider = "codex"`)
-
-Mount the Codex CLI config and auth files:
-
-```yaml
-volumes:
-  - ./codex_config.toml:/root/.codex/config.toml:ro
-  - ./codex_auth.json:/root/.codex/auth.json:ro
-```
-
-### Truncate (`provider = "truncate"`)
-
-No AI call — diffs are truncated to `analysis.truncate_chars`. Intended for testing and CI environments without AI access.
+When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back to truncation. There is no bundled CLI provider (the legacy `claude_code`/`codex` CLI providers were removed in the redesign).
 
 ## Configuration
 
-Application configuration lives in the **database**. `config.toml` is a one-time seed plus the provider of infrastructure settings. After the first run:
+Application configuration lives in the **database** `config` table, split into sections (`core`, `repo`, `changelog`, `proposal`). `config.toml` is Ansible-class and carries **only** `state_home`; everything else is edited at runtime:
 
-- Edit ongoing settings through the web UI (`/config`) or the `/api/v1/config` API.
-- Re-seed from the file with `docker compose exec progress progress config import --force`.
-- Move config between file and DB with `progress config import` (file → DB) and `progress config export` (DB → file).
+- Edit ongoing settings through the web UI (`/config`) or the API (`PUT /api/v1/config/{section}`).
+- For a first deploy or testing, place a `config.db.toml` seed file next to `config.toml`; it is imported into the DB on startup (DB values win over the seed). In production, ensure no `config.db.toml` exists — the DB is the single source of truth.
 
-Override infrastructure values via environment variables (`PROGRESS_` prefix, `__` for nested keys):
-
-```yaml
-environment:
-  - PROGRESS_TIMEZONE=Asia/Shanghai
-  - PROGRESS_GITHUB__GH_TOKEN=${GH_TOKEN}
-  - PROGRESS_MARKPOST__URL=${MARKPOST_URL}
-  - PROGRESS_OBSERVABILITY__BUGSINK__DSN=${BUGSINK_DSN}
-```
-
-See [guides/config.md](../guides/config.md) for the full model.
+Environment-variable overrides (`PROGRESS_` prefix, `__` for nested keys) still apply, but only for keys the DB does not already set. For a production deploy, prefer editing via the Web UI over env vars. Note: `core.observability.otel.*` is not a config field (OTel export paths derive from `state_home`) — do **not** set `PROGRESS_OBSERVABILITY__OTEL__*` env vars, they will fail `CoreConfig` validation and prevent startup.
 
 ## Data & Database
 
-Progress stores everything under a single data directory (`/app/data` in the container):
+Progress stores everything under a single data directory (`/app/data` in the container, `state_home`):
 
-- `data/progress.db` — SQLite database (reports, repository state, the config blob)
-- `data/repos/` — cloned tracked repositories
-- `data/progress.log` — application log
-- `data/telemetry/` — OpenTelemetry traces/metrics (when enabled)
+- `progress.db` — SQLite database (reports, repository/owner/changelog/proposal state, the `config` table)
+- `repos/` — cloned tracked repositories
+- `logs/` — application logs
+- `observability/` — OpenTelemetry traces/metrics JSONL
 
-SQLite is the only database backend. It requires zero configuration — just keep the `data/` volume persistent:
+SQLite (WAL mode) is the only database backend. Keep the `data/` volume persistent:
 
 ```yaml
 volumes:
   - ./data:/app/data
 ```
+
+## Migrating from the Legacy Build
+
+The redesign changed the DB schema (peewee → tortoise-orm) and the config storage model (single `app_config` blob → per-section `config` rows). A one-shot migration script carries over all state tables and configuration losslessly:
+
+```bash
+# On the new server, with the legacy DB copied to ./old/progress.db:
+uv run python scripts/migrate_from_legacy.py \
+  --old ./old/progress.db \
+  --new ./data/progress.db
+```
+
+The script refuses to overwrite a new DB that already contains data. It migrates:
+
+- **State tables** verbatim (repositories, reports, batches, owners, changelog/proposal trackers, proposals) — renaming `batch`→`batches` and `proposal_trackers`→`proposal_tracker_states`.
+- **Configuration** from the legacy `app_config.data` JSON blob into the `core` / `repo` / `changelog` / `proposal` sections, dropping fields not in the new schema (e.g. feishu `timeout`) and leaving `analysis` empty (fill via Web UI). Secrets (gh_token, webhook URLs) are preserved in plaintext, matching how the config table stores them.
+
+The `repo` section is populated from the `repositories`/`github_owners` tables so the tracker's reconcile pass does not garbage-collect the migrated checkpoints on first run. Run the migration **before** the first scheduled `progress run`.
 
 ## Reverse Proxy
 
@@ -218,29 +190,30 @@ progress.example.com {
 }
 ```
 
-If you serve Progress under a public URL, set `web.base_url` so oversized reports can link back to the full report in the Web UI:
-
-```bash
-PROGRESS_WEB__BASE_URL="https://progress.example.com"
-```
+If you serve Progress under a public URL, set `core.web.base_url` (via the Web UI or config API) so oversized reports can link back to the full report.
 
 ## Building the Image
 
 ```bash
-python3 docker/build.py                    # build for the local platform (load)
-python3 docker/build.py --push             # build and push multi-platform to registry
-python3 docker/build.py --platform amd64   # build a specific platform
-python3 docker/build.py --tags v1.0.0      # additional tags (replaces default "latest")
-python3 docker/build.py --no-cache         # disable the build cache
+uv run python docker/build.py                                      # build for the local platform (load)
+uv run python docker/build.py --push --registry ghcr               # build + push multi-platform (alias)
+uv run python docker/build.py --push --registry ghcr.io/youruser   # build + push with explicit host
+uv run python docker/build.py --platform amd64                     # build a specific platform
+uv run python docker/build.py --tags v1.0.0                        # additional tags (replaces default "latest")
+uv run python docker/build.py --no-cache                           # disable the build cache
 ```
 
-Run `python3 docker/build.py --help` for the full list of options. The build uses Docker buildx and requires QEMU binfmt registered for cross-platform builds.
+Registry targets: aliases `ghcr` → `ghcr.io`, `dockerhub`/`docker` → `docker.io`;
+or any host like `registry.local:5000` (owner auto-derived from git config when possible).
+Run `uv run python docker/build.py --help` for the full list of options. The build uses Docker buildx and requires QEMU binfmt registered for cross-platform builds. Third-party binaries (Caddy, s6-overlay, supercronic) are downloaded with mandatory SHA checksum verification.
 
 ## Ansible Automation
 
-An automated deployment playbook lives in `devops/ansible/`. Variables are encrypted with `ansible-vault` for internal use — external users should replace `devops/ansible/vars/` and `host_vars/` with their own values.
+An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, and (re)starts the container. Variables are encrypted with `ansible-vault` for internal use — external users should replace `devops/ansible/vars/` and `host_vars/` with their own values.
 
 ```bash
 ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
   --vault-password-file ~/.ansible-vault/progress.pwd
 ```
+
+The inventory (`hosts.yml`) targets the new server (`fn`); the legacy server (`oect`) is retained until the new build is verified and the old one decommissioned.

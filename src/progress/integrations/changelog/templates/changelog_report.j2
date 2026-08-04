@@ -1,0 +1,22 @@
+{# changelog integration report section (spec changelog §6.2).
+
+Renders all new versions for one tracker.
+- H2: tracker name (links to source URL)
+- For each new version: 🏷️ version badge + description body
+- Versions separated by `---`
+
+Footer is emitted once by the aggregator (``aggregated_report.j2``), not per
+section, to avoid repeating it for every tracker.
+#}
+## [{{ name }}]({{ url }})
+
+{% for entry in new_entries %}
+<small>🏷️ {{ entry.version }}</small>
+
+{{ entry.description }}
+
+{% if not loop.last %}
+---
+
+{% endif %}
+{% endfor %}

@@ -1,0 +1,28 @@
+You are a changelog structure analyzer. Analyze the changelog content below and output a JSON object.
+
+Your PRIMARY task: identify a DETERMINISTIC, reusable parsing rule (regex + CSS selector) that can extract version blocks without AI. Output it in `deterministic_rule` whenever possible.
+
+Your SECONDARY (fallback) task: if no deterministic rule can capture the structure, output the parsed versions directly in `versions`.
+
+Content (first 8000 chars):
+{{ content }}
+
+Output EXACTLY this JSON shape (no markdown, no code fences):
+{
+  "deterministic_rule": {
+    "version_selector": "CSS selector for HTML (e.g. 'h2'); null for markdown line-based",
+    "version_pattern": "regex with named group version, e.g. 'Release v(?P<version>\\\\d+\\\\.\\\\d+\\\\.\\\\d+)'",
+    "body_selector": "CSS selector for the version body block (HTML only); null otherwise",
+    "category_selector": "optional; null",
+    "item_selector": "optional; null"
+  },
+  "versions": [
+    {"version": "x.y.z", "description": "body text of this version"}
+  ]
+}
+
+Rules:
+- Prefer deterministic_rule. Only omit it (set to null) if the structure is truly irregular.
+- version_pattern MUST contain a named group `version`.
+- For markdown, set version_selector to null (parser matches headings by line).
+- Output ONLY the JSON object, nothing else.

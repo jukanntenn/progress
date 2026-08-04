@@ -1,10 +1,43 @@
+# Caddy reverse proxy + static SPA serve (spec 14)
+#
+# Two responsibilities:
+#   1. /api/* -> reverse_proxy 127.0.0.1:8000 (FastAPI / uvicorn, s6 longrun)
+#   2. everything else -> Vite dist/ with SPA try_files fallback
+#
+# Security headers are emitted at the edge so the FastAPI app does not need
+# to duplicate them (its own `secure` middleware is a defense-in-depth layer).
+
 :5000 {
-	handle /api/v1/* {
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# HSTS is added automatically when Caddy terminates TLS.
+		# CSP: allow same-origin + inline styles (Tailwind runtime + base-ui).
+		# tighten for production once the inline-style budget is audited.
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Health probes live at the root (spec 12), not under /api, so they need an
+	# explicit reverse_proxy rule — otherwise the SPA fallback serves index.html
+	# (HTTP 200) and the Docker HEALTHCHECK reports healthy even with FastAPI down.
+	handle /healthz {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /readyz {
 		reverse_proxy 127.0.0.1:8000
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		root * /app/web/dist
+		try_files {path} /index.html
+		file_server
 	}
 
 	log {

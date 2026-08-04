@@ -120,9 +120,10 @@ hands-on steps, and add the **owner-edit fix**.
   ```bash
   curl -s http://127.0.0.1:5000/api/v1/config | python3 -m json.tool
   ```
-- **Restore path:** `uv run progress -c config.toml config import --force`
-  is the only way the file reaches the DB; afterward the DB reflects the file
-  and `version` bumps. `config export` dumps DB → TOML.
+- **Restore path:** edit `config.db.toml` and restart the backend; the seed
+  file is re-imported on every startup (priority `DB > seed > defaults`,
+  so the seed only fills keys the DB doesn't already have), after which the
+  DB reflects the file and `version` bumps.
 
 ---
 

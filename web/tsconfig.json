@@ -1,47 +1,33 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": [
-      "ES2017",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
     "jsx": "react-jsx",
+
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "incremental": true,
-    "skipLibCheck": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "types": [
-      "vitest/globals"
-    ],
-    "allowJs": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+      "@/*": ["src/*"]
+    }
   },
-  "include": [
-    "src",
-    "next-env.d.ts",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src", "vite.config.ts"]
 }

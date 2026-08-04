@@ -1,0 +1,29 @@
+{% from "_email.j2" import email_shell, cta_button, section_heading, hr %}
+{% set feeds = feeds or [] %}
+{% set total = (feeds | map(attribute="entry_count") | sum) or (entry_count | default(0)) %}
+{% set footer_text = "⏱ " ~ _("Report tool: Progress @") ~ " " ~ run_at if run_at is defined and run_at else none %}
+{% call email_shell(title, "wathet", total ~ " " ~ _("new"), "wathet", footer=footer_text) %}
+{% if summary %}<div style="background-color:#E8F3FF;border-radius:8px;padding:14px 16px;margin-bottom:8px;font-size:14px;line-height:1.6;color:#1D2129;">{{ summary }}</div>{% endif %}
+{{ section_heading("📡 " ~ _("Feed Sources")) }}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:6px;margin:8px 0;">
+  {% for batch in [feeds[:3], feeds[3:6], feeds[6:9], feeds[9:12]] %}
+  {% if batch %}
+  <tr>
+  {% for f in batch %}
+  <td width="{{ (100 // (batch | length)) }}%" valign="top" style="background-color:#E8F3FF;border-radius:8px;padding:16px 10px;text-align:center;">
+    <div style="font-size:13px;color:#1D2129;font-weight:600;margin-bottom:8px;">📡 {{ f.title }}</div>
+    <div style="font-size:30px;font-weight:700;color:#0091FF;line-height:1;">{{ f.entry_count }}</div>
+    <div style="font-size:12px;color:#86909C;margin-top:6px;">{{ _("new articles") }}</div>
+  </td>
+  {% endfor %}
+  </tr>
+  {% endif %}
+  {% endfor %}
+</table>
+{% if total_batches is defined and total_batches > 1 %}
+<div style="font-size:12px;color:#86909C;margin-top:4px;">{{ _("Part {n} of {total}").format(n=batch_index + 1, total=total_batches) }}</div>
+{% endif %}
+{% if markpost_url %}
+{{ cta_button(markpost_url, _("View Full Digest") ~ "（Markpost）", "wathet") }}
+{% endif %}
+{% endcall %}

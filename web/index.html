@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Progress Reports</title>
+    <script>
+      // Apply the persisted/system theme before first paint to avoid a flash of
+      // the wrong theme (FOUC). Mirrors ThemeProvider's storage key; supports
+      // the system/light/dark preference cycle.
+      ;(function () {
+        try {
+          var pref = localStorage.getItem('progress-theme') || 'system'
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

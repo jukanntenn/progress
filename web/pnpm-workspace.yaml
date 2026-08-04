@@ -1,7 +1,10 @@
+# pnpm workspace config (single-package repo).
+#
+# pnpm v10+ blocks install scripts (postinstall/preinstall) unless reviewed.
+# ``allowBuilds`` records the review verdict per package: ``msw`` is a
+# devDependency used solely for test mocking, and its install script is not
+# needed for production Vite builds, so it is explicitly disallowed (``false``).
+# ``strictDepBuilds`` is on by default, so an unreviewed build script would
+# fail ``pnpm install --frozen-lockfile``; this explicit verdict resolves that.
 allowBuilds:
-  '@parcel/watcher': true
-  '@swc/core': true
-  esbuild: true
-  msw: true
-  sharp: true
-  unrs-resolver: true
+  msw: false

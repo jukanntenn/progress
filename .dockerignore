@@ -1,38 +1,61 @@
+# VCS / IDE / caches
 .git/
-.venv/
-.claude/
-.pytest_cache/
-.ruff_cache/
-.pre-commit-config.yaml
+.gitignore
+.github/
 .vscode/
 .idea/
+.pre-commit-config.yaml
 
-tests/
+# Python caches & virtualenvs
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Frontend build artefacts & deps (rebuilt inside the image)
+web/dist/
+web/.next/
+web/node_modules/
+web/coverage/
+web/openapi.json
+
+# Local agent / context directories — never ship to the image
+.local/
+.zcode/
+.agents/
+.codex/
+.fa/
+.playwright-cli/
+.claude/
+
+# Project docs & specs (not needed at runtime)
+docs/
 specs/
 guides/
 wiki/
 devops/
-scripts/
+stress/
+e2e/
+tests/
+
+# Runtime data (mounted as a volume, not baked in)
 data/
 
-__pycache__/
-**/__pycache__/
-**/node_modules/
-*.pyc
-*.pyo
-
-*.db
-*.db-journal
-*.log
-
+# Tooling configs (not needed at runtime)
 .dockerignore
 .gitignore
 AGENTS.md
 CLAUDE.md
 README.md
 README_zh.md
-.fa/
+PLAN.md
 
+# Local config (mounted as a volume)
 config*.toml
 requirements.txt
+conftest.py
 run_web.py

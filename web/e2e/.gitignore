@@ -1,0 +1,8 @@
+# Playwright e2e workspace — deps, reports, and run artifacts are local only.
+# Tracked source lives under tests/ and lib/ (see the root .gitignore negations
+# for web/src/lib/ and web/e2e/lib/).
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

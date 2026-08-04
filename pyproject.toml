@@ -2,60 +2,95 @@
 name = "progress"
 version = "0.0.1"
 description = "Progress is a GitHub project tracking tool that traces multi-repo code changes, runs AI analysis, and generates reports to help users track open-source project progress."
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "typer>=0.26.0",
     "fastapi[standard]>=0.115.0",
+    "uvicorn>=0.32.0",
     "feedgen>=0.9.0",
     "jinja2>=3.1.0",
     "markdown-it-py>=3.0.0",
+    "nh3>=0.2.0",
     "tortoise-orm>=1.1.7",
-    "aiohttp>=3.12.0",
+    "aiosqlite>=0.20.0",
+    "aiohttp>=3.10,<3.11",
     "aiosmtplib>=3.0.0",
-    "aiofiles>=24.1.0",
-    "requests>=2.32.5",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
-    "mdit-py-plugins>=0.4.0",
+    "pydantic-ai-slim[openai,anthropic]>=2.10.0",
+    "json-repair>=0.61.1",
     "tomlkit>=0.13.0",
-    "gitpython>=3.1.46",
-    "PyGithub>=2.8.1",
-    "pytz>=2024.1",
-    "urllib3>=2.6.3",
-    "opentelemetry-api>=1.43.0",
-    "opentelemetry-sdk>=1.43.0",
+    "gidgethub>=5.4.0",
+    "tenacity>=9.0.0",
+    "structlog>=24.4.0",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
     "opentelemetry-instrumentation-fastapi>=0.64b0",
     "opentelemetry-instrumentation-sqlite3>=0.64b0",
-    "opentelemetry-instrumentation-requests>=0.64b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.64b0",
     "opentelemetry-instrumentation-logging>=0.64b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.28.0",
+    "opentelemetry-exporter-otlp-json-file>=0.64b0",
     "sentry-sdk[fastapi]>=2.60.0",
-    "json-repair>=0.61.1",
+    "secure>=1.0.1",
+    "asgi-correlation-id>=4.3.0",
+    "slowapi>=0.1.9",
+    "babel>=2.15.0",
+    "miniflux>=1.1.5,<2.0.0",
+    "asgiref>=3.8.0",
+    "lxml>=5.0.0",
+    "cssselect>=1.3.0",
+    "markpost>=0.2.0-rc.2",
+    "pyjwt[crypto]>=2.12.0",
+    "pwdlib[argon2]>=0.2.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
-dev = ["watchdog>=5.0.0", "pytest>=9.0.2"]
-test = ["pytest>=9.0.2", "httpx>=0.27.0"]
+dev = [
+    "ruff>=0.16.1",
+    "ty>=0.0.55",
+    "deptry>=0.25.0",
+    "bandit>=1.9.0",
+    "import-linter>=2.13",
+    "watchdog>=5.0.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.14.0",
+    "aioresponses>=0.7.9",
+    "time-machine>=2.14.0",
+    "aiosmtpd>=1.4.0",
+    "pytest-httpserver>=1.1.5",
+    "httpx>=0.27.0",
+    "asgi-lifespan>=2.1.0",
+    "faker>=30.0.0",
+    "uvloop>=0.20.0",
+    "coverage[toml]>=7.10.0",
+]
+
+[project.scripts]
+progress = "progress.cli.main:app"
+tortoise = "tortoise.cli.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[project.scripts]
-progress = "progress.cli:cli"
-
-[tool.fastapi]
-entrypoint = "progress.main:app"
+[tool.hatch.build.targets.wheel]
+packages = ["src/progress"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-asyncio>=0.24.0",
-    "httpx>=0.27.0",
+# Coverage is always on (local + CI identical command: `uv run pytest`).
+# term-missing prints uncovered lines to the terminal; xml feeds codecov in CI.
+addopts = "--cov=progress --cov-report=term-missing --cov-report=xml"
+markers = [
+    "unit: unit tests (pure functions / single class, injected fakes, no IO)",
+    "component: component tests (mocked external services + real SQLite/git)",
+    "e2e: end-to-end tests against real external services (direct core.run() calls)",
+    "feed: feed e2e (real Miniflux + Postgres via docker compose; spec feed §15)",
 ]
 
 [tool.ty.environment]
@@ -63,3 +98,197 @@ python-version = "3.13"
 
 [tool.ty.rules]
 all = "error"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # --- whole rule families (style/coverage overlap or intentional) ---
+    "D",      # docstring style; not enforced project-wide
+    "ANN",    # annotation presence; type *correctness* is ty's job
+    "CPY",    # copyright header
+    "T201",   # print() — CLI output / debugging
+    "EM",     # exception message style
+    "TRY",    # try/except style
+    "DOC",    # docstring style (pydocstyle extension)
+    "FBT",    # boolean positional args (style preference)
+    "S",      # security surface — covered by the standalone bandit gate
+              # (bandit -lll, HIGH/CRITICAL only). ruff S is noisier (incl.
+              # Medium/Low) and redundant; security lives in security.yml.
+    "BLE001", # blind-except — intentional in observability/telemetry fallbacks
+    "PLW0603",# global statement — config/state singletons by design
+    "PLW1510",# subprocess.run without explicit check= — style preference
+    "ASYNC",  # async-blocking detection — real value but per-site judgment
+              # required (hot path? anyio worth it?); tracked as a separate
+              # effort, not a gate-blocking decision in this hygiene pass.
+    "PT",     # pytest style — high noise, low signal (PT019/011/012)
+    "PGH003", # blanket type-ignore — used for mypy/pylance compatibility
+    "PLR0917",# too many positional args — same family as PLR0913 (ignored)
+    # --- false positives on non-ascii literals ---
+    "RUF001", # ambiguous unicode in string (Chinese prompts / emoji)
+    "RUF002", # ambiguous unicode in docstring
+    "RUF003", # ambiguous unicode in comment
+    # --- typing-only imports — incompatible with FastAPI/Pydantic runtime ---
+    # FastAPI reflects Annotated[X, Depends()] params at runtime and Pydantic
+    # needs model types visible for isinstance()/rebuild_model(); moving these
+    # to TYPE_CHECKING breaks 40+ API tests with 422s. Net-negative here.
+    "TC001",
+    "TC002",
+    "TC003",
+    # --- complexity / signature shape (style) ---
+    "PLR2004", # magic value in comparison
+    "PLR0913", # too many args
+    "PLR0915", # too many statements
+    "PLR0912", # too many branches
+    "PLR0911", # too many return
+    "C901",    # McCabe complexity
+    "ARG001",  # unused function argument
+    "ARG002",  # unused method argument
+    "ARG005",  # unused lambda argument
+    # --- formatter conflicts (ruff docs: never enable with ruff format) ---
+    "COM812",  # missing trailing comma — handled by formatter
+    "ISC001",  # single-line implicit string concat — handled by formatter
+    "E501",    # line length — handled by line-length above
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["progress"]
+case-sensitive = true
+combine-as-imports = true
+force-sort-within-sections = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.per-file-ignores]
+# Tests routinely touch private members and use magic values.
+"tests/**/*.py" = ["S101", "SLF001", "PLR2004", "ARG", "RUF012", "DTZ001"]
+# e2e tests also drive real subprocesses (git/shell) and use private members.
+"tests/e2e/**/*.py" = ["S603", "S404", "S607", "N802"]
+# One-off scripts legitimately call subprocess without shell-escape hardening.
+"scripts/**/*.py" = ["S603", "S404", "INP001"]
+# Root-level conftest pokes agent private state for test isolation.
+"conftest.py" = ["SLF001"]
+# tortoise-orm generates these; class-level mutable defaults are inherent to
+# the migration format and the files are append-only history (never hand-edited).
+"**/migrations/**/*.py" = ["RUF012", "SLF001"]
+
+[tool.coverage.run]
+source = ["src/progress"]
+branch = true
+omit = [
+    "src/progress/locales/*",
+    "src/progress/**/migrations/*",
+    "tests/*",
+    "e2e/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.deptry]
+# The project package itself is first-party (src-layout, name == import name).
+known_first_party = ["progress"]
+
+# Distributions whose import name differs from their PyPI name, or that back a
+# single import shared across multiple distributions (e.g. the opentelemetry-*
+# family all import as `opentelemetry`). Without these hints deptry cannot map
+# imports back to declared dependencies and reports false DEP001/DEP002.
+[tool.deptry.package_module_name_map]
+"markdown-it-py" = ["markdown_it"]
+"pydantic-ai-slim" = ["pydantic_ai"]
+"tortoise-orm" = ["tortoise"]
+"opentelemetry-api" = ["opentelemetry"]
+"opentelemetry-sdk" = ["opentelemetry"]
+"opentelemetry-instrumentation-fastapi" = ["opentelemetry"]
+"opentelemetry-instrumentation-sqlite3" = ["opentelemetry"]
+"opentelemetry-instrumentation-aiohttp-client" = ["opentelemetry"]
+"opentelemetry-instrumentation-logging" = ["opentelemetry"]
+"opentelemetry-exporter-otlp-proto-http" = ["opentelemetry"]
+"opentelemetry-exporter-otlp-json-file" = ["opentelemetry"]
+
+# DEP002 false positives: runtime/dev deps consumed indirectly (DB driver for
+# tortoise, dev CLI tools like ruff/ty/deptry/coverage, pytest plugins) rather
+# than via a top-level import.
+[tool.deptry.per_rule_ignores]
+DEP002 = [
+    "aiosqlite",
+    "watchdog",
+    "ruff",
+    "ty",
+    "deptry",
+    "bandit",
+    "import-linter",
+    "cssselect",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-cov",
+    "time-machine",
+    "pytest-httpserver",
+    "aioresponses",
+    "aiosmtpd",
+    "faker",
+    "coverage",
+    "httpx",
+    "asgi-lifespan",
+]
+# DEP003: starlette is re-exported by fastapi; the LocaleMiddleware types
+# (ASGIApp/Receive/Scope/Send) are imported from starlette deliberately.
+DEP003 = ["starlette"]
+
+[tool.bandit]
+# 与 ruff source 对齐,仅扫描 src/。tests 里合理的 assert/子进程不扫。
+exclude_dirs = ["tests", ".local", ".venv", "data", "web"]
+[tool.bandit.assert_used]
+skips = ["*_test.py", "test_*.py"]
+
+[tool.importlinter]
+# Root package for import graph analysis. progress is a src-layout package
+# (src/progress/), so it must be installed (editable) before running lint-imports.
+root_package = "progress"
+# Imports inside `if TYPE_CHECKING:` blocks are type-checking-only: they never
+# execute at runtime and exist precisely to break cycles in type annotations
+# (Python's recommended decoupling idiom). Excluding them lets the contract
+# enforce real runtime layering without flagging legitimate TYPE_CHECKING edges.
+exclude_type_checking_imports = true
+
+# Contract 1: the git client layer must not depend on business integrations.
+# This is the layering violation that previously caused a runtime circular
+# import (cli.git.github -> integrations.repo.discovery). parse_created_at was
+# moved to utils.timezone and _NotFoundException was lifted to errors.py to
+# fix it; this contract prevents regressions.
+[[tool.importlinter.contracts]]
+name = "Git client must not depend on integrations"
+type = "forbidden"
+source_modules = ["progress.cli.git"]
+forbidden_modules = ["progress.integrations"]
+
+# Contract 2: utils is the lowest layer and must not depend upward. Only
+# progress.errors (which defines pure exception classes, no dependencies) is
+# allowed. This keeps utility helpers truly bottom-of-stack.
+[[tool.importlinter.contracts]]
+name = "Utils layer must be dependency-free"
+type = "forbidden"
+source_modules = ["progress.utils"]
+forbidden_modules = [
+    "progress.api",
+    "progress.cli",
+    "progress.config",
+    "progress.db",
+    "progress.integrations",
+    "progress.observability",
+]
+
+# Contract 3: the CLI is core infrastructure + a tool on top; the API depends
+# on shared layers (config/db/integrations/utils), never the reverse.
+# Previously cli.users imported hash_password from api.auth, dragging the
+# FastAPI stack into the CLI; that primitive now lives in utils.security. This
+# contract prevents any cli -> api regression.
+[[tool.importlinter.contracts]]
+name = "CLI must not depend on API"
+type = "forbidden"
+source_modules = ["progress.cli"]
+forbidden_modules = ["progress.api"]

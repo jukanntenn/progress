@@ -1,0 +1,47 @@
+version: 2
+
+# Keep pinned GitHub Actions, Python/uv, npm, and Docker dependencies current.
+# Workflows pin actions to a commit SHA (supply-chain hardening), so Dependabot
+# is the only practical way to pick up new major versions.
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+      include: scope
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(web)"
+      include: scope
+    groups:
+      web:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(docker)"
+      include: scope

@@ -1,439 +1,227 @@
+[English](README.md) | 简体中文
+
+<div align="center">
+
 # Progress
 
-简体中文 | [English](./README.md)
+**追踪多个仓库的代码变更，运行 AI 分析，为你关注的开源项目生成进展报告。**
 
-Progress 是一个 GitHub 项目跟踪工具，能够追踪多个仓库的代码变更，运行 AI 分析，并生成报告，帮助用户跟踪开源项目的进展。
+[![CI](https://github.com/jukanntenn/progress/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jukanntenn/progress/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Vite](https://img.shields.io/badge/Vite-React%2019-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+
+</div>
+
+---
 
 ## 功能特性
 
-- **多仓库监控** - 可同时监控多个 GitHub 仓库，跟踪代码变更
-- **版本发布跟踪** - 自动跟踪 GitHub 版本发布，分析版本间变化
-- **AI 智能分析** - 使用 Claude Code CLI 分析代码变更，生成 Markdown 分析报告
-- **通知功能** - 支持飞书和邮件通知，及时推送分析报告
-- **Web 服务** - 内置 Web 界面浏览聚合报告，支持 RSS 订阅
-- **Docker 部署** - Docker 容器化部署，最快一分钟拉起
+- 📊 **多仓库监控** — 同时监控多个 GitHub 仓库，跟踪代码变更
+- 🤖 **AI 智能分析** — 通过任意 [Pydantic AI](https://ai.pydantic.dev/) 提供方（Anthropic、OpenAI、OpenAI 兼容端点）将 diff 转换为简洁的 Markdown 报告
+- 📝 **提案跟踪** — 监控 EIP / ERC / PEP / RFC / DEP 提案，状态变化时通知
+- 📋 **Changelog 跟踪** — 从任意 changelog URL 检测新版本
+- 📰 **Feed 集成** — 从 Miniflux 实例拉取星标/订阅的 RSS 源并分析新条目
+- 📬 **通知推送** — 将报告推送到飞书、邮件或控制台
+- 🌐 **Web 面板** — 浏览聚合报告、通过 UI 在线编辑配置、RSS 订阅
+- 🔭 **可观测性** — 结构化日志、OpenTelemetry 链路、通过 [Bugsink](https://www.bugsink.com/) 采集错误
+- 🌍 **国际化** — 基于 Babel 提取的消息目录（英文 + 简体中文）
+- 🐳 **单容器部署** — 一个加固镜像（Caddy + FastAPI + Vite SPA，由 s6-overlay 托管，内置 supercronic 调度器），一分钟拉起
 
-## 环境要求
+## 工作原理
 
-### Docker 运行
-
-- 需安装 [Docker Engine](https://docs.docker.com/engine/install/)
-
-### 宿主机运行
-
-- Python 3.12 或更高版本
-- [uv 包管理器](https://github.com/astral-sh/uv)（推荐）或 pip
-- [GitHub CLI](https://cli.github.com/)
-- [Claude Code CLI](https://claude.com/product/claude-code)
+1. **克隆 & diff** — Progress 拉取每个配置的仓库，计算自上次运行以来的 diff
+2. **分析** — diff 被发送给 AI 提供方（例如 `anthropic:claude-sonnet-4`），生成人类可读的摘要
+3. **发布** — 报告存入数据库，可选上传到 [Markpost](https://github.com/jukanntenn/markpost)，并推送到通知渠道
+4. **调度** — 通过 cron 表达式按设定的节奏触发整条流水线
 
 ## 快速开始
 
-### 在 Docker 容器中运行
+完整指南见 [docs/deployment.md](docs/deployment.md)。
 
-1. 准备配置文件：
+1. 准备配置文件和数据目录：
 
-```bash
-cp config.example.toml config.toml
-```
+   ```bash
+   cp config.example.db.toml config.db.toml   # 数据库种子（凭据、仓库、通知渠道）
+   cp config.example.toml      config.toml     # 基础设施（state_home）
+   mkdir -p data
+   chown 100:101 data                          # 镜像以 uid 100 / gid 101 运行
+   ```
 
-编辑配置文件，填写必要的配置项（详见[配置说明](#配置说明)）。
+2. 编辑 `config.db.toml` —— 至少设置 `[core.github].gh_token`、`[core.analysis]`，并添加一个 `[[repo.repos]]` 条目（详见[配置说明](#配置说明)）。
 
-2. 创建数据目录用于持久化存储：
+3. 创建 `docker-compose.yml`：
 
-```bash
-mkdir -p data
-```
+   ```yaml
+   services:
+     progress:
+       image: ghcr.io/jukanntenn/progress:latest
+       container_name: progress
+       ports:
+         - "5000:5000"
+       user: "100:101"
+       read_only: true
+       tmpfs:
+         - /tmp
+         - /run:rw,exec,mode=0755,uid=100,gid=101
+         - /home/progress
+       cap_drop: ["ALL"]
+       security_opt: ["no-new-privileges:true"]
+       volumes:
+         - ./config.toml:/app/config.toml:ro
+         - ./data:/app/data
+       environment:
+         - TZ=UTC
+         - S6_READ_ONLY_ROOT=1
+         - PROGRESS_SCHEDULE_CRON=0 8 * * *   # 每天 08:00 运行
+       restart: unless-stopped
+   ```
 
-3. 准备 Claude Code 配置文件。将本地的 Claude Code 配置复制到项目目录：
+4. 启动容器，然后访问 `http://<你的主机>:5000`：
 
-```bash
-cp ~/.claude/settings.json ./claude_settings.json
-```
+   ```bash
+   docker compose up -d
+   docker compose logs -f
+   ```
 
-`claude_settings.json` 最小化配置示例：
+   设置 `PROGRESS_SCHEDULE_CRON` 后，Progress 会在启动时运行一次流水线，然后按 cron 调度执行。不设置则手动触发：`docker compose exec progress progress run`。
 
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "xxxxxxxx",
-    "API_TIMEOUT_MS": "3000000",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-  },
-  "alwaysThinkingEnabled": true
-}
-```
+## 在宿主机上运行
 
-4. 使用 Docker Compose 启动容器（推荐）。
+1. 克隆项目：
 
-创建 `docker-compose.yml` 文件：
+   ```bash
+   git clone https://github.com/jukanntenn/progress.git
+   cd progress
+   ```
 
-```yaml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * * # 每天 8:00 运行
-    restart: always
-```
+2. 安装依赖（使用 [uv](https://github.com/astral-sh/uv)）：
 
-启动容器：
+   ```bash
+   uv sync --extra dev
+   ```
 
-```bash
-docker-compose up -d
-```
+3. 准备配置文件（同上，复制两个示例文件并编辑 `config.db.toml`）。
 
-5. 或使用 Docker 命令直接运行：
+4. 运行流水线或启动 API 服务：
 
-```bash
-docker run --rm \
-  -v $(pwd)/config.toml:/app/config.toml:ro \
-  -v $(pwd)/claude_settings.json:/root/.claude/settings.json:ro \
-  -v $(pwd)/data:/app/data \
-  jukanntenn/progress:latest
-```
+   ```bash
+   uv run progress run  -c config.toml        # 运行完整跟踪流水线
+   uv run progress serve -c config.toml       # 启动 API 服务（默认 0.0.0.0:8000）
+   ```
 
-6. 查看容器日志，确认程序正常运行：
+   首次运行时会自动克隆配置的仓库、计算 diff、进行 AI 分析并生成报告。`run` 还支持 `--trackers-only` 只运行跟踪类集成（跳过报告/通知）。
 
-```bash
-docker-compose logs -f
-```
-
-或使用 Docker 命令：
-
-```bash
-docker logs -f progress
-```
-
-7. 验证定时任务配置是否正确，查看容器日志确认程序按预期时间运行。
-
-### 在宿主机上运行
-
-1. 克隆项目到本地：
-
-```bash
-git clone https://github.com/your-username/progress.git
-cd progress
-```
-
-2. 安装 Python 依赖：
-
-使用 uv（推荐）：
-
-```bash
-uv sync
-```
-
-或使用 pip：
-
-```bash
-pip install -r requirements.txt
-```
-
-3. 创建配置文件：
-
-```bash
-cp config.example.toml config.toml
-```
-
-4. 编辑配置文件，填写必要的配置项（详见[配置说明](#配置说明)）：
-
-```bash
-vim config.toml
-```
-
-确保已安装并配置好 Claude Code CLI，保证程序可以正常调用。
-
-5. 运行程序：
-
-```bash
-uv run progress -c config.toml
-```
-
-或使用 pip 安装的方式：
-
-```bash
-python -m progress.cli -c config.toml
-```
-
-首次运行时，程序会自动克隆配置的仓库到本地数据目录，检测代码变更，生成 diff 并进行 AI 分析，最后生成报告并通过配置的通知方式推送。
-
-6. 持续跟踪需定期运行程序，详见[定时任务配置](#定时任务配置)。
+5. 定期运行可借助系统 crontab（见[定时任务](#定时任务)），或在容器内使用 `PROGRESS_SCHEDULE_CRON`。
 
 ## 配置说明
 
-应用配置存储在**数据库**中。`config.toml` 文件是一次性的**种子**
-（同时提供 `data_dir`、调度计划等基础设施配置）：首次运行时它会把配置
-写入数据库，此后数据库即为唯一事实来源。复制 `config.example.toml` 为
-`config.toml` 作为起始模板。
+Progress 采用**双文件**配置模型：
 
-- **日常配置通过 Web UI 修改**（*Configuration* 页面，以及 *Repositories* /
-  *Owners* 区块），或通过 API。
-- **在文件与数据库之间迁移配置**：`progress config import`（文件 → 数据库）、
-  `progress config export`（数据库 → 文件）。
-- 下面的 TOML 示例同时用作首次部署的种子文件内容，并逐项说明每个配置项。
+- **`config.toml`**（Ansible 级）—— 仅基础设施，目前只含 `state_home`（决定 `progress.db`、日志、克隆仓库的存放位置）。见 `config.example.toml`。
+- **`config.db.toml`**（数据库种子）—— 应用配置，启动时导入数据库。复制 `config.example.db.toml` 作为种子。首次运行后**数据库即为唯一事实来源** —— 通过 **Web UI**（`/config` 页面）或 API（`PUT /api/v1/config/{section}`）在线修改，或编辑 `config.db.toml` 后重启重新导入。
 
-完整模型见 [guides/config.md](guides/config.md)。
+优先级：**数据库 > 种子（`config.db.toml`）> 代码默认值**；环境变量覆盖（`PROGRESS_` 前缀）在种子导入时叠加生效。凭据缺失（`gh_token`、`api_key`）会优雅降级 —— 对应集成被禁用并告警，而非崩溃（零配置）。
 
-### 配置项优先级
-
-- **基础设施**（`data_dir`、`workspace_dir`、数据库路径、调度计划）：每次
-  启动时按 **环境变量 > 配置文件 > 默认值** 解析。
-- **应用配置**：**数据库**是唯一事实来源。应用配置的环境变量仅在首次
-  种子写入时生效；如需从文件重新导入，请运行 `progress config import`。
-
-### 配置文件（种子 + 基础设施）
-
-#### 基本配置结构
+完整模型见 [docs/config.md](docs/config.md)。一个最小化的 `config.db.toml` 种子：
 
 ```toml
-# 时区配置（可选，默认：UTC）
+[core]
+language = "en"
 timezone = "UTC"
 
-# 应用程序语言（可选，默认：en）
-# 控制用户界面文本的语言
-language = "en"
+[core.github]
+gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"        # 留空 -> GitHub 跟踪禁用
 
-[markpost]
-# Markpost 发布 URL（必需）
-url = "https://markpost.example.com/p/your-post-key"
-# HTTP 请求超时时间（秒，默认：30）
-timeout = 30
-# 最大批次上传大小（字节，默认：1048576）
-# 超过此大小的报告将被拆分为多个批次上传
-max_batch_size = 1048576
+[core.analysis]
+provider = "anthropic"                        # 任意 Pydantic AI 提供方
+model = "claude-sonnet-4"
+api_key = "sk-xxxxxxxxxxxxxxxx"               # 留空 -> AI 分析禁用
 
-[notification]
-
-[[notification.channels]]
-type = "feishu"
+[[core.notification.channels]]
+type = "console"                              # console | email | feishu
 enabled = true
-# 飞书 webhook URL（必需）
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-# HTTP 请求超时时间（秒，默认：30）
-timeout = 30
 
-[[notification.channels]]
-type = "email"
-enabled = false
-# 邮件通知配置
-host = "smtp.example.com"
-port = 587
-user = "user@example.com"
-password = "password"
-from_addr = "progress@example.com"  # 发件地址（默认：progress@example.com）
-recipient = ["recipient@example.com"]  # 收件人列表
-starttls = false  # STARTTLS（默认：false）
-ssl = false  # SSL（默认：false）
+[repo]
+first_run_lookback_commits = 3
 
-[github]
-# GitHub CLI token（必需）
-gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
-# 全局协议配置（可选，默认：https）
-protocol = "https"
-# 全局代理配置（可选）
-# 支持 HTTP/HTTPS/SOCKS5 代理，例如：
-# proxy = "http://127.0.0.1:7890"
-# proxy = "socks5://127.0.0.1:1080"
-proxy = ""
-# Git 命令超时时间（秒，默认：300）
-git_timeout = 300
-# GitHub CLI 命令超时时间（秒，默认：300）
-gh_timeout = 300
-
-[analysis]
-# 最大 diff 长度（字符数，默认：100000）
-max_diff_length = 100000
-# 并发数（可选，默认：1 为串行）
-concurrency = 1
-# Claude Code 分析超时时间（秒，默认：600）
-timeout = 600
-# AI 分析输出语言（可选，默认：en）
-# 支持任何语言代码（如：zh、en、ja、ko、fr、de、es、pt、ru、ar 等）
-# 与顶层 language 配置相互独立
-language = "zh"
-
-# 仓库配置（至少配置一个）
-[[repos]]
-# GitHub 仓库格式：owner/repo（推荐格式，简洁明了）
-url = "vitejs/vite"
-# 监控分支（可选，默认：main）
+[[repo.repos]]
+url = "vitejs/vite"                           # "owner/repo"、HTTPS 或 SSH URL
 branch = "main"
-# 是否启用（可选，默认：true）
 enabled = true
-# 仓库级协议配置（可选，覆盖全局配置）
-# 默认值：https
-# protocol = "ssh"
-
-[[repos]]
-url = "facebook/react"
-# 未指定分支，默认为 main
-
-[[repos]]
-# 支持完整 HTTPS URL 格式
-url = "https://github.com/vitejs/vite.git"
-
-[[repos]]
-# 支持 SSH URL 格式（适用于配置了 SSH key 的场景）
-url = "git@github.com:vitejs/vite.git"
-
-[[repos]]
-url = "vue/core"
-# 仓库级协议配置，覆盖全局配置
-protocol = "ssh"
-
-[[repos]]
-url = "mycompany/private-repo"
-branch = "develop"
-enabled = false  # 暂时禁用
 ```
 
-#### 配置项说明
+### 配置项说明
 
-**必需配置项：**
+| 配置项 | 说明 |
+| --- | --- |
+| `[core].language` | 报告/通知/UI 语言，默认 `en` |
+| `[core].timezone` | IANA 时区，默认 `UTC` |
+| `[core.github].gh_token` | GitHub token（SecretStr），留空禁用 GitHub 跟踪 |
+| `[core.analysis].provider` | Pydantic AI 提供方，例如 `anthropic` / `openai` |
+| `[core.analysis].model` | 模型名，例如 `claude-sonnet-4`，留空用提供方默认 |
+| `[core.analysis].api_key` | API key（SecretStr），留空禁用 AI 分析（截断兜底） |
+| `[core.analysis].base_url` | OpenAI 兼容端点；留空用提供方默认 |
+| `[core.analysis].language` | AI 输出语言（独立于顶层 `language`） |
+| `[core.markpost].enabled` | 是否启用 Markpost 上传，默认 `false` |
+| `[core.markpost].url` | Markpost 发布 URL（SecretStr） |
+| `[core.markpost].max_batch_size` | 单批次最大字节数，默认 1048576 |
+| `[[core.notification.channels]]` | 通知通道（`type` 判别联合：`console` / `email` / `feishu`） |
+| `[core.observability.bugsink].dsn` | Bugsink DSN（SecretStr），留空禁用错误采集 |
+| `[core.web].base_url` | 报告反向链接的公网 base URL |
+| `[repo].first_run_lookback_commits` | 首次运行某仓库时回溯的提交数 |
+| `[[repo.repos]]` | 仓库列表（`url` / `branch` / `enabled`） |
+| `[[repo.owners]]` | 组织/用户发现（`type` = `organization` \| `user`，`name`） |
+| `[[changelog.trackers]]` | Changelog 跟踪源（`name` / `url` / `parser_type` / `enabled`） |
+| `[proposal].trackers` | 启用的提案类型，例如 `["eip", "erc", "pep", "rfc", "dep"]` |
+| `[feed].base_url` | Miniflux 实例 URL，留空禁用 feed 集成 |
+| `[feed].api_key` | Miniflux API key（SecretStr） |
 
-- `markpost.url` - Markpost 发布 URL（访问 [Markpost](https://markpost.cc/) 获取）
-- `notification.channels` - 通知通道列表（至少配置 1 个且至少 1 个 enabled=true）
-- `github.gh_token` - GitHub CLI token（参见 [管理个人访问令牌](https://docs.github.com/zh/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)）
-- `repos` - 至少配置一个仓库
-
-**可选配置项：**
-
-- `timezone` - 时区配置，默认 UTC
-- `language` - 应用程序语言，默认 en
-- `markpost.timeout` - Markpost HTTP 请求超时时间，默认 30 秒
-- `markpost.max_batch_size` - 最大批次上传大小（字节），默认 1048576（1MB）。超过此大小的报告将被拆分为多个批次上传
-- `notification.channels[].type` - 通道类型（例如 feishu / email）
-- `notification.channels[].enabled` - 是否启用该通道，默认 true
-- `notification.channels[].timeout` - 飞书 HTTP 请求超时时间（type=feishu），默认 30 秒
-- `notification.channels[]` - 邮件通知配置（type=email，字段见上方示例）
-- `github.protocol` - Git 协议，默认 https
-- `github.proxy` - 代理配置，默认为空
-- `github.git_timeout` - Git 命令超时时间，默认 300 秒
-- `github.gh_timeout` - GitHub CLI 命令超时时间，默认 300 秒
-- `analysis.max_diff_length` - 最大 diff 长度，默认 100000 字符
-- `analysis.concurrency` - 并发分析数，默认 1
-- `analysis.timeout` - 分析超时时间，默认 600 秒
-- `analysis.language` - AI 分析输出语言，默认 en
-- `repos[].branch` - 仓库分支，默认 main
-- `repos[].enabled` - 是否启用，默认 true
-- `repos[].protocol` - 仓库级协议配置，默认 https
+所有 `SecretStr` 字段（`gh_token`、`api_key`、`password`、`webhook_url`、`dsn`、`markpost.url`）在文件中写真实值，Web UI 与 `GET /api/v1/config` 会自动序列化为 `**********`。
 
 ### 环境变量
 
-可以使用环境变量覆盖任意配置值，使用 `PROGRESS__` 前缀。
-
-#### 命名规则
-
-格式：`PROGRESS__<SECTION>__<KEY>`
-
-- `PROGRESS__` 是固定前缀
-- `<SECTION>` 是配置节的名称
-- `<KEY>` 是配置项的名称
-- 使用双下划线 `__` 分隔嵌套层级
-
-#### 环境变量示例
+使用 `PROGRESS_` 前缀覆盖任意配置值，嵌套层级用双下划线 `__` 分隔：
 
 ```bash
-# 覆盖 GitHub token
-export PROGRESS__GITHUB__GH_TOKEN="ghp_your_token_here"
-
-# 覆盖通知通道配置（channels 为 JSON 字符串）
-export PROGRESS__NOTIFICATION__CHANNELS='[{"type":"feishu","enabled":true,"webhook_url":"https://open.feishu.cn/...","timeout":30}]'
-
-# 覆盖 Markpost URL
-export PROGRESS__MARKPOST__URL="https://markpost.cc/your-post-key"
-
-# 覆盖代理配置
-export PROGRESS__GITHUB__PROXY="http://127.0.0.1:7890"
-
-# 覆盖分析语言
-export PROGRESS__ANALYSIS__LANGUAGE="en"
-
-# 覆盖时区
-export PROGRESS__TIMEZONE="Asia/Shanghai"
+# 注意：前缀是 PROGRESS_（单个下划线），__ 只是节与键之间的分隔符
+export PROGRESS_CORE__TIMEZONE="Asia/Shanghai"
+export PROGRESS_CORE__GITHUB__GH_TOKEN="ghp_your_token_here"
+export PROGRESS_CORE__ANALYSIS__PROVIDER="openai"
+export PROGRESS_CORE__ANALYSIS__API_KEY="sk-xxxx"
+export PROGRESS_CORE__NOTIFICATION__CHANNELS='[{"type":"feishu","enabled":true,"webhook_url":"https://open.feishu.cn/..."}]'
+export PROGRESS_STATE_HOME="/app/data"
 ```
 
-#### Docker 部署使用环境变量
-
-在 Docker 部署时，通过环境变量配置敏感信息尤其方便：
+在 Docker 部署中通过环境变量注入敏感信息尤其方便，可配合 `.env` 文件：
 
 ```yaml
 # docker-compose.yml
 services:
   progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
+    image: ghcr.io/jukanntenn/progress:latest
     environment:
-      # 通过环境变量覆盖敏感配置
-      - PROGRESS__GITHUB__GH_TOKEN=${GH_TOKEN}
-      - PROGRESS__NOTIFICATION__CHANNELS=${NOTIFICATION_CHANNELS}
-      - PROGRESS__MARKPOST__URL=${MARKPOST_URL}
+      - PROGRESS_CORE__GITHUB__GH_TOKEN=${GH_TOKEN}
+      - PROGRESS_CORE__ANALYSIS__API_KEY=${ANALYSIS_API_KEY}
       - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
 ```
 
-配合 `.env` 文件使用：
+> 应用配置的环境变量仅在**首次种子写入**时生效；如需从文件重新导入，编辑 `config.db.toml` 后重启服务。基础设施配置（如 `PROGRESS_STATE_HOME`）则每次启动都按 **环境变量 > 配置文件 > 默认值** 解析。
 
-```bash
-# .env
-GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-NOTIFICATION_CHANNELS=[{"type":"feishu","enabled":true,"webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/xxx","timeout":30}]
-MARKPOST_URL=https://markpost.cc/your-post-key
-```
-
-### 最小化配置示例
-
-只包含必需配置项的最小化 `config.toml`：
-
-```toml
-[markpost]
-url = "https://markpost.cc/your-post-key"
-
-[notification]
-[[notification.channels]]
-type = "feishu"
-enabled = true
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-
-[github]
-gh_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
-
-[[repos]]
-url = "vitejs/vite"
-```
-
-所有其他配置项将使用默认值。
-
-## 定时任务配置
+## 定时任务
 
 ### 宿主机定时任务
 
-在宿主机上运行时，需要使用系统自带的调度工具配置定时任务。crontab 示例：
-
-编辑 crontab：
+使用系统 crontab：
 
 ```bash
 crontab -e
-```
-
-添加定时任务配置：
-
-```bash
 # 每天早上 8 点运行
-0 8 * * * cd /path/to/progress && uv run progress -c config.toml
+0 8 * * * cd /path/to/progress && uv run progress run -c config.toml
 ```
 
-Crontab 时间格式说明：
+crontab 时间格式：
 
 ```text
 ┌───────────── 分钟 (0 - 59)
@@ -447,69 +235,53 @@ Crontab 时间格式说明：
 
 ### Docker 定时任务
 
-在 Docker 容器中运行时，通过环境变量配置定时任务。
-
-编辑 `docker-compose.yml`，添加 `PROGRESS_SCHEDULE_CRON` 环境变量：
+在容器中通过 `PROGRESS_SCHEDULE_CRON` 环境变量配置（supercronic 读取，s6-overlay 托管）：
 
 ```yaml
 services:
   progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
+    image: ghcr.io/jukanntenn/progress:latest
     environment:
-      # 配置定时任务（每天 8:00 运行）
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
+      - PROGRESS_SCHEDULE_CRON=0 8 * * *   # 每天 8:00 运行
+    # ...其余配置同“快速开始”
 ```
 
-配置完成后重启容器使配置生效：
-
-```bash
-docker-compose down
-docker-compose up -d
-```
+修改后重启容器生效：`docker compose down && docker compose up -d`。
 
 ## Web 服务
 
-Progress 包含 Web 服务，允许您浏览聚合报告并通过 RSS 订阅。
+容器在端口 `5000` 暴露 Web UI 与 JSON API：
 
-### 访问 Web 界面
+| 路径 | 说明 |
+| --- | --- |
+| `/healthz`、`/readyz` | 存活/就绪探针（k8s 风格） |
+| `/reports` | 聚合报告浏览（根路径 `/` 重定向到此） |
+| `/reports/:id` | 单条报告完整内容 |
+| `/integrations` | 各集成状态概览 |
+| `/config` | 在线配置编辑器（写入数据库） |
+| `/api/v1/version` | 版本信息（JSON） |
+| `/api/v1/reports` | 报告列表与详情（JSON） |
+| `/api/v1/integrations` | 集成状态（JSON） |
+| `/api/v1/config` | 读取在线配置（JSON，只读） |
+| `/api/v1/config/schema` | 配置模型的 JSON Schema |
+| `PUT /api/v1/config/{section}` | 更新某个配置节 |
+| `/api/v1/rss` | 最新报告的 RSS 订阅源 |
 
-Web 服务在 Docker 容器中自动运行。您可以访问：
+使用 RSS：复制 `http://<你的主机>:5000/api/v1/rss` 到任意 RSS 阅读器（Feedly、Inoreader、NetNewsWire 等）即可订阅。
 
-- **报告列表**：`http://your-host:5000/` - 浏览所有聚合报告，支持分页（每页 50 条）
-- **报告详情**：`http://your-host:5000/report/<id>` - 查看特定报告的完整内容
-- **RSS 订阅**：`http://your-host:5000/api/v1/rss` - 订阅 RSS 获取最新报告
+## 开发
 
-### Docker Compose 配置
+详见 [docs/development.md](docs/development.md)。要求：Python 3.12+ 配 [uv](https://github.com/astral-sh/uv)，前端需 Node 22+ 配 [pnpm](https://pnpm.io/) 11+。
 
-```yaml
-services:
-  progress:
-    image: jukanntenn/progress:latest
-    container_name: progress
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./claude_settings.json:/root/.claude/settings.json:ro
-      - ./data:/app/data
-    ports:
-      - "5000:5000"
-    environment:
-      - PROGRESS_SCHEDULE_CRON=0 8 * * *
-    restart: always
+本地质量门控（与 CI 一致）：
+
+```bash
+uv sync --extra dev
+uv run ruff check && uv run ruff format --check
+uv run ty check
+uv run pytest -m "not e2e or (e2e and not feed)"
+
+cd web && pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-### 使用 RSS
-
-您可以使用任何 RSS 阅读器订阅 RSS：
-
-1. 复制 RSS URL：`http://your-host:5000/rss`
-2. 添加到您喜欢的 RSS 阅读器（例如 Feedly、Inoreader、NetNewsWire）
-3. 当生成新的聚合报告时接收更新
-
-RSS 订阅源包含最近 50 条报告。
-
+更多文档见 [`docs/`](docs/)：[config.md](docs/config.md)、[deployment.md](docs/deployment.md)、[development.md](docs/development.md)、[observability.md](docs/observability.md)、[testing.md](docs/testing.md)。
