@@ -109,6 +109,16 @@ def check_frontend_type_drift() -> int:
     if gen.returncode != 0:
         print(gen.stderr or gen.stdout)
         return gen.returncode
+    # The committed schema.ts is formatted by Prettier (singleQuote, no semicolons,
+    # tabWidth 2 per web/.prettierrc.json). Reformat the freshly generated file
+    # so the diff compares apples-to-apples.
+    fmt = _run_captured(
+        ["pnpm", "--dir", "web", "exec", "prettier", "--write", "--parser", "typescript", str(check_file)]
+    )
+    if fmt.returncode != 0:
+        print(fmt.stderr or fmt.stdout)
+        check_file.unlink(missing_ok=True)
+        return fmt.returncode
     diff = subprocess.run(
         ["diff", "-u", str(SCHEMA_TS), str(check_file)],
         cwd=str(PROJECT_ROOT),
