@@ -105,9 +105,7 @@ def check_openapi_drift() -> int:
 def check_frontend_type_drift() -> int:
     """Generate schema.ts.check from openapi.json, diff against committed schema.ts."""
     check_file = SCHEMA_TS.with_suffix(".ts.check")
-    gen = _run_captured(
-        ["pnpm", "--dir", "web", "exec", "openapi-typescript", "web/openapi.json", "-o", str(check_file)]
-    )
+    gen = _run_captured(["pnpm", "--dir", "web", "exec", "openapi-typescript", "openapi.json", "-o", str(check_file)])
     if gen.returncode != 0:
         print(gen.stderr or gen.stdout)
         return gen.returncode

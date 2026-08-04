@@ -20,7 +20,7 @@ def extract_edited_paths(command: str) -> list[str]:
     for raw in command.splitlines():
         line = raw.strip()
         if pending_update is not None and line.startswith(MOVE_TO_PREFIX):
-            paths.append(line[len(MOVE_TO_PREFIX):].strip())
+            paths.append(line[len(MOVE_TO_PREFIX) :].strip())
             pending_update = None
             continue
         if pending_update is not None:
@@ -30,7 +30,7 @@ def extract_edited_paths(command: str) -> list[str]:
             continue
         for prefix in PATCH_FILE_PREFIXES:
             if line.startswith(prefix):
-                pending_update = line[len(prefix):].strip()
+                pending_update = line[len(prefix) :].strip()
                 break
     if pending_update is not None:
         paths.append(pending_update)
