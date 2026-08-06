@@ -209,3 +209,43 @@ class TestRstFieldlist:
         text = "Author: Alice,\n        Bob\n\n"
         fields = parse_rst_fieldlist(text)
         assert "Bob" in fields["author"]
+
+    def test_overline_underline_title_with_colon_not_mistaken_for_field(self) -> None:
+        # Regression: DEP 0020 "DEP 0020: Annual Release Cycle" — a section
+        # title adorned with overline+underline that contains a colon must NOT
+        # be parsed as a bare RFC822 field. Before the fix this set
+        # seen_any_field and the blank line after the title ended parsing,
+        # so :Status: was never reached.
+        text = (
+            "================================\n"
+            "DEP 0020: Annual Release Cycle\n"
+            "================================\n"
+            "\n"
+            ":DEP: 0020\n"
+            ":Author: Carlton Gibson\n"
+            ":Status: Draft\n"
+            ":Type: Process\n"
+            ":Created: 2026-04-24\n"
+        )
+        fields = parse_rst_fieldlist(text)
+        # the title line must not become a field
+        assert "dep_0020" not in fields
+        assert fields["status"] == "Draft"
+        assert fields["author"] == "Carlton Gibson"
+        assert fields["type"] == "Process"
+
+    def test_rst_field_form_after_overline_title_with_colon(self) -> None:
+        # End-to-end via parse_dep: a real DEP file whose RST title contains a
+        # colon must parse its :Status: field correctly.
+        text = (
+            "========================\nDEP 0001: DEP Process\n========================\n\n:DEP: 0001\n:Status: Final\n"
+        )
+        result = parse_dep(text, "0001-dep-process.rst")
+        assert result.raw_status == "Final"
+
+    def test_pep_bare_rfc822_unchanged_by_title_guard(self) -> None:
+        # PEP files start with bare RFC822 headers (no overline title); the
+        # title guard must not affect them.
+        fields = parse_rst_fieldlist("PEP: 1\nTitle: PEP Purpose\nStatus: Active\n")
+        assert fields["pep"] == "1"
+        assert fields["status"] == "Active"
