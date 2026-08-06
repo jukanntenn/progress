@@ -146,6 +146,29 @@ CLONE_RETRIES: int = 3
 CLONE_BACKOFF_BASE_SECONDS: float = 3.0
 
 
+def _normalize_status(raw_status: str, kind: str, file_path: str) -> str:
+    """Normalize a raw status with observability on the ``unknown`` sink.
+
+    Wraps :func:`normalize` so a fall-through to ``unknown`` (empty/misspelled
+    raw status, or a parser bug) is never silent: it emits a warning log and a
+    ``progress.proposal.status_unknown`` business event carrying ``kind``,
+    ``raw_status`` and ``file_name`` for triage.
+    """
+    normalized = normalize(raw_status, kind)
+    if normalized == ProposalStatus.UNKNOWN.value:
+        logger.warning(
+            "proposal status normalized to unknown: kind=%s raw_status=%r file=%s",
+            kind,
+            raw_status,
+            file_path,
+        )
+        record_business_event(
+            "progress.proposal.status_unknown",
+            attributes={"kind": kind, "raw_status": raw_status, "file_name": file_path},
+        )
+    return normalized
+
+
 @dataclass
 class ProposalReport:
     """In-memory intermediate result produced by ``check`` (spec proposal §14.1)."""
@@ -396,7 +419,7 @@ class ProposalIntegration:
                 "progress.proposal.parsed",
                 attributes={"kind": kind},
             )
-            normalized_status = normalize(parsed.raw_status, kind)
+            normalized_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
             await self._upsert_proposal(
                 kind=kind,
                 parsed=parsed,
@@ -425,7 +448,7 @@ class ProposalIntegration:
             attributes={"kind": kind},
         )
         parsed = await self._resolve_rfc_title(kind, parsed)
-        normalized_status = normalize(parsed.raw_status, kind)
+        normalized_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
         await self._upsert_proposal(
             kind=kind,
             parsed=parsed,
@@ -542,7 +565,7 @@ class ProposalIntegration:
         )
 
         parsed = await self._resolve_rfc_title(kind, parsed)
-        new_status = normalize(parsed.raw_status, kind)
+        new_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
         old_status = await self._lookup_old_status(kind, parsed.number)
 
         analysis = await self._analyze_proposal(
