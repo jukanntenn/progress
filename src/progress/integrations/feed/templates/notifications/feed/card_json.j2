@@ -1,35 +1,36 @@
-{% from "_feishu_v2.j2" import card %}
+{% from "_feishu_v2.j2" import card, footer_content %}
 {% set feeds = feeds or [] %}
+{% set total = (feeds | map(attribute="entry_count") | sum) or (entry_count | default(0)) %}
 {% set ns = namespace(elements=[]) %}
-{% set pairs = namespace(items=[]) %}
-{% for f in feeds %}{% set pairs.items = pairs.items + [f] %}{% endfor %}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "📡 **" ~ _("Feed Sources") ~ "**", "text_size": "heading-4"}] -%}
-{% set i = namespace(n=0) %}
-{% for batch in [feeds[:2], feeds[2:4], feeds[4:]] %}
-{% if batch %}
+{% if summary %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": summary}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% endif %}
+{# Two-column grid (bisect): feeds grouped in pairs, each pair renders as an
+   equal two-column row; a trailing single feed fills the whole row. Replaces
+   the previous hardcoded 2-2-N split that misaligned on the 3rd batch. #}
+{% for batch in feeds | batch(2) %}
 {%- set cols = namespace(items=[]) -%}
 {% for f in batch %}
+{%- set is_last_single = (loop.last and (batch | length) == 1) -%}
 {%- set cols.items = cols.items + [{
   "tag": "column", "width": "weighted", "weight": 1,
   "background_style": "blue-50", "padding": "14px",
   "horizontal_align": "center", "vertical_align": "center",
   "elements": [
-    {"tag": "markdown", "content": "📡 " ~ f.title, "text_align": "center", "text_size": "normal"},
+    {"tag": "markdown", "content": f.title, "text_align": "center", "text_size": "normal"},
     {"tag": "markdown", "content": "**" ~ f.entry_count ~ "**", "text_align": "center", "text_size": "heading-0"},
     {"tag": "markdown", "content": "<font color='grey'>" ~ _("new articles") ~ "</font>", "text_align": "center", "text_size": "notation"}
   ]
 }] -%}
 {% endfor %}
-{%- set flex = "bisect" if (batch | length) == 2 else ("trisect" if (batch | length) == 3 else "none") -%}
-{%- set ns.elements = ns.elements + [{"tag": "column_set", "flex_mode": flex, "horizontal_align": "center", "columns": cols.items}] -%}
-{% endif %}
+{%- set ns.elements = ns.elements + [{"tag": "column_set", "flex_mode": "bisect", "horizontal_align": "center", "columns": cols.items}] -%}
 {% endfor %}
 {%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
 {% if markpost_url %}
-{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("View Full Digest") ~ "（Markpost）"}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": markpost_url}]}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("View Report") ~ " "}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": markpost_url}]}] -%}
 {%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
 {% endif %}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>⏱ " ~ _("Report tool: Progress @") ~ " " ~ run_at ~ "</font>", "text_size": "notation"}] -%}
-{% set total = (feeds | map(attribute="entry_count") | sum) or (entry_count | default(0)) %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": footer_content(generated_at), "text_align": "center", "text_size": "notation"}] -%}
 {% set text_tags = [{"tag": "text_tag", "text": {"tag": "plain_text", "content": total ~ " " ~ _("new")}, "color": "wathet"}] %}
-{{ card(title, ns.elements, markpost_url, "wathet", "", "news-outlined", "wathet", text_tags) }}
+{{ card(title, ns.elements, markpost_url, "wathet", header_icon_token="news-outlined", header_icon_color="wathet", text_tags=text_tags) }}

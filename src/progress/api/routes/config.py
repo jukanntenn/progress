@@ -202,7 +202,7 @@ async def test_notifications(request: Request) -> TestNotificationResponse:
     if not channels:
         return TestNotificationResponse(results=[], summary="no_channels")
     event = TestNotificationEvent()
-    renderer = JinjaRenderer()
+    renderer = JinjaRenderer(cfg)
     dispatcher = Dispatcher(channels, renderer)
     outcome = await dispatcher.dispatch(event)
     for r in outcome.results:

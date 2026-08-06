@@ -1,6 +1,6 @@
 {% from "_email.j2" import email_shell, badge, cta_button, section_heading %}
 {% set entries = entries or [] %}
-{% call email_shell(title, "indigo", "RELEASE " ~ (entries | length), "indigo") %}
+{% call email_shell(title, "indigo", "RELEASE " ~ (entries | length), "indigo", generated_at=generated_at) %}
 {{ section_heading("📦 " ~ _("Version List") ~ " (" ~ (entries | length) ~ ")") }}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
   {% for e in entries %}
@@ -15,6 +15,6 @@
   {% endfor %}
 </table>
 {% if markpost_url %}
-{{ cta_button(markpost_url, _("View Full Changelog") ~ "（Markpost）", "indigo") }}
+{{ cta_button(markpost_url, _("View Report"), "indigo") }}
 {% endif %}
 {% endcall %}

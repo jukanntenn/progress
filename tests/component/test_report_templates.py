@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from progress.cli.notifications.status import status_label
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
 
@@ -26,6 +27,7 @@ _TEMPLATE_DIRS = [
 def env():
     env = create_environment(_TEMPLATE_DIRS, autoescape=False)
     env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
+    env.globals.update({"status_label": status_label})  # type: ignore
     return env
 
 
@@ -274,7 +276,8 @@ class TestProposalReport:
         )
         assert "## [EIP](https://github.com/ethereum/EIPs)" in out
         assert "#️⃣ #1" in out
-        assert "draft → final" in out
+        # status renders via status_label (msgid keys in the en catalog)
+        assert "proposal_status_draft → proposal_status_final" in out
         assert "📄 eip-1.md" in out
         assert "Click to view detailed analysis" in out
 

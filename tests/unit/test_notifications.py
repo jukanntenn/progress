@@ -250,7 +250,7 @@ class TestConsoleChannel:
         assert "Progress Report" in output
         assert "FAILED" in output
         assert "bad/repo" in output
-        assert "View Detailed Report" in output
+        assert "View Report" in output
 
     async def test_send_falls_back_to_body_for_unknown_kind(self) -> None:
         ch = ConsoleChannel()

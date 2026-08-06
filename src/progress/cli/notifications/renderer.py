@@ -25,7 +25,7 @@ FeishuMessage × proposal variants) with a declarative template matrix.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from progress.cli.notifications.base import ChannelPayload, ContentType
 from progress.cli.notifications.events import (
@@ -37,6 +37,10 @@ from progress.cli.notifications.status import status_color, status_icon, status_
 from progress.integrations.registry import discover_integrations
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
+from progress.utils.timezone import format_now_local, format_now_utc
+
+if TYPE_CHECKING:
+    from progress.config.root import CoreConfig
 
 _NOTIFICATIONS_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -107,13 +111,21 @@ class JinjaRenderer:
     console channel can re-derive structured rich output from the same data
     the templates consumed (without it the channel only has the rendered
     plain-text body, which is too flat to reconstruct a rich card).
+
+    ``cfg`` (optional) provides the configured timezone so the per-render
+    ``generated_at`` footer timestamp reflects the user's locale instead of
+    UTC. When omitted (e.g. unit tests), UTC is used.
     """
+
+    def __init__(self, cfg: CoreConfig | None = None) -> None:
+        self._cfg = cfg
 
     def render(self, event: Any, content_type: ContentType) -> ChannelPayload:
         kind = getattr(event, "kind", "report")
         suffix = _CONTENT_TYPE_SUFFIX.get(content_type, "plain_text")
         template_name = f"{kind}/{suffix}.j2"
-        template_vars: dict[str, Any] = {"event": event}
+        generated_at = format_now_local(self._cfg.timezone) if self._cfg is not None else format_now_utc()
+        template_vars: dict[str, Any] = {"event": event, "generated_at": generated_at}
         if isinstance(event, NotificationEvent):
             template_vars["title"] = event.title
             template_vars["summary"] = event.summary

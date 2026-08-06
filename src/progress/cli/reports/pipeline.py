@@ -23,7 +23,6 @@ from dataclasses import dataclass, field
 import logging
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import aiohttp
 from pydantic import ValidationError
@@ -36,6 +35,7 @@ from progress.cli.ai import (
     run_extraction,
 )
 from progress.cli.notifications.events import ReportEvent, ReportRepo
+from progress.cli.notifications.status import status_label
 from progress.cli.outcome import RunOutcome
 from progress.cli.reports.markpost import MarkpostClient, MarkpostError, split_batches, split_sections
 from progress.cli.reports.prompts import render_prompt
@@ -49,7 +49,7 @@ from progress.observability import record_business_event
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.markdown import downgrade_headings
 from progress.utils.templating import create_environment
-from progress.utils.timezone import now_utc
+from progress.utils.timezone import format_now_local
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,7 @@ def _get_env() -> Any:
     if _env is None:
         env = create_environment(_collect_integration_template_dirs(), autoescape=False)
         env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # ty:ignore[no-matching-overload]
+        env.globals.update({"status_label": status_label})  # ty:ignore[no-matching-overload]
         _env = env
     return _env
 
@@ -544,14 +545,10 @@ async def _persist_batch_rows(report_id: int, clean_title: str, urls: list[Batch
 def _format_generation_time(cfg: CoreConfig) -> str:
     """Format now in the configured core timezone for the report footer.
 
-    Mirrors ``feed.tracker._format_local_run_at``: UTC now → configured zone →
-    ``strftime("%Y-%m-%d %H:%M:%S %Z")``. Falls back to UTC ISO on failure.
+    Thin wrapper over :func:`progress.utils.timezone.format_now_local`. Kept as
+    a call-site local for readability where ``cfg`` is already in scope.
     """
-    try:
-        local_now = now_utc().astimezone(ZoneInfo(cfg.timezone))
-        return local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
-    except Exception:
-        return now_utc().strftime("%Y-%m-%d %H:%M:%S %Z")
+    return format_now_local(cfg.timezone)
 
 
 async def run(

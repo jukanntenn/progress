@@ -23,7 +23,7 @@ section, to avoid repeating it for every kind.
 {% else %}
 ### #{{ report.number }} {{ report.file_path | basename }}
 {% endif %}
-<small>#️⃣ #{{ report.number }} · 📌 {% if report.old_status %}{{ report.old_status }} → {{ report.new_status }}{% else %}{{ report.new_status }} ({{ _("new") }}){% endif %} · 📄 {{ report.file_path | basename }}</small>
+<small>#️⃣ #{{ report.number }} · 📌 {% if report.old_status %}{{ status_label("proposal_status", report.old_status) }} → {{ status_label("proposal_status", report.new_status) }}{% else %}{{ status_label("proposal_status", report.new_status) }} ({{ _("new") }}){% endif %} · 📄 {{ report.file_path | basename }}</small>
 
 {{ report.analysis_summary or _("No summary available.") }}
 

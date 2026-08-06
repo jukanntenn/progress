@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from progress.utils.timezone import (
+    format_now_local,
+    format_now_utc,
     from_utc,
     get_now,
     now_utc,
@@ -61,3 +63,23 @@ class TestFormatDatetime:
     def test_custom_format(self) -> None:
         dt = datetime(2026, 1, 15, tzinfo=UTC)
         assert render_datetime(dt, "%Y/%m/%d") == "2026/01/15"
+
+
+class TestFormatNowLocal:
+    def test_returns_timestamp_in_requested_timezone(self) -> None:
+        s = format_now_local("Asia/Shanghai")
+        # Shanghai is UTC+8, so the suffix is the zone abbreviation or offset
+        assert s.endswith(("CST", "+08:00"))
+        # format is YYYY-MM-DD HH:MM:SS Z
+        assert len(s) >= 19
+
+    def test_invalid_timezone_falls_back_to_utc(self) -> None:
+        s = format_now_local("Not/A/Zone")
+        assert s.endswith("UTC")
+
+
+class TestFormatNowUtc:
+    def test_returns_utc_timestamp(self) -> None:
+        s = format_now_utc()
+        assert s.endswith("UTC")
+        assert len(s) >= 19

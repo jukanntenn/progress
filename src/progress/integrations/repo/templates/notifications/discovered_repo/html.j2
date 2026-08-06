@@ -1,14 +1,12 @@
-{% from "_email.j2" import email_shell, info_row, badge, cta_button, hr, section_heading %}
+{% from "_email.j2" import email_shell, info_row, badge, cta_button, hr %}
 {% set repos = repos or [] %}
-{% call email_shell(title, "turquoise", "NEW " ~ (repos | length), "turquoise") %}
-{{ section_heading("📦 " ~ _("Newly Discovered Repositories") ~ " (" ~ (repos | length) ~ ")") }}
+{% call email_shell(title, "turquoise", "NEW " ~ (repos | length), "turquoise", generated_at=generated_at) %}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
   {% for repo in repos %}
   {{ info_row("📦 " ~ repo.name, repo.url, "", "", repo.url, _("View"), "grey", "turquoise") }}
   {% endfor %}
 </table>
-<div style="background-color:#E8F3FF;border-radius:6px;padding:10px 12px;font-size:13px;color:#3370FF;margin-top:10px;">💡 {{ _("New repos can be added under integrations.repo in config.toml") }}</div>
 {% if markpost_url %}
-{{ cta_button(markpost_url, _("View Discovery Details") ~ "（Markpost）", "turquoise") }}
+{{ cta_button(markpost_url, _("View Report"), "turquoise") }}
 {% endif %}
 {% endcall %}

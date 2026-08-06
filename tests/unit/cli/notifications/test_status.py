@@ -25,7 +25,20 @@ from progress.utils.i18n import override
 # categories consumed by the templates and console_card.py.
 _EXPECTED_KEYS = {
     "repo_status": {"success", "failed", "skipped"},
-    "proposal_status": {"Final", "Review", "Draft", "Idea", "Withdrawn", "Rejected", "Stagnant", "Living"},
+    "proposal_status": {
+        "draft",
+        "review",
+        "accepted",
+        "final",
+        "active",
+        "stagnant",
+        "deferred",
+        "withdrawn",
+        "rejected",
+        "superseded",
+        "moved",
+        "unknown",
+    },
     "proposal_kind": {"EIP", "ERC", "PEP", "RFC", "DEP"},
     "changelog_level": {"MAJOR", "MINOR", "PATCH"},
 }
@@ -52,10 +65,11 @@ class TestStatusColor:
             ("repo_status", "success", "green"),
             ("repo_status", "failed", "red"),
             ("repo_status", "skipped", "grey"),
-            ("proposal_status", "Final", "green"),
-            ("proposal_status", "Review", "orange"),
-            ("proposal_status", "Withdrawn", "red"),
-            ("proposal_status", "Living", "blue"),
+            ("proposal_status", "final", "green"),
+            ("proposal_status", "review", "orange"),
+            ("proposal_status", "withdrawn", "red"),
+            ("proposal_status", "active", "blue"),
+            ("proposal_status", "unknown", "grey"),
             ("proposal_kind", "EIP", "blue"),
             ("proposal_kind", "ERC", "purple"),
             ("proposal_kind", "PEP", "turquoise"),
@@ -90,6 +104,22 @@ class TestStatusLabel:
             assert status_label("repo_status", "success") == "成功"
             assert status_label("repo_status", "failed") == "失败"
             assert status_label("repo_status", "skipped") == "已跳过"
+
+    def test_proposal_status_labels_in_chinese(self) -> None:
+        # All 12 normalized proposal statuses resolve to localized Chinese labels.
+        with override("zh-hans"):
+            assert status_label("proposal_status", "draft") == "草案"
+            assert status_label("proposal_status", "review") == "审议中"
+            assert status_label("proposal_status", "accepted") == "已接受"
+            assert status_label("proposal_status", "final") == "最终"
+            assert status_label("proposal_status", "active") == "活跃"
+            assert status_label("proposal_status", "stagnant") == "停滞"
+            assert status_label("proposal_status", "deferred") == "已搁置"
+            assert status_label("proposal_status", "withdrawn") == "已撤回"
+            assert status_label("proposal_status", "rejected") == "已拒绝"
+            assert status_label("proposal_status", "superseded") == "已取代"
+            assert status_label("proposal_status", "moved") == "已迁移"
+            assert status_label("proposal_status", "unknown") == "未知"
 
     def test_label_falls_back_to_msgid_in_english(self) -> None:
         with override("en"):

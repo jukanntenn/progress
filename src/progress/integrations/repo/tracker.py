@@ -717,6 +717,11 @@ class RepoIntegration:
             repo_statuses = {s.title: s.payload.get("status") or result.status for s in update_sections}
             repo_urls = {s.title: s.payload.get("repo_web_url") or "" for s in update_sections}
             total_commits = sum(int(s.payload.get("commit_count", 0) or 0) for s in update_sections)
+            repos_with_updates = sum(
+                1
+                for s in update_sections
+                if int(s.payload.get("commit_count", 0) or 0) > 0 or s.payload.get("releases")
+            )
             events.append(
                 NotificationEvent(
                     kind="repo_update",
@@ -730,6 +735,7 @@ class RepoIntegration:
                         "repo_urls": repo_urls,
                         "total_commits": total_commits,
                         "total_repos": len(repo_statuses),
+                        "repos_with_updates": repos_with_updates,
                     },
                 )
             )

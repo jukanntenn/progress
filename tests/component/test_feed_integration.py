@@ -379,8 +379,9 @@ class TestBuildNotification:
         assert event.data["entry_count"] == 2
         feed_titles = {f["title"] for f in event.data["feeds"]}
         assert feed_titles == {"A", "B"}
-        # run_at timestamp present for the Feishu footer
-        assert event.data["run_at"]
+        # the footer timestamp is now injected per-render by the renderer
+        # (generated_at), so the feed event no longer carries a run_at field
+        assert "run_at" not in event.data
 
 
 class TestPipelineCommitCount:

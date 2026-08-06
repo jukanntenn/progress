@@ -286,7 +286,7 @@ class TestRunNotifications:
             "progress.cli.core.build_channels",
             lambda config, *, session=None: [_StubChannel()],
         )
-        monkeypatch.setattr("progress.cli.core.JinjaRenderer", lambda: None)
+        monkeypatch.setattr("progress.cli.core.JinjaRenderer", lambda cfg=None: None)
 
         cfg = CoreConfig(state_home="data")
         await run_notifications(

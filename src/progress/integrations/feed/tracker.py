@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
@@ -352,7 +351,6 @@ class FeedIntegration:
                     "feed_count": len(feeds_payload),
                     "entry_count": entry_count,
                     "feeds": feeds_payload,
-                    "run_at": _format_local_run_at(self._cfg),
                 },
             )
         ]
@@ -378,22 +376,6 @@ def _entry_analysis(analysis: FeedAnalysis, entry: RawEntry, index: int) -> str:
         attributes={"entry_index": str(index), "entry_id": str(entry.id)},
     )
     return ""
-
-
-def _format_local_run_at(cfg: CoreConfig | None) -> str:
-    """Format ``now`` in the core timezone for the notification footer (§8.3.1).
-
-    Mirrors feeber's ``to_local(run_at, config.timezone)`` then
-    ``strftime("%Y-%m-%d %H:%M:%S %Z")``. Returns an empty string when the core
-    timezone cannot be resolved (defensive — should not happen in practice).
-    """
-    if cfg is None:
-        return ""
-    try:
-        local_now = now_utc().astimezone(ZoneInfo(cfg.timezone))
-    except Exception:  # pragma: no cover - defensive
-        return ""
-    return local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def _degraded_analysis(feed: Feed, *, reason: str) -> FeedAnalysis:

@@ -142,7 +142,7 @@ async def run(
                         break
                 return
 
-            renderer = JinjaRenderer()
+            renderer = JinjaRenderer(cfg)
             dispatcher = Dispatcher(channels, renderer)
             active_producers = len(integrations)
             while active_producers > 0:
@@ -302,7 +302,7 @@ async def run_notifications(
         logger.info("no enabled notification channels; skipping dispatch")
         return
 
-    renderer = JinjaRenderer()
+    renderer = JinjaRenderer(cfg)
     dispatcher = Dispatcher(channels, renderer)
     logger.info("dispatching %d notification event(s)", len(events))
     for event in events:

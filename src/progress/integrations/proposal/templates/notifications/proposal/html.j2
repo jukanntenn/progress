@@ -1,6 +1,6 @@
 {% from "_email.j2" import email_shell, badge, cta_button, hr, section_heading %}
 {% set proposals = proposals or [] %}
-{% call email_shell(title, "blue", "NEW " ~ (proposals | length), "blue") %}
+{% call email_shell(title, "blue", "NEW " ~ (proposals | length), "blue", generated_at=generated_at) %}
 {{ section_heading("📄 " ~ _("Proposal List") ~ " (" ~ (proposals | length) ~ ")") }}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:13px;margin:4px 0;table-layout:fixed;">
   <thead><tr>
@@ -10,7 +10,8 @@
   </tr></thead>
   <tbody>
   {% for p in proposals %}
-  {%- set status_text = (p.old_status ~ " → " ~ p.new_status) if p.old_status else (p.new_status ~ " (" ~ _("new") ~ ")") -%}
+  {%- set new_label = status_label("proposal_status", p.new_status) -%}
+  {%- set status_text = (status_label("proposal_status", p.old_status) ~ " → " ~ new_label) if p.old_status else (new_label ~ " (" ~ _("new") ~ ")") -%}
   {%- set sc = status_color("proposal_status", p.new_status) -%}
   {%- set kc = status_color("proposal_kind", p.kind) -%}
   <tr>
@@ -24,6 +25,6 @@
   </tbody>
 </table>
 {% if markpost_url %}
-{{ cta_button(markpost_url, _("View Proposal Details") ~ "（Markpost）", "blue") }}
+{{ cta_button(markpost_url, _("View Report"), "blue") }}
 {% endif %}
 {% endcall %}

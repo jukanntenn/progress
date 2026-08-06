@@ -87,8 +87,9 @@ def test_html_renders_failed_repos(env, repo_statuses: dict[str, str]) -> None:
     # failure state → red header + FAILED badge in the header
     assert "background-color:#F53F3F" in html
     assert "FAILED" in html
-    # failed count appears in the stat tile (red-tinted) and the section heading
-    assert f"Failed Repositories ({len(_FAILED_REPOS)})" in html
+    # failed count appears in the stat tile (red-tinted); the section heading
+    # carries no redundant count (the header badge already shows it)
+    assert "Failed Repositories" in html
 
 
 def test_card_json_renders_failed_count(env, repo_statuses: dict[str, str]) -> None:
