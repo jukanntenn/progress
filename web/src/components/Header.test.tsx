@@ -63,7 +63,7 @@ describe('Header UserMenu', () => {
     const item = await screen.findByText('Change Password')
     fireEvent.click(item)
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/settings')
+      expect(navigateMock).toHaveBeenCalledWith('/settings/account')
     })
   })
 

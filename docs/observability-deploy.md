@@ -87,11 +87,11 @@ environment = "production"
 ## 3. 构建并推送镜像
 
 ```bash
-# 多架构构建并推送到 192.168.5.50:5000
-python docker/build.py --push
+# 多架构构建并推送到 192.168.5.50:5000（生产 tag 为 :main）
+uv run python docker/build.py --push --tags main
 ```
 
-确认推送成功（镜像 `192.168.5.50:5000/progress:latest` 已更新）。Dockerfile 会在构建阶段执行 `uv export …`，新依赖（opentelemetry-*、sentry-sdk）随之固化进镜像。
+确认推送成功（镜像 `192.168.5.50:5000/progress:main` 已更新）。Dockerfile 会在构建阶段执行 `uv export …`，新依赖（opentelemetry-*、sentry-sdk）随之固化进镜像。
 
 ---
 

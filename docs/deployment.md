@@ -139,9 +139,10 @@ When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back
 
 ## Configuration
 
-Application configuration lives in the **database** `config` table, split into sections (`core`, `repo`, `changelog`, `proposal`). `config.toml` is Ansible-class and carries **only** `state_home`; everything else is edited at runtime:
+Application configuration lives in the **database** `config` table, split into sections (`core`, `repo`, `changelog`, `proposal`, `feed`). `config.toml` is Ansible-class and carries **only** `state_home`; everything else is edited at runtime:
 
-- Edit ongoing settings through the web UI (`/config`) or the API (`PUT /api/v1/config/{section}`).
+- Edit ongoing settings through the web UI (`/config`) or the API (`PUT /api/v1/config/{section}`). The Web UI renders the config form from the server's JSON Schema via RJSF; secret fields are masked with `type="password"` inputs in the browser. Writes are validated with the section's Pydantic model — invalid payloads return 422 and leave the DB untouched.
+- On container startup, after DB migrations, `migrate_config_data()` repairs known-bad structures from the legacy editor (e.g. `core.observability.bugsink` stored as a list, `recipient` containing non-string entries) so the runtime can load the config without falling back to defaults. It is idempotent: healthy data is never touched.
 - For a first deploy or testing, place a `config.db.toml` seed file next to `config.toml`; it is imported into the DB on startup (DB values win over the seed). In production, ensure no `config.db.toml` exists — the DB is the single source of truth.
 
 Environment-variable overrides (`PROGRESS_` prefix, `__` for nested keys) still apply, but only for keys the DB does not already set. For a production deploy, prefer editing via the Web UI over env vars. Note: `core.observability.otel.*` is not a config field (OTel export paths derive from `state_home`) — do **not** set `PROGRESS_OBSERVABILITY__OTEL__*` env vars, they will fail `CoreConfig` validation and prevent startup.
@@ -215,5 +216,19 @@ An automated deployment playbook lives in `devops/ansible/`. It renders `config.
 ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
   --vault-password-file ~/.ansible-vault/progress.pwd
 ```
+
+Internal production on `fn` pulls the image from the in-network registry at `192.168.5.50:5000` under the **`:main`** tag (the dogfooding `:next` tag is retired). The release flow is **manual** — no git tag is cut and `release.yml` is not involved; cutting a `v*` tag would publish to GHCR instead, which is a separate path. To ship a new build to `fn`:
+
+```bash
+# 1. build + push :main to the in-network registry (run on a host that can reach 192.168.5.50:5000)
+uv run python docker/build.py --push --tags main                   # host platform only (faster)
+uv run python docker/build.py --push --tags main --all-platforms   # amd64 + arm64
+
+# 2. deploy — playbook pulls :main (pull: always) and recreates the container
+ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
+  --vault-password-file ~/.ansible-vault/progress.pwd
+```
+
+After each upgrade, verify the DB auto-migration succeeded — startup migrations never crash on schema errors (they log a `migration_failed` metric and degrade), so check `data/observability/metrics.jsonl` and `data/logs/progress.log` rather than relying on the container being up.
 
 The inventory (`hosts.yml`) targets the new server (`fn`); the legacy server (`oect`) is retained until the new build is verified and the old one decommissioned.

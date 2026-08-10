@@ -98,7 +98,7 @@ test.describe('config console: test notification + dirty guard', () => {
     await page.addInitScript(authInit, authToken)
     await page.goto('/config')
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
 
     const button = page.getByRole('button', { name: /Test Notifications/i })
     await button.click()
@@ -132,16 +132,15 @@ test.describe('config console: test notification + dirty guard', () => {
     await page.addInitScript(authInit, authToken)
     await page.goto('/config')
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
 
     // Initially the Core section shows "No changes" (draft == saved).
     await expect(page.getByText('No changes').first()).toBeVisible()
 
-    // The timezone field renders as a <select> labelled "Timezone" (no `name`
-    // attr — react-hook-form/base-ui fields are uncontrolled). Select a
-    // different option to flip the section to dirty.
-    const tzSelect = page.locator('label', { hasText: 'Timezone' }).locator('..').locator('select')
-    await tzSelect.selectOption('Asia/Tokyo')
+    // The Language field renders as a text input (RJSF schema-driven form);
+    // #root_language is the stable RJSF-generated id (label text varies with locale).
+    const langInput = page.locator('#root_language')
+    await langInput.fill('zh-Hans')
 
     // The dirty indicator ("Unsaved changes") now appears for that section.
     await expect(page.getByText('Unsaved changes').first()).toBeVisible({ timeout: 5_000 })

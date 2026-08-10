@@ -106,16 +106,25 @@ into the DB `config` table:
 
 ## Editing configuration
 
-- **Web UI** — the *Configuration* page renders a form from the JSON Schema
-  (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
-- **API** — `GET /api/v1/config` returns all sections (SecretStr fields masked
-  as `**********`); `PUT /api/v1/config/{section}` validates and writes one.
+- **Web UI** — the *Configuration* page renders an RJSF form from the JSON
+  Schema (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
+- **API** — `GET /api/v1/config` returns all sections in **plaintext**
+  (secret fields carry real values; the Web UI masks them with
+  `type="password"` inputs); `PUT /api/v1/config/{section}` validates the
+  payload with the section's Pydantic model (`extra="forbid"`) and writes a
+  normalized plaintext copy. A failed validation returns 422 and leaves the
+  DB untouched.
 - **Seed file** — edit `config.db.toml` and restart (re-imports into the DB).
 
 Secrets (`gh_token`, `api_key`, `password`, `webhook_url`, `dsn`, markpost
-`url`) are `pydantic.SecretStr`: they are stored as real values in the DB
-(trusted internal store) but serialized to `**********` in every API response.
-Submitting the mask value unchanged preserves the stored value.
+`url`) are `pydantic.SecretStr`: stored as real plaintext values in the DB
+(trusted internal store) and returned as-is by the API. The browser renders
+them as password fields (with a reveal toggle); there is no mask sentinel —
+what you submit is what gets stored.
+
+System-internal fields (`state_home`, `auth.secret_key`,
+`auth.initial_admin_password`) are excluded from the editable schema and from
+API responses; writes always preserve their DB values.
 
 ## Zero configuration
 

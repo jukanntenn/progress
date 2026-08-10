@@ -54,8 +54,8 @@ test.describe('config persistence flow', () => {
     // Let the lazy-loaded route + config query settle before asserting.
     await page.waitForLoadState('networkidle')
 
-    // The page title heading is i18n key `config.title` ("Configuration").
-    await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
+    // The Settings page title is i18n key `settings.title` ("Settings").
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
     // The reports nav link must be present (proves the SPA shell mounted).
     await expect(page.getByRole('link', { name: 'Reports', exact: true })).toBeVisible()
 
