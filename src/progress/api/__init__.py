@@ -30,6 +30,7 @@ from progress.cli.git.local import set_git_proxy
 from progress.config.loader import apply_db_and_seed, load_config
 from progress.config.root import CoreConfig
 from progress.db import close_db, init_db
+from progress.db.migrations._config_data import migrate_config_data
 from progress.observability import (
     instrument_fastapi_app,
     setup_observability,
@@ -104,6 +105,7 @@ def _lifespan_factory(config_path: str | None):
         try:
             cfg = load_config(config_path)
             await init_db(cfg.state_home)
+            await migrate_config_data()
             cfg = await apply_db_and_seed(cfg, config_path)
 
             cfg = await bootstrap_auth(cfg)

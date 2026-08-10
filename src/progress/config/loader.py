@@ -185,19 +185,11 @@ def _load_seed_core(config_path: str | None) -> dict[str, Any]:
 def merge_db_config(cfg: CoreConfig, db_core: dict[str, Any]) -> CoreConfig:
     """Merge DB-stored core section into a CoreConfig built from the Ansible file.
 
-    DB values override Ansible-file values for non-``state_home`` fields.
-    ``state_home`` is always preserved from the Ansible file (Ansible-owned).
-
-    Uses ``model_dump(mode="python")`` (not ``"json"``) so ``SecretStr`` fields
-    stay as live objects during the merge. With ``mode="json"`` every secret is
-    serialized to the ``"**********"`` mask sentinel; a partial ``db_core``
-    (e.g. ``{"language": ...}`` from the language switcher) then leaves the
-    un-overridden secrets masked, corrupting the in-memory config until a
-    restart. The Python-mode dump preserves the real secret values.
+    明文方案：DB 存的是规范化明文 dict，直接 model_validate。
+    state_home 始终保留 ansible-file 的值（Ansible-owned）。
     """
     if not db_core:
         return cfg
-    state_home = cfg.state_home
-    merged = {**cfg.model_dump(mode="python"), **db_core}
-    merged["state_home"] = state_home
+    merged = dict(db_core)
+    merged["state_home"] = cfg.state_home
     return CoreConfig.model_validate(merged)

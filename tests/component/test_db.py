@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from tortoise.exceptions import IntegrityError
 
-from progress.db import _unmask_real_secrets, close_db, get_all_config, get_config, init_db, set_config
+from progress.db import close_db, get_all_config, get_config, init_db, set_config
 from progress.db.models.batch import Batch
 from progress.db.models.config import Config
 from progress.db.models.report import Report
@@ -50,13 +50,13 @@ class TestConfigCrud:
     async def test_set_and_get(self) -> None:
         await set_config("core", {"language": "zh-hans"})
         out = await get_config("core")
-        assert out == {"language": "zh-hans"}
+        assert out["language"] == "zh-Hans"
 
     async def test_set_upserts(self) -> None:
         await set_config("core", {"language": "en"})
         await set_config("core", {"language": "zh-hans"})
         out = await get_config("core")
-        assert out == {"language": "zh-hans"}
+        assert out["language"] == "zh-Hans"
         assert await Config.all().count() == 1
 
     async def test_get_all(self) -> None:
@@ -73,34 +73,31 @@ class TestConfigCrud:
         with pytest.raises(ConfigException):
             await set_config("repo", {"repos": "not-a-list"})
 
-    async def test_set_unknown_section_passes_through(self) -> None:
-        # Unknown sections (no registered schema) are stored as-is.
-        await set_config("unknown", {"key": "val"})
-        out = await get_config("unknown")
-        assert out == {"key": "val"}
+    async def test_set_unknown_section_rejected(self) -> None:
+        """Unknown sections have no Pydantic model; set_config rejects them."""
+        with pytest.raises(ConfigException, match="unknown config section"):
+            await set_config("unknown", {"key": "val"})
 
-    async def test_set_preserves_masked_secret(self) -> None:
-        # Spec 02: a PUT that round-trips the SecretStr mask sentinel must
-        # preserve the real stored value rather than overwriting it with the
-        # literal mask string.
+    async def test_mask_literal_stored_as_plain_value(self) -> None:
+        """Plaintext design: there is no sentinel — a submitted '**********'
+        is a literal string like any other and is stored verbatim."""
         await set_config("core", {"github": {"gh_token": "ghp_real_secret"}})
         await set_config(
             "core",
             {"github": {"gh_token": "**********"}, "language": "zh-hans"},
         )
         out = await get_config("core")
-        assert out["github"]["gh_token"] == "ghp_real_secret"
-        assert out["language"] == "zh-hans"
+        assert out["github"]["gh_token"] == "**********"
+        assert out["language"] == "zh-Hans"
 
     async def test_set_overwrites_when_real_value_submitted(self) -> None:
         await set_config("core", {"github": {"gh_token": "old"}})
         await set_config("core", {"github": {"gh_token": "new"}})
         assert (await get_config("core"))["github"]["gh_token"] == "new"
 
-    async def test_set_preserves_masked_secret_in_list_of_dicts(self) -> None:
-        # Spec 02: ``notification.channels`` is a discriminated union list;
-        # a channel that round-tripped its masked ``password`` must keep the
-        # real one while non-secret edits still take effect.
+    async def test_plaintext_round_trip_in_list_of_dicts(self) -> None:
+        """notification.channels secrets move with their channel object; no
+        positional mask merging (acceptance #4/#5)."""
         await set_config(
             "core",
             {"notification": {"channels": [{"type": "email", "password": "real_pw"}]}},
@@ -110,25 +107,27 @@ class TestConfigCrud:
             {"notification": {"channels": [{"type": "email", "password": "**********"}]}},
         )
         out = await get_config("core")
-        assert out["notification"]["channels"][0]["password"] == "real_pw"
+        assert out["notification"]["channels"][0]["password"] == "**********"
 
     async def test_set_plugin_secret_not_masked(self) -> None:
-        """set_config with a real SecretStr value must store the real value, not the mask.
-
-        _validate_section round-trips through model_validate + model_dump(mode='json')
-        which masks SecretStr to '**********'. _unmask_real_secrets must restore it.
-        """
+        """A real SecretStr value must be stored as real plaintext."""
         await set_config("feed", {"base_url": "http://localhost:18080", "api_key": "real_api_key_123"})
         out = await get_config("feed")
         assert out["api_key"] == "real_api_key_123"
         assert out["base_url"] == "http://localhost:18080"
 
-    async def test_set_plugin_secret_mask_preserved_from_db(self) -> None:
-        """When the submitted value is the mask sentinel, the existing DB value is kept."""
+    async def test_set_plugin_secret_plaintext_round_trip(self) -> None:
+        """The value submitted is the value stored (no sentinel preservation)."""
         await set_config("feed", {"base_url": "http://localhost:18080", "api_key": "real_api_key_123"})
         await set_config("feed", {"base_url": "http://localhost:18080", "api_key": "**********"})
         out = await get_config("feed")
-        assert out["api_key"] == "real_api_key_123"
+        assert out["api_key"] == "**********"
+
+    async def test_plugin_secret_cleared_with_empty_string(self) -> None:
+        await set_config("feed", {"base_url": "http://localhost:18080", "api_key": "real"})
+        await set_config("feed", {"base_url": "http://localhost:18080", "api_key": ""})
+        out = await get_config("feed")
+        assert out["api_key"] == ""
 
     async def test_set_list_shortening_takes_effect(self) -> None:
         # Removing list items must work (no masked-secret coupling here).
@@ -210,37 +209,31 @@ class TestGitHubOwnerModel:
         assert await GitHubOwner.all().count() == 2
 
 
-class TestUnmaskRealSecrets:
-    """Pure-function tests for _unmask_real_secrets."""
+class TestInternalFieldPreservation:
+    """set_config-level checks for _preserve_internal_fields behaviour."""
 
-    def test_replaces_masked_value_with_original(self) -> None:
+    async def test_core_internal_fields_preserved_across_writes(self) -> None:
+        await set_config(
+            "core",
+            {"state_home": "/app/data", "auth": {"secret_key": "sk-1", "initial_admin_password": "pw-1"}},
+        )
+        await set_config("core", {"language": "zh-Hans"})
+        out = await get_config("core")
+        assert out["state_home"] == "/app/data"
+        assert out["auth"]["secret_key"] == "sk-1"
+        assert out["auth"]["initial_admin_password"] == "pw-1"
+        assert out["language"] == "zh-Hans"
 
-        result = _unmask_real_secrets({"api_key": "**********"}, {"api_key": "real_key"})
-        assert result == {"api_key": "real_key"}
+    async def test_first_boot_defaults_used(self) -> None:
+        """No existing row → nothing injected; state_home falls back to the
+        model default 'data' (spec 3.6.2 first-deploy boundary)."""
+        await set_config("core", {"language": "zh-Hans"})
+        out = await get_config("core")
+        assert out["state_home"] == "data"
 
-    def test_preserves_non_masked_value(self) -> None:
-
-        result = _unmask_real_secrets({"base_url": "http://x"}, {"base_url": "http://x"})
-        assert result == {"base_url": "http://x"}
-
-    def test_nested_dict_unmasked(self) -> None:
-
-        validated = {"github": {"gh_token": "**********"}, "language": "en"}
-        original = {"github": {"gh_token": "ghp_real"}, "language": "en"}
-        result = _unmask_real_secrets(validated, original)
-        assert result == {"github": {"gh_token": "ghp_real"}, "language": "en"}
-
-    def test_masked_original_not_used(self) -> None:
-        """If original is also masked, keep the validated (masked) value."""
-
-        result = _unmask_real_secrets({"key": "**********"}, {"key": "********"})
-        assert result == {"key": "**********"}
-
-    def test_missing_original_keeps_validated(self) -> None:
-
-        result = _unmask_real_secrets({"key": "**********"}, {})
-        assert result == {"key": "**********"}
-
-    def test_empty_dicts(self) -> None:
-
-        assert _unmask_real_secrets({}, {}) == {}
+    async def test_normalized_dump_is_round_trip_stable(self) -> None:
+        await set_config("core", {"language": "zh-Hans"})
+        first = await get_config("core")
+        await set_config("core", first)
+        second = await get_config("core")
+        assert first == second

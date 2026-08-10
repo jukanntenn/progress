@@ -30,9 +30,23 @@ from progress.observability.config import ObservabilityConfig
 class GitHubConfig(BaseModel):
     """GitHub credentials (Web class, user-editable)."""
 
-    model_config = ConfigDict(extra="forbid")
-    gh_token: SecretStr = SecretStr("")
-    proxy: str = ""
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 10},
+    )
+    gh_token: SecretStr = Field(
+        default=SecretStr(""),
+        title="GitHub Access Token",
+        description="Personal access token for GitHub API calls. Requires `repo` read scope. "
+        "Create one at GitHub Settings → Developer settings → Personal access tokens.",
+        examples=["ghp_xxxxxxxxxxxx"],
+    )
+    proxy: str = Field(
+        default="",
+        title="HTTP Proxy",
+        description="Optional HTTP(S) proxy for reaching GitHub. Leave empty for direct connection.",
+        examples=["http://127.0.0.1:7890"],
+    )
 
 
 class AnalysisConfig(BaseModel):
@@ -44,29 +58,90 @@ class AnalysisConfig(BaseModel):
     (``AI_CONCURRENCY`` constant in ``cli/ai/agent.py``, spec 02/08).
     """
 
-    model_config = ConfigDict(extra="forbid")
-    provider: str = ""
-    model: str = ""
-    api_key: SecretStr = SecretStr("")
-    base_url: str = ""
-    language: str = "en"
-    concurrency: int = Field(default=1, ge=1)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 20},
+    )
+    provider: str = Field(
+        default="",
+        title="AI Provider",
+        description="The model provider used for AI analysis.",
+        examples=["openai", "deepseek"],
+    )
+    model: str = Field(
+        default="",
+        title="AI Model",
+        description="Specific model identifier to use for analysis.",
+        examples=["gpt-4o", "deepseek-chat"],
+        json_schema_extra={"ui_group": "integrations", "ui_order": 40},
+    )
+    api_key: SecretStr = Field(
+        default=SecretStr(""),
+        title="AI API Key",
+        description="Secret key for authenticating with the AI provider.",
+    )
+    base_url: str = Field(
+        default="",
+        title="API Base URL",
+        description="Custom API endpoint. Leave empty to use the provider's default.",
+        examples=["https://api.openai.com/v1"],
+    )
+    language: str = Field(
+        default="en",
+        title="Report Language",
+        description="Language the AI uses when generating analysis reports.",
+        examples=["en", "zh-Hans"],
+    )
+    concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        title="Concurrency",
+        description="Number of integrations processed in parallel. Higher values speed up runs "
+        "but increase AI resource usage and rate-limit risk. Range 1–10.",
+        examples=[1, 2, 3],
+    )
 
 
 class MarkpostConfig(BaseModel):
     """MarkPost publishing target (Web class)."""
 
-    model_config = ConfigDict(extra="forbid")
-    enabled: bool = False
-    url: SecretStr = SecretStr("")
-    max_batch_size: int = 1_048_576
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "system", "ui_order": 10},
+    )
+    enabled: bool = Field(
+        default=False,
+        title="Publish to MarkPost",
+        description="When enabled, reports are published to the configured MarkPost instance.",
+    )
+    url: SecretStr = Field(
+        default=SecretStr(""),
+        title="MarkPost URL",
+        description="Base URL of the MarkPost publishing endpoint.",
+        examples=["https://markpost.example.com"],
+    )
+    max_batch_size: int = Field(
+        default=1_048_576,
+        title="Max Batch Size",
+        description="Maximum payload size in bytes when publishing to MarkPost.",
+        examples=[1_048_576],
+    )
 
 
 class WebConfig(BaseModel):
     """Public-facing web base URL (used for report back-links)."""
 
-    model_config = ConfigDict(extra="forbid")
-    base_url: str = ""
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "system", "ui_order": 40},
+    )
+    base_url: str = Field(
+        default="",
+        title="Public Web Base URL",
+        description="Public-facing base URL of this instance, used for back-links in notifications and RSS.",
+        examples=["https://progress.example.com"],
+    )
 
 
 class AuthConfig(BaseModel):
@@ -77,13 +152,47 @@ class AuthConfig(BaseModel):
     a random key is generated, persisted to the DB config, and used thereafter.
     """
 
-    model_config = ConfigDict(extra="forbid")
-    enabled: bool = True
-    secret_key: SecretStr = SecretStr("")
-    access_token_expire_minutes: int = Field(default=30, ge=1)
-    refresh_token_expire_days: int = Field(default=30, ge=1)
-    initial_admin_username: str = "admin"
-    initial_admin_password: SecretStr = SecretStr("")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "system", "ui_order": 50},
+    )
+    enabled: bool = Field(
+        default=True,
+        title="Enable Authentication",
+        description="When enabled, all non-public API endpoints require a valid Bearer token.",
+    )
+    secret_key: SecretStr = Field(
+        default=SecretStr(""),
+        title="JWT Secret Key",
+        description="Secret used to sign access and refresh tokens. A random key is generated "
+        "on first boot if left empty.",
+    )
+    access_token_expire_minutes: int = Field(
+        default=30,
+        ge=1,
+        title="Access Token Lifetime",
+        description="Lifetime of access tokens in minutes. Range ≥1.",
+        examples=[30],
+    )
+    refresh_token_expire_days: int = Field(
+        default=30,
+        ge=1,
+        title="Refresh Token Lifetime",
+        description="Lifetime of refresh tokens in days. Range ≥1.",
+        examples=[30],
+    )
+    initial_admin_username: str = Field(
+        default="admin",
+        title="Initial Admin Username",
+        description="Username of the superuser created on first boot when authentication is "
+        "enabled and the users table is empty.",
+        examples=["admin"],
+    )
+    initial_admin_password: SecretStr = Field(
+        default=SecretStr(""),
+        title="Initial Admin Password",
+        description="Password of the initial superuser. A random password is printed to the logs if left empty.",
+    )
 
 
 class CoreConfig(BaseSettings):
@@ -103,8 +212,20 @@ class CoreConfig(BaseSettings):
         env_nested_delimiter="__",  # ty:ignore[invalid-key]
     )
     state_home: str = "data"
-    language: str = "en"
-    timezone: str = "UTC"
+    language: str = Field(
+        default="en",
+        title="Language",
+        description="UI and report language. Changing this also switches the running interface immediately.",
+        examples=["en", "zh-Hans"],
+        json_schema_extra={"ui_group": "preferences", "ui_order": 10},
+    )
+    timezone: str = Field(
+        default="UTC",
+        title="Timezone",
+        description="Timezone used for report timestamps and scheduling. Must be an IANA zone identifier.",
+        examples=["UTC", "Asia/Shanghai"],
+        json_schema_extra={"ui_group": "preferences", "ui_order": 20},
+    )
     github: GitHubConfig = Field(default_factory=GitHubConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     markpost: MarkpostConfig = Field(default_factory=MarkpostConfig)

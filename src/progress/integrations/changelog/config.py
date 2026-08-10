@@ -24,10 +24,26 @@ class ChangelogItemConfig(BaseModel):
     """Single changelog tracker entry."""
 
     model_config = ConfigDict(extra="forbid")
-    name: str
-    url: str
-    parser_type: ParserType = "auto"
-    enabled: bool = True
+    name: str = Field(
+        title="Name",
+        description="Display name for this changelog source.",
+        examples=["Vite"],
+    )
+    url: str = Field(
+        title="URL",
+        description="Raw text URL of the changelog.",
+        examples=["https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"],
+    )
+    parser_type: ParserType = Field(
+        default="auto",
+        title="Parser Type",
+        description="How to parse the changelog content.",
+    )
+    enabled: bool = Field(
+        default=True,
+        title="Enabled",
+        description="Whether to track this changelog source.",
+    )
 
     @field_validator("parser_type", mode="before")
     @classmethod
@@ -40,8 +56,15 @@ class ChangelogItemConfig(BaseModel):
 class ChangelogIntegrationConfig(BaseModel):
     """Top-level config for the ``changelog`` integration."""
 
-    model_config = ConfigDict(extra="forbid")
-    trackers: list[ChangelogItemConfig] = Field(default_factory=list)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 100},
+    )
+    trackers: list[ChangelogItemConfig] = Field(
+        default_factory=list,
+        title="Tracked Changelogs",
+        description="List of changelog sources to monitor.",
+    )
 
 
 __all__ = [

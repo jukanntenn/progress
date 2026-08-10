@@ -33,12 +33,37 @@ class RepoItemConfig(BaseModel):
     """Single tracked repository (spec repo §3)."""
 
     model_config = ConfigDict(extra="forbid")
-    url: str
-    branch: str = "main"
-    enabled: bool = True
-    track_commits: bool = True
-    track_releases: bool = True
-    protocol: Literal["https", "ssh"] = "https"
+    url: str = Field(
+        title="Repository URL",
+        description="Supports owner/repo, HTTPS, or SSH format.",
+        examples=["vitejs/vite", "https://github.com/vitejs/vite"],
+    )
+    branch: str = Field(
+        default="main",
+        title="Branch",
+        description="Repository branch to track.",
+        examples=["main"],
+    )
+    enabled: bool = Field(
+        default=True,
+        title="Enabled",
+        description="Whether to track this repository.",
+    )
+    track_commits: bool = Field(
+        default=True,
+        title="Track Commits",
+        description="Whether to analyze this repository's commit history.",
+    )
+    track_releases: bool = Field(
+        default=True,
+        title="Track Releases",
+        description="Whether to analyze this repository's release history.",
+    )
+    protocol: Literal["https", "ssh"] = Field(
+        default="https",
+        title="Clone Protocol",
+        description="Protocol used to clone the repository.",
+    )
 
     @field_validator("url")
     @classmethod
@@ -58,9 +83,20 @@ class OwnerItemConfig(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["organization", "user"]
-    name: str
-    enabled: bool = True
+    type: Literal["organization", "user"] = Field(
+        title="Owner Type",
+        description="Whether the owner is an organization or a user.",
+    )
+    name: str = Field(
+        title="Owner Name",
+        description="GitHub organization or username.",
+        examples=["bytedance"],
+    )
+    enabled: bool = Field(
+        default=True,
+        title="Enabled",
+        description="Whether to track this owner's repositories.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -74,11 +110,34 @@ class OwnerItemConfig(BaseModel):
 class RepoIntegrationConfig(BaseModel):
     """Top-level config for the ``repo`` integration."""
 
-    model_config = ConfigDict(extra="forbid")
-    repos: list[RepoItemConfig] = Field(default_factory=list)
-    owners: list[OwnerItemConfig] = Field(default_factory=list)
-    first_run_lookback_commits: int = Field(default=3, ge=1)
-    max_incremental_lookback_releases: int = Field(default=3, ge=1)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 90},
+    )
+    repos: list[RepoItemConfig] = Field(
+        default_factory=list,
+        title="Tracked Repositories",
+        description="List of repositories to monitor for code changes.",
+    )
+    owners: list[OwnerItemConfig] = Field(
+        default_factory=list,
+        title="Monitored Owners",
+        description="GitHub organizations or users to monitor in bulk.",
+    )
+    first_run_lookback_commits: int = Field(
+        default=3,
+        ge=1,
+        title="First-run Lookback Commits",
+        description="Number of commits to analyze on a repository's first run.",
+        examples=[3],
+    )
+    max_incremental_lookback_releases: int = Field(
+        default=3,
+        ge=1,
+        title="Max Incremental Lookback Releases",
+        description="Number of releases to analyze during incremental runs.",
+        examples=[3],
+    )
 
 
 def normalize_repo_url(url: str) -> str:

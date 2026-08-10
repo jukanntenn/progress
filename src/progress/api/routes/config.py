@@ -2,24 +2,28 @@
 
 Three Web-class concerns surfaced over HTTP:
 
-- ``GET /api/v1/config`` — full config dump with secrets masked (SecretStr
-  serializes to ``********``).
+- ``GET /api/v1/config`` — full config dump in plaintext (secret fields are
+  real values; the frontend masks them with ``type="password"``).
 - ``GET /api/v1/config/schema`` — per-section JSON Schemas for the frontend
-  config editor.
-- ``PUT /api/v1/config/{section}`` — write a section's payload after schema
-  validation (atomic single-row upsert; legacy ``replace_*`` endpoints gone).
+  config editor (internal fields stripped).
+- ``PUT /api/v1/config/{section}`` — write a section's payload after Pydantic
+  validation (atomic single-row upsert; a failed validation returns 422 and
+  leaves the DB untouched).
 - ``POST /api/v1/config/reload`` — re-read DB config into ``app.state.cfg``
   so config edits take effect without a restart.
 
-Per spec 02, SecretStr fields are automatically masked via ``model_dump(mode="json")``
-when the data is round-tripped through a Pydantic model. No hand-written masking.
+Plaintext round-trip (spec 02 redesign): the DB stores normalized plaintext;
+``model_validate`` validates on write; ``model_dump`` re-normalizes on store.
+No sentinel masking anywhere in the chain.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, ValidationError
 
 from progress.api.auth import get_current_user
 from progress.api.routes._limiter import limiter
@@ -42,6 +46,7 @@ from progress.config.loader import merge_db_config
 from progress.config.root import CoreConfig, _normalize_bcp47
 from progress.config.schema import get_config_json_schema
 from progress.db import get_all_config, get_config, set_config
+from progress.db.models import User
 from progress.errors import ConfigException
 from progress.integrations.registry import discover_integrations
 from progress.observability import record_business_event
@@ -57,15 +62,24 @@ router = APIRouter(tags=["config"], dependencies=[Depends(get_current_user)])
     status_code=status.HTTP_200_OK,
 )
 async def get_all_sections() -> AllConfigResponse:
-    """Return ``{core, plugins}`` with secrets masked (spec 02)."""
+    """Return ``{core, plugins}`` in plaintext (internal fields stripped)."""
     all_cfg = await get_all_config()
-    core_raw = all_cfg.get("core", {})
+    core_data = all_cfg.get("core", {})
     plugins = {k: v for k, v in all_cfg.items() if k != "core"}
-
-    core_masked = _mask_core_section(core_raw)
+    try:
+        CoreConfig.model_validate(core_data)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=f"core config corrupted: {e}") from e
     for name, plugin_data in plugins.items():
-        plugins[name] = _mask_plugin_section(name, plugin_data)
-    return AllConfigResponse(core=core_masked, plugins=plugins)
+        model = _get_section_model(name)
+        if model is None:
+            continue
+        try:
+            model.model_validate(plugin_data)
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=f"plugin '{name}' config corrupted: {e}") from e
+    core_public = _strip_internal_fields(core_data)
+    return AllConfigResponse(core=core_public, plugins=plugins)
 
 
 @router.get(
@@ -111,11 +125,6 @@ async def set_language(body: LanguageUpdateRequest, request: Request) -> Languag
         raise HTTPException(status_code=422, detail=str(e)) from e
     cfg: CoreConfig = request.app.state.cfg
     try:
-        # Update only the language field on the live config — a full
-        # ``merge_db_config(cfg, core)`` rebuild would overwrite any runtime-only
-        # cfg state with DB defaults, and the old partial merge masked SecretStr
-        # fields (model_dump mode="json"). ``model_copy(update=...)`` touches
-        # only language, leaving secrets (and test-time overrides) intact.
         request.app.state.cfg = cfg.model_copy(update={"language": new_language})
     except Exception as e:
         logger.warning("language update merge failed; keeping current cfg: %s", e)
@@ -146,9 +155,10 @@ async def put_section(
     section: str,
     body: ConfigUpdateRequest,
     request: Request,
+    user: Annotated[User, Depends(get_current_user)],
 ) -> ConfigSectionResponse:
-    """Validate ``data`` against the section's schema and upsert it."""
-    if not _is_known_section(section):
+    """Validate ``data`` against the section's Pydantic model and upsert it."""
+    if _get_section_model(section) is None:
         raise HTTPException(
             status_code=404,
             detail=f"unknown config section: {section}",
@@ -158,9 +168,15 @@ async def put_section(
     except ConfigException as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    record_business_event(
+        "progress.config.updated",
+        attributes={"section": section, "user": user.username},
+    )
+
     fresh = await get_config(section)
-    masked = _mask_plugin_section(section, fresh) if section != "core" else _mask_core_section(fresh)
-    return ConfigSectionResponse(section=section, data=masked)
+    if section == "core":
+        fresh = _strip_internal_fields(fresh)
+    return ConfigSectionResponse(section=section, data=fresh)
 
 
 @router.post(
@@ -215,52 +231,29 @@ async def test_notifications(request: Request) -> TestNotificationResponse:
     return TestNotificationResponse(results=results, summary=summary)
 
 
-def _is_known_section(section: str) -> bool:
+def _get_section_model(section: str) -> type[BaseModel] | None:
+    """Return the section's Pydantic config model; ``None`` if unknown."""
     if section == "core":
-        return True
-    return section in discover_integrations()
+        from progress.config.root import CoreConfig  # noqa: PLC0415
 
-
-def _mask_core_section(data: dict) -> dict:  # ty:ignore[missing-type-argument]
-    """Validate ``data`` through ``CoreConfig`` so SecretStr fields auto-mask.
-
-    Per spec 02, ``SecretStr.model_dump(mode="json")`` emits ``**********``
-    automatically. We merge the DB data into a default CoreConfig dump first
-    so that any missing keys get their defaults, then validate the result.
-    """
-    if not data:
-        return CoreConfig().model_dump(mode="json")
-    merged = _deep_merge(CoreConfig().model_dump(mode="json"), data)
-    try:
-        return CoreConfig.model_validate(merged).model_dump(mode="json")
-    except Exception as e:
-        logger.warning("core config validation failed; returning raw data: %s", e)
-        return data
-
-
-def _mask_plugin_section(name: str, data: dict) -> dict:  # ty:ignore[missing-type-argument]
-    """Mask secrets in a plugin section using its registered config schema."""
-    integration_cls = discover_integrations().get(name)
+        return CoreConfig
+    integration_cls = discover_integrations().get(section)
     if integration_cls is None:
-        return data
-    schema = getattr(integration_cls, "config_schema", None)
-    if schema is None:
-        return data
-    try:
-        validated = schema.model_validate(data)
-        return validated.model_dump(mode="json")
-    except Exception as e:
-        logger.warning("plugin %s payload failed schema validation; returning raw: %s", name, e)
-        return data
+        return None
+    config_schema = getattr(integration_cls, "config_schema", None)
+    return config_schema if isinstance(config_schema, type) and issubclass(config_schema, BaseModel) else None
 
 
-def _deep_merge(base: dict, overlay: dict) -> dict:  # ty:ignore[missing-type-argument]
-    out = dict(base)
-    for k, v in overlay.items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            out[k] = v
+def _strip_internal_fields(core_data: dict) -> dict:  # ty:ignore[missing-type-argument]
+    """从 GET 返回的 core 数据中移除内部字段（前端不可见）。"""
+    out = dict(core_data)
+    out.pop("state_home", None)
+    auth = out.get("auth")
+    if isinstance(auth, dict):
+        auth = dict(auth)
+        auth.pop("secret_key", None)
+        auth.pop("initial_admin_password", None)
+        out["auth"] = auth
     return out
 
 

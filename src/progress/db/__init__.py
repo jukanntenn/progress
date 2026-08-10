@@ -5,6 +5,12 @@ Per spec 03:
 - ``init_db`` initializes the connection and applies migrations.
 - Config table read/write API (spec 02) is implemented here on top of the
   ``Config`` tortoise model.
+
+Config writes (``set_config``) validate the submitted payload with the
+section's Pydantic model before the upsert happens — a failed validation
+raises ``ConfigException`` and leaves the DB untouched. Data is stored as a
+normalized plaintext dict (SecretStr unwrapped), so the runtime can load it
+back with a plain ``model_validate``.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, SecretStr, ValidationError
 from tortoise import Tortoise
 from tortoise.connection import get_connection
 from tortoise.migrations.executor import MigrationExecutor, MigrationTarget
@@ -137,94 +144,173 @@ async def get_config(section: str) -> dict[str, Any]:
 
 
 async def set_config(section: str, data: dict[str, Any]) -> None:
-    """Upsert a config section's payload after schema validation (spec 02).
+    """Upsert a config section after Pydantic validation.
 
-    Per spec 02, when a submitted SecretStr field equals the mask sentinel
-    ``"**********"`` (i.e. the frontend round-tripped the masked value
-    unchanged), the real value already stored in the DB is preserved instead
-    of being overwritten with the literal mask string.
+    校验失败抛 ConfigException（调用方转 422），DB 不变。
+    core 段的内部字段（state_home / auth.secret_key / auth.initial_admin_password）
+    始终保留 DB 原值，不从前端提交覆盖。
     """
+    if not isinstance(data, dict):
+        raise ConfigException(f"config section '{section}' payload must be a JSON object")
 
-    existing = await Config.get_or_none(section=section)
-    existing_data = existing.data if existing is not None else {}
-    if isinstance(existing_data, dict):
-        data = _preserve_masked_secrets(data, existing_data)
-    payload = _validate_section(section, data)
+    model = _get_section_model(section)
+    if model is None:
+        raise ConfigException(f"unknown config section: {section}")
+
+    if section == "core":
+        data = _preserve_internal_fields(data, await get_config("core"))
+
+    from progress.config.schema import get_config_json_schema  # noqa: PLC0415
+
+    schema = get_config_json_schema().get(section, {})
+    data = _normalize_nulls(data, schema, schema)
+
+    try:
+        validated = model.model_validate(data)
+    except ValidationError as e:
+        raise ConfigException(_format_validation_errors(section, e)) from e
+
+    payload = _dump_plaintext(validated)
     await Config.update_or_create(section=section, defaults={"data": payload})
 
 
-_SECRET_MASK_VALUES = frozenset({"**********", "********"})
+def _get_section_model(section: str) -> type[BaseModel] | None:
+    """Return section 对应的 Pydantic 配置模型，未知 section 返回 None。"""
+    if section == "core":
+        from progress.config.root import CoreConfig  # noqa: PLC0415
+
+        return CoreConfig
+    try:
+        integration_cls = discover_integrations().get(section)
+    except Exception:
+        return None
+    if integration_cls is None:
+        return None
+    config_schema = getattr(integration_cls, "config_schema", None)
+    return config_schema if isinstance(config_schema, type) and issubclass(config_schema, BaseModel) else None
 
 
-def _unmask_real_secrets(validated: dict[str, Any], original: dict[str, Any]) -> dict[str, Any]:
-    """Replace masked secret values with real ones from the original data.
+def _format_validation_errors(section: str, e: ValidationError) -> str:
+    """把 Pydantic ValidationError 格式化为前端可读的字符串。
 
-    After ``model_validate`` + ``model_dump(mode='json')``, SecretStr fields
-    are masked to ``'**********'``.  If the caller supplied the real value in
-    ``original``, restore it so the DB stores the actual credential.
+    errors() 返回 [{loc, msg, type, ...}]，loc 是元组如 ('github', 'gh_token')。
+    转为 'github.gh_token: <msg>' 形式，多条用换行分隔。
     """
+    lines = [f"invalid config for section '{section}':"]
+    for err in e.errors():
+        loc = ".".join(str(item) for item in err["loc"])
+        lines.append(f"  - {loc}: {err['msg']}")
+    return "\n".join(lines)
+
+
+def _dump_plaintext(model: BaseModel) -> dict[str, Any]:
+    """把校验后的 Pydantic 模型 dump 为纯 dict（SecretStr 解包为明文）。
+
+    model_dump(mode="python") 保留 SecretStr 对象（不可直接 JSON 序列化），
+    需递归解包为 get_secret_value()。输出是 coercion 后的规范化值
+    （如 "3" -> int 3），保证 DB 存储的是干净数据。
+    """
+    return _unwrap_secrets(model.model_dump(mode="python"))
+
+
+def _unwrap_secrets(obj: Any) -> Any:
+    """递归把 SecretStr 对象解包为明文字符串。"""
+    if isinstance(obj, dict):
+        return {k: _unwrap_secrets(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_unwrap_secrets(item) for item in obj]
+    if isinstance(obj, SecretStr):
+        return obj.get_secret_value()
+    return obj
+
+
+# core 段的内部字段路径（所有者=系统/Ansible，前端不可编辑）
+_CORE_INTERNAL_PATHS = {
+    "state_home": (),  # 顶层
+    "secret_key": ("auth",),
+    "initial_admin_password": ("auth",),
+}
+
+
+def _preserve_internal_fields(submitted: dict[str, Any], existing: dict[str, Any]) -> dict[str, Any]:
+    """把 DB 中的内部字段原值注入提交数据，确保前端不提交时保留。
+
+    这些字段不出现在可编辑 JSON Schema 里（前端不可见），所以前端
+    提交的 data 里不会包含它们。从 DB 读取原值注入，校验时 model_validate
+    会接受它们（因为是合法值），dump 后原样存回 DB。
+    """
+    out = dict(submitted)
+    for field, path in _CORE_INTERNAL_PATHS.items():
+        cursor_existing = existing
+        for key in path:
+            cursor_existing = cursor_existing.get(key, {}) if isinstance(cursor_existing, dict) else {}
+        if isinstance(cursor_existing, dict) and field in cursor_existing:
+            if path:
+                out.setdefault(path[0], {})
+                if isinstance(out.get(path[0]), dict):
+                    out[path[0]][field] = cursor_existing[field]
+            else:
+                out[field] = cursor_existing[field]
+    return out
+
+
+def _normalize_nulls(data: Any, schema: dict[str, Any], root: dict[str, Any]) -> Any:
+    """把 string 类型字段的 null 值转为空串（前端 RJSF 空输入的兜底）。
+
+    基于 JSON Schema 的 type:"string" 递归（非 Pydantic model 类型），
+    $ref 在每步解析（root 是含 $defs 的 section schema）。
+    SecretStr 在 schema 里也是 type:"string"（+format:password），一并覆盖。
+    """
+    schema = _resolve_ref(schema, root)
+    if not isinstance(data, dict):
+        return data
+    props = schema.get("properties", {})
     out: dict[str, Any] = {}
-    for key, val in validated.items():
-        orig = original.get(key)
-        if (
-            isinstance(val, str)
-            and val in _SECRET_MASK_VALUES
-            and isinstance(orig, str)
-            and orig not in _SECRET_MASK_VALUES
-        ):
-            out[key] = orig
-        elif isinstance(val, dict) and isinstance(orig, dict):
-            out[key] = _unmask_real_secrets(val, orig)
+    for key, val in data.items():
+        prop_schema = _resolve_ref(props.get(key, {}), root)
+        if val is None and prop_schema.get("type") == "string":
+            out[key] = ""
+        elif isinstance(val, dict):
+            out[key] = _normalize_nulls(val, prop_schema, root)
+        elif isinstance(val, list):
+            item_schema = _resolve_ref(prop_schema.get("items", {}), root)
+            out[key] = [_normalize_nulls_list_item(item, item_schema, root) for item in val]
         else:
             out[key] = val
     return out
 
 
-def _preserve_masked_secrets(submitted: dict[str, Any], existing: dict[str, Any]) -> dict[str, Any]:
-    """Recursively keep existing values where the submit sent a mask sentinel.
+def _normalize_nulls_list_item(item: Any, item_schema: dict[str, Any], root: dict[str, Any]) -> Any:
+    """处理 list item 的 null 容错（支持 discriminated union 与普通 object）。"""
+    if not isinstance(item, dict):
+        return item
+    one_of = item_schema.get("oneOf")
+    if one_of:
+        discriminator = item_schema.get("discriminator", {}).get("propertyName", "type")
+        item_type = item.get(discriminator)
+        for member_ref in one_of:
+            member_schema = _resolve_ref(member_ref, root)
+            if member_schema.get("properties", {}).get(discriminator, {}).get("const") == item_type:
+                return _normalize_nulls(item, member_schema, root)
+        return item
+    if item_schema.get("type") == "object":
+        return _normalize_nulls(item, item_schema, root)
+    return item
 
-    Walks ``submitted`` alongside ``existing``. For any key whose submitted
-    value is a known SecretStr mask (``"**********"``), the existing value
-    is substituted in. Nested dicts (e.g. ``[github]``, ``[analysis]``) are
-    recursed so secrets one level down are also preserved. Lists of dicts
-    (e.g. ``notification.channels``) are merged element-wise by position so
-    a channel that round-tripped its masked ``password`` keeps the real one.
+
+def _resolve_ref(node: Any, root: dict[str, Any]) -> dict[str, Any]:
+    """解析 JSON Schema 的本地 $ref（如 "#/$defs/AuthConfig"）。
+
+    node 形如 {"$ref": "#/$defs/AuthConfig"}，按 JSON Pointer 解析 root。
     """
-    out: dict[str, Any] = {}
-    for key, new_val in submitted.items():
-        old_val = existing.get(key)
-        if isinstance(new_val, dict) and isinstance(old_val, dict):
-            out[key] = _preserve_masked_secrets(new_val, old_val)
-        elif isinstance(new_val, list) and isinstance(old_val, list):
-            out[key] = _merge_list_with_existing(new_val, old_val)
-        elif isinstance(new_val, str) and new_val in _SECRET_MASK_VALUES and old_val is not None:
-            out[key] = old_val
-        else:
-            out[key] = new_val
-    return out
-
-
-def _merge_list_with_existing(new_list: list[Any], old_list: list[Any]) -> list[Any]:
-    """Merge a submitted list against the existing one, preserving masked secrets.
-
-    The submitted list is the source of truth for length and ordering (so
-    adding/removing list items works as a normal config edit). For elements
-    that exist positionally in both lists and are dicts, we recurse so any
-    masked SecretStr field inside (e.g. ``channels[0].password``) is preserved
-    from the existing row. Elements beyond the old list's length pass through
-    unchanged.
-    """
-    merged: list[Any] = []
-    for idx, new_item in enumerate(new_list):
-        if idx < len(old_list):
-            old_item = old_list[idx]
-            if isinstance(new_item, dict) and isinstance(old_item, dict):
-                merged.append(_preserve_masked_secrets(new_item, old_item))
-            else:
-                merged.append(new_item)
-        else:
-            merged.append(new_item)
-    return merged
+    if isinstance(node, dict) and node.get("$ref"):
+        ref = node["$ref"]
+        if isinstance(ref, str) and ref.startswith("#/"):
+            cursor: Any = root
+            for part in ref[2:].split("/"):
+                cursor = cursor.get(part, {}) if isinstance(cursor, dict) else {}
+            return cursor if isinstance(cursor, dict) else node
+    return node
 
 
 async def get_all_config() -> dict[str, dict[str, Any]]:
@@ -237,29 +323,8 @@ async def get_all_config() -> dict[str, dict[str, Any]]:
     return out
 
 
-def _validate_section(section: str, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate ``data`` against the section's registered JSON Schema."""
-    if not isinstance(data, dict):
-        raise ConfigException(f"config section '{section}' payload must be a JSON object")
-    if section == "core":
-        return data
-    try:
-        integration_cls = discover_integrations().get(section)
-    except Exception:
-        integration_cls = None
-    if integration_cls is None:
-        return data
-    config_schema = getattr(integration_cls, "config_schema", None)
-    if config_schema is None:
-        return data
-    try:
-        validated = config_schema.model_validate(data)
-    except Exception as e:
-        raise ConfigException(f"invalid config for section '{section}': {e}") from e
-    return _unmask_real_secrets(validated.model_dump(mode="json"), data)
-
-
 __all__ = [
+    "_dump_plaintext",
     "build_db_url",
     "build_tortoise_config",
     "close_db",

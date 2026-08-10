@@ -217,7 +217,7 @@ export interface paths {
     }
     /**
      * Get All Sections
-     * @description Return ``{core, plugins}`` with secrets masked (spec 02).
+     * @description Return ``{core, plugins}`` in plaintext (internal fields stripped).
      */
     get: operations['get_all_sections_api_v1_config_get']
     put?: never
@@ -292,7 +292,7 @@ export interface paths {
     get?: never
     /**
      * Put Section
-     * @description Validate ``data`` against the section's schema and upsert it.
+     * @description Validate ``data`` against the section's Pydantic model and upsert it.
      */
     put: operations['put_section_api_v1_config__section__put']
     post?: never

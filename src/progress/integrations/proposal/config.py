@@ -19,8 +19,16 @@ SUPPORTED_KINDS: frozenset[str] = frozenset({"eip", "erc", "pep", "rfc", "dep"})
 class ProposalIntegrationConfig(BaseModel):
     """Top-level config for the ``proposal`` integration."""
 
-    model_config = ConfigDict(extra="forbid")
-    trackers: list[str] = Field(default_factory=list)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 110},
+    )
+    trackers: list[str] = Field(
+        default_factory=list,
+        title="Tracked Proposal Kinds",
+        description="Which built-in proposal kinds to enable. Valid: eip, erc, pep, rfc, dep.",
+        examples=[["eip", "erc"]],
+    )
 
     @field_validator("trackers")
     @classmethod

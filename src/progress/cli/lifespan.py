@@ -23,6 +23,7 @@ from progress.cli.git.local import set_git_proxy
 from progress.config.loader import apply_db_and_seed
 from progress.config.root import CoreConfig
 from progress.db import close_db, init_db
+from progress.db.migrations._config_data import migrate_config_data
 from progress.integrations.base import Components
 from progress.observability import setup_observability, shutdown_observability
 from progress.utils.http import session_factory
@@ -40,6 +41,7 @@ async def lifespan(
 ) -> AsyncIterator[Components]:
     """CLI process lifespan: DB + observability + i18n + aiohttp session."""
     await init_db(cfg.state_home)
+    await migrate_config_data()
     cfg = await apply_db_and_seed(cfg, config_path)
 
     setup_observability(

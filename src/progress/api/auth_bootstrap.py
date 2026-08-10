@@ -16,10 +16,10 @@ from __future__ import annotations
 import logging
 import secrets
 
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
 from progress.config.root import CoreConfig
-from progress.db import get_config, set_config
+from progress.db import _dump_plaintext, get_config, set_config
 from progress.db.models import User
 from progress.utils.security import hash_password
 
@@ -46,7 +46,7 @@ async def _ensure_secret_key(cfg: CoreConfig) -> CoreConfig:
     generated = secrets.token_urlsafe(32)
     logger.warning("auth.secret_key was empty; generated a random key and persisted it to the DB config")
     cfg.auth.secret_key = SecretStr(generated)
-    await _persist_core_field(cfg, "auth", cfg.auth.model_dump(mode="json"))
+    await _persist_core_field(cfg, "auth", cfg.auth)
     return cfg
 
 
@@ -80,12 +80,12 @@ async def _ensure_admin_user(cfg: CoreConfig) -> None:
         logger.info("created initial admin user %r from configured credentials", username)
 
 
-async def _persist_core_field(cfg: CoreConfig, field: str, value: dict[str, object]) -> None:
-    """Merge a field's new value back into the DB ``[core]`` config section."""
+async def _persist_core_field(cfg: CoreConfig, field: str, sub_model: BaseModel) -> None:
+    """Merge a sub-config's new value (plaintext) back into the DB core section."""
     raw = await get_config("core")
     if not isinstance(raw, dict):
         raw = {}
-    raw[field] = value
+    raw[field] = _dump_plaintext(sub_model)
     await set_config("core", raw)
 
 
