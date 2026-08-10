@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -14,15 +14,17 @@ function PasswordField({
   value,
   onChange,
   placeholder,
+  error,
 }: {
   id: string
   label: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
+  error?: string | null
 }) {
-  const [visible, setVisible] = useState(false)
   const { t } = useTranslation()
+  const [visible, setVisible] = useState(false)
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -33,6 +35,7 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          error={!!error}
           className="pr-10"
         />
         <button
@@ -44,6 +47,7 @@ function PasswordField({
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   )
 }
@@ -54,25 +58,34 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [fieldError, setFieldError] = useState<string | null>(null)
   const [success, setSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const passwordsMatch = newPassword === confirmPassword
   const sameAsCurrent = newPassword.length > 0 && newPassword === currentPassword
+  const confirmError =
+    confirmPassword.length > 0 && !passwordsMatch ? t('settings.passwordMismatch') : null
+  const newError = sameAsCurrent ? t('settings.passwordSameAsCurrent') : null
   const canSubmit =
-    currentPassword.length > 0 && newPassword.length >= 8 && passwordsMatch && !sameAsCurrent
+    currentPassword.length > 0 &&
+    newPassword.length >= 8 &&
+    passwordsMatch &&
+    !sameAsCurrent &&
+    !submitting
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
+    setGlobalError(null)
+    setFieldError(null)
     setSuccess('')
     if (!passwordsMatch) {
-      setError(t('settings.passwordMismatch'))
+      setFieldError(t('settings.passwordMismatch'))
       return
     }
     if (sameAsCurrent) {
-      setError(t('settings.passwordSameAsCurrent'))
+      setFieldError(t('settings.passwordSameAsCurrent'))
       return
     }
     setSubmitting(true)
@@ -82,24 +95,33 @@ export default function SettingsPage() {
       })
       if (!response.ok) {
         const body = await response.json().catch(() => null)
-        throw new Error(body?.error?.message ?? 'Failed to change password')
+        const msg = body?.error?.message ?? 'Failed to change password'
+        if (/current|incorrect|invalid/i.test(msg)) {
+          setFieldError(t('settings.incorrectPassword'))
+        } else {
+          setGlobalError(msg)
+        }
+        return
       }
       setSuccess(t('settings.passwordChanged'))
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change password')
+      setGlobalError(err instanceof Error ? err.message : 'Failed to change password')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8">
+    <div className="space-y-4">
+      <h2 className="text-muted-foreground font-mono text-sm font-semibold tracking-wide uppercase">
+        {t('settings.changePassword')}
+      </h2>
       <Card>
         <CardHeader>
-          <CardTitle>{t('settings.title')}</CardTitle>
+          <CardTitle>{t('settings.changePassword')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -107,11 +129,19 @@ export default function SettingsPage() {
               {t('settings.userLabel', { username: user?.username ?? '' })}
             </div>
 
+            {globalError && (
+              <div className="border-destructive/30 bg-destructive/10 flex items-start gap-2 rounded-lg border p-3">
+                <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
+                <p className="text-destructive text-sm">{globalError}</p>
+              </div>
+            )}
+
             <PasswordField
               id="currentPassword"
               label={t('settings.currentPassword')}
               value={currentPassword}
               onChange={setCurrentPassword}
+              error={fieldError}
             />
 
             <PasswordField
@@ -120,6 +150,7 @@ export default function SettingsPage() {
               value={newPassword}
               onChange={setNewPassword}
               placeholder={t('settings.newPasswordPlaceholder')}
+              error={newError}
             />
 
             <PasswordField
@@ -127,19 +158,12 @@ export default function SettingsPage() {
               label={t('settings.confirmPassword')}
               value={confirmPassword}
               onChange={setConfirmPassword}
+              error={confirmError}
             />
 
-            {!passwordsMatch && confirmPassword.length > 0 && (
-              <p className="text-destructive text-sm">{t('settings.passwordMismatch')}</p>
-            )}
-            {sameAsCurrent && (
-              <p className="text-destructive text-sm">{t('settings.passwordSameAsCurrent')}</p>
-            )}
-
-            {error && <p className="text-destructive text-sm">{error}</p>}
             {success && <p className="text-sm text-green-600">{success}</p>}
 
-            <Button type="submit" disabled={!canSubmit || submitting} className="w-full">
+            <Button type="submit" disabled={!canSubmit} className="w-full">
               {submitting ? t('settings.changing') : t('settings.submit')}
             </Button>
           </form>

@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { Header } from '@/components/Header'
 
 export function RootLayout() {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -15,7 +17,7 @@ export function RootLayout() {
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Progress
+          {t('app.title')}
         </a>
       </footer>
     </div>

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, createBrowserRouter, RouterProvider } from 'react-router'
 import { RootLayout } from '@/routes/RootLayout'
+import { SettingsLayout } from '@/routes/SettingsLayout'
 import { Spinner } from '@/components/ui/Spinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { RequireAuth } from '@/auth/RequireAuth'
@@ -10,8 +11,13 @@ import SettingsPage from '@/routes/SettingsPage'
 const ReportsListPage = lazy(() => import('@/routes/ReportsListPage'))
 const ReportDetailPage = lazy(() => import('@/routes/ReportDetailPage'))
 const IntegrationsPage = lazy(() => import('@/routes/IntegrationsPage'))
-const ConfigPage = lazy(() => import('@/routes/ConfigPage'))
 const NotFoundPage = lazy(() => import('@/routes/NotFoundPage'))
+
+// SettingsConfigSection has a named export; wrap it for lazy via a default shim.
+const SettingsConfigSection = lazy(async () => {
+  const mod = await import('@/routes/SettingsConfigSection')
+  return { default: mod.SettingsConfigSection }
+})
 
 function RouteFallback() {
   return (
@@ -22,6 +28,16 @@ function RouteFallback() {
 }
 
 const router = createBrowserRouter([
+  // Login is a standalone full-screen page (no global Header/footer) — matches
+  // Linear/Vercel/GitHub where the auth screen has no app chrome.
+  {
+    path: '/login',
+    element: (
+      <ErrorBoundary>
+        <LoginPage />
+      </ErrorBoundary>
+    ),
+  },
   {
     path: '/',
     element: (
@@ -31,10 +47,6 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/reports" replace /> },
-      {
-        path: 'login',
-        element: <LoginPage />,
-      },
       {
         element: <RequireAuth />,
         children: [
@@ -54,26 +66,35 @@ const router = createBrowserRouter([
               </Suspense>
             ),
           },
-          {
-            path: 'integrations',
-            element: (
-              <Suspense fallback={<RouteFallback />}>
-                <IntegrationsPage />
-              </Suspense>
-            ),
-          },
-          {
-            path: 'config',
-            element: (
-              <Suspense fallback={<RouteFallback />}>
-                <ConfigPage />
-              </Suspense>
-            ),
-          },
+          // Unified Settings area — schema-driven grouped sidebar lives in
+          // SettingsLayout; each config section is a child route.
           {
             path: 'settings',
-            element: <SettingsPage />,
+            element: <SettingsLayout />,
+            children: [
+              { index: true, element: <Navigate to="/settings/config/core" replace /> },
+              {
+                path: 'config/:section',
+                element: (
+                  <Suspense fallback={<RouteFallback />}>
+                    <SettingsConfigSection />
+                  </Suspense>
+                ),
+              },
+              { path: 'account', element: <SettingsPage /> },
+              {
+                path: 'integrations',
+                element: (
+                  <Suspense fallback={<RouteFallback />}>
+                    <IntegrationsPage />
+                  </Suspense>
+                ),
+              },
+            ],
           },
+          // Legacy redirects — old entry points now funnel into Settings.
+          { path: 'config', element: <Navigate to="/settings/config/core" replace /> },
+          { path: 'integrations-old', element: <Navigate to="/settings/integrations" replace /> },
         ],
       },
       {

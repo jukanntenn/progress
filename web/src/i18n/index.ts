@@ -7,7 +7,20 @@ import zhHans from './zh-hans.json'
 // Intl.getCanonicalLocales, which produces "zh-Hans" (capital H) regardless of
 // the input casing. The resource key MUST match this canonical form or the
 // case-sensitive resource lookup misses and silently falls back to English.
-const ZH_HANS = 'zh-Hans'
+export const ZH_HANS = 'zh-Hans'
+
+// Single source of truth for supported locales. Both the resource map and the
+// LanguageSwitcher derive from this list, so a new locale is added in exactly
+// one place and the canonical casing can never drift again (the recurring
+// "selecting Chinese still shows English" bug).
+export interface SupportedLocale {
+  value: string
+  label: string
+}
+export const SUPPORTED_LOCALES: readonly SupportedLocale[] = [
+  { value: 'en', label: 'English' },
+  { value: ZH_HANS, label: '中文' },
+] as const
 
 void i18n.use(initReactI18next).init({
   resources: {
@@ -40,7 +53,7 @@ function detectLocale(): string {
 // Migrate legacy lowercase "zh-hans" (written by older builds) to the BCP-47
 // canonical "zh-Hans" so it matches the resource key after i18next's
 // Intl.getCanonicalLocales normalization.
-function normalizeLocale(locale: string): string {
+export function normalizeLocale(locale: string): string {
   if (locale.toLowerCase() === 'zh-hans') return ZH_HANS
   return locale
 }

@@ -28,7 +28,6 @@ export default function ReportsListPage() {
   if (isPending) {
     return (
       <PageContainer>
-        <h1 className="text-foreground mb-4 text-2xl font-bold">{t('reports.title')}</h1>
         <Card>
           <CardContent>
             {Array.from({ length: 5 }).map((_, i) => (
@@ -64,7 +63,6 @@ export default function ReportsListPage() {
 
   return (
     <PageContainer>
-      <h1 className="text-foreground mb-4 text-2xl font-bold">{t('reports.title')}</h1>
       <Card>
         <CardContent>
           {items.length === 0 ? (
