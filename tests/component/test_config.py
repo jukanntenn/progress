@@ -300,6 +300,41 @@ class TestPutSection:
         )
         assert resp.status_code == 422
 
+    async def test_put_refreshes_app_state_cfg(self, app_client) -> None:
+        """PUT /config/core must refresh app.state.cfg so downstream consumers
+        (notification test, report pipeline) see the new values immediately."""
+        app, client = app_client
+        before = app.state.cfg.timezone
+        new_tz = "America/New_York" if before != "America/New_York" else "Europe/London"
+        resp = await client.put("/api/v1/config/core", json={"data": {"timezone": new_tz}})
+        assert resp.status_code == 200
+        assert app.state.cfg.timezone == new_tz
+
+    async def test_put_core_refreshes_notification_channels(self, app_client) -> None:
+        """After PUT saves notification channels, test_notifications must see
+        them without a manual reload (the original bug: email tests silently
+        returned only feishu because app.state.cfg was stale)."""
+        app, client = app_client
+        resp = await client.put(
+            "/api/v1/config/core",
+            json={
+                "data": {
+                    "notification": {
+                        "channels": [
+                            {
+                                "type": "console",
+                                "enabled": True,
+                            }
+                        ]
+                    }
+                }
+            },
+        )
+        assert resp.status_code == 200
+        channels = app.state.cfg.notification.channels
+        assert len(channels) == 1
+        assert channels[0].type == "console"
+
 
 class TestAuditEvent:
     async def test_put_records_config_updated_event(self, client, monkeypatch) -> None:

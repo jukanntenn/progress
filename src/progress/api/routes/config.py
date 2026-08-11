@@ -168,6 +168,14 @@ async def put_section(
     except ConfigException as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    if section == "core":
+        db_core = await get_config("core")
+        if db_core:
+            try:
+                request.app.state.cfg = merge_db_config(request.app.state.cfg, db_core)
+            except Exception as e:
+                logger.warning("config refresh after PUT failed; keeping current cfg: %s", e)
+
     record_business_event(
         "progress.config.updated",
         attributes={"section": section, "user": user.username},
