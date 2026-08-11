@@ -1,11 +1,7 @@
 {% from "_feishu_v2.j2" import card, footer_content %}
 {% set ns = namespace(elements=[]) %}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "**✅  " ~ _("Notification channel configured correctly!") ~ "**", "text_align": "center", "text_size": "heading-2"}] -%}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>" ~ _("You have successfully received this test notification from Progress.<br>Your Feishu Webhook is working.") ~ "</font>", "text_align": "center", "text_size": "normal"}] -%}
-{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
-{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("Go to Progress Settings") ~ " "}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": "#"}]}] -%}
-{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>" ~ _("Test message, no reply needed") ~ "</font>", "text_align": "center", "text_size": "notation"}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": _("This is a test notification from Progress."), "text_align": "center", "text_size": "normal"}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>" ~ _("Your notification channel is working correctly.") ~ "</font>", "text_align": "center", "text_size": "normal"}] -%}
 {%- set ns.elements = ns.elements + [{"tag": "markdown", "content": footer_content(generated_at), "text_align": "center", "text_size": "notation"}] -%}
 {% set text_tags = [{"tag": "text_tag", "text": {"tag": "plain_text", "content": "TEST"}, "color": "green"}] %}
 {{ card(_("Test Notification"), ns.elements, "", "green", header_icon_token="check-circle-outlined", header_icon_color="green", text_tags=text_tags) }}

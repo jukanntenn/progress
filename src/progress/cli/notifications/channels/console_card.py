@@ -342,13 +342,12 @@ def _render_discovered_repo(ev: NotificationEvent, generated_at: str) -> Rendera
 
 def _render_test(ev: NotificationEvent, generated_at: str) -> RenderableType:  # pragma: no cover - trivial
     body_parts: list[RenderableType] = [
-        Text(f"✅ {_('Notification channel configured correctly!')}", style="bold #00B42A", justify="center"),
+        Text(_("This is a test notification from Progress."), style="#1D2129", justify="center"),
         Text(
-            _("This is a test notification. If you received this, the notification channel is configured correctly."),
+            _("Your notification channel is working correctly."),
             style="dim #86909C",
             justify="center",
         ),
-        Text(_("Test message, no reply needed."), style="dim #86909C", justify="center"),
     ]
     body_parts.append(_divider())
     body_parts.append(_footer(generated_at))

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-10 13:29+0800\n"
+"POT-Creation-Date: 2026-08-11 10:47+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -26,14 +26,12 @@ msgid "Tracked GitHub repository changes and analyses"
 msgstr "追踪的 GitHub 仓库变更与分析"
 
 #: src/progress/cli/notifications/renderer.py:162
-#: src/progress/cli/notifications/templates/test/card_json.j2:11
+#: src/progress/cli/notifications/templates/test/card_json.j2:7
 #: src/progress/cli/notifications/templates/test/html.j2:2
 msgid "Test Notification"
 msgstr "测试通知"
 
 #: src/progress/cli/notifications/renderer.py:172
-#: src/progress/cli/notifications/templates/test/html.j2:4
-#: src/progress/cli/notifications/templates/test/plain_text.j2:1
 msgid "✅ Test Notification from Progress"
 msgstr "✅ Progress 测试通知"
 
@@ -239,20 +237,17 @@ msgstr "查看"
 
 #: src/progress/cli/notifications/channels/console_card.py:345
 #: src/progress/cli/notifications/templates/test/card_json.j2:3
-msgid "Notification channel configured correctly!"
-msgstr "通知渠道配置正确！"
+#: src/progress/cli/notifications/templates/test/html.j2:4
+#: src/progress/cli/notifications/templates/test/plain_text.j2:1
+msgid "This is a test notification from Progress."
+msgstr "这是一条来自 Progress 的测试通知。"
 
 #: src/progress/cli/notifications/channels/console_card.py:347
+#: src/progress/cli/notifications/templates/test/card_json.j2:4
 #: src/progress/cli/notifications/templates/test/html.j2:5
 #: src/progress/cli/notifications/templates/test/plain_text.j2:3
-msgid ""
-"This is a test notification. If you received this, the notification "
-"channel is configured correctly."
-msgstr "这是一条测试通知。如果你收到了这条消息，说明通知通道已正确配置。"
-
-#: src/progress/cli/notifications/channels/console_card.py:351
-msgid "Test message, no reply needed."
-msgstr "由 Progress 生成 · 测试消息，无需回复"
+msgid "Your notification channel is working correctly."
+msgstr "你的通知渠道已配置正常。"
 
 #: src/progress/cli/notifications/templates/repo_update/card_json.j2:50
 #: src/progress/cli/notifications/templates/repo_update/html.j2:29
@@ -270,27 +265,6 @@ msgstr "展开剩余"
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:15
 msgid "repos"
 msgstr "个仓库"
-
-#: src/progress/cli/notifications/templates/test/card_json.j2:4
-msgid ""
-"You have successfully received this test notification from "
-"Progress.<br>Your Feishu Webhook is working."
-msgstr ""
-
-#: src/progress/cli/notifications/templates/test/card_json.j2:6
-#: src/progress/cli/notifications/templates/test/html.j2:8
-msgid "Go to Progress Settings"
-msgstr "前往 Progress 设置"
-
-#: src/progress/cli/notifications/templates/test/card_json.j2:8
-#: src/progress/cli/notifications/templates/test/html.j2:9
-msgid "Test message, no reply needed"
-msgstr "测试消息,无需回复"
-
-#: src/progress/cli/notifications/templates/test/html.j2:6
-#: src/progress/cli/notifications/templates/test/plain_text.j2:5
-msgid "Sent from Progress config console."
-msgstr "由 Progress 配置控制台发送。"
 
 #: src/progress/cli/reports/pipeline.py:456
 msgid "This content is too large to publish here. "

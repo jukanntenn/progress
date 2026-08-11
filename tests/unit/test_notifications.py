@@ -36,6 +36,7 @@ from progress.cli.notifications.dispatcher import (
 from progress.cli.notifications.events import (
     NotificationEvent,
     ReportEvent,
+    TestNotificationEvent,
 )
 from progress.cli.notifications.renderer import JinjaRenderer
 from progress.errors import NotificationException
@@ -220,6 +221,35 @@ class TestJinjaRenderer:
         entry_md = first_entry["columns"][0]["elements"][0]["content"]
         assert "uTools" in entry_md
         assert "7.8.0" in entry_md
+
+    def test_render_test_notification_plain_text(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.PLAIN_TEXT)
+        assert "This is a test notification from Progress." in payload.body
+        assert "Your notification channel is working correctly." in payload.body
+
+    def test_render_test_notification_html(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.HTML)
+        assert "This is a test notification from Progress." in payload.body
+        assert "Your notification channel is working correctly." in payload.body
+        assert "<br>" not in payload.body
+        assert "Go to Progress Settings" not in payload.body
+        assert "no reply needed" not in payload.body.lower()
+
+    def test_render_test_notification_card_json(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.CARD_JSON)
+        card = json.loads(payload.body)
+        elements = card["body"]["elements"]
+        all_content = " ".join(e.get("content", "") for e in elements if e.get("tag") == "markdown")
+        assert "This is a test notification from Progress." in all_content
+        assert "Your notification channel is working correctly." in all_content
+        assert "<br>" not in all_content
+        assert "Notification channel configured correctly" not in all_content
+        assert "no reply needed" not in all_content.lower()
+        button_tags = [e for e in elements if e.get("tag") == "button"]
+        assert len(button_tags) == 0
 
 
 class TestConsoleChannel:
