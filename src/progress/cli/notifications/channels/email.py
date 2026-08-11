@@ -41,6 +41,10 @@ class EmailChannel:
         cfg = self._config
         if not cfg.recipient:
             raise NotificationException("email channel has no recipients configured")
+        if not cfg.host:
+            raise NotificationException("email channel has no SMTP host configured")
+        if not cfg.from_addr:
+            raise NotificationException("email channel has no from address configured")
         if payload.content_type != ContentType.HTML:
             logger.warning(
                 "email channel received %s payload; expected HTML",

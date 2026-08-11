@@ -13,6 +13,7 @@ import io
 import json
 from unittest.mock import AsyncMock, MagicMock
 
+from pydantic import SecretStr
 import pytest
 from rich.console import Console as RichConsole
 
@@ -24,8 +25,9 @@ from progress.cli.notifications.base import (
     SendResult,
 )
 from progress.cli.notifications.channels.console import ConsoleChannel
+from progress.cli.notifications.channels.email import EmailChannel
 from progress.cli.notifications.channels.feishu import FeishuChannel
-from progress.cli.notifications.config import FeishuChannelConfig
+from progress.cli.notifications.config import EmailChannelConfig, FeishuChannelConfig
 from progress.cli.notifications.dispatcher import (
     DispatchOutcome,
     Dispatcher,
@@ -300,3 +302,40 @@ class TestFeishuWebhookValidation:
         ch = self._channel("not-a-url")
         with pytest.raises(NotificationException, match="invalid or appears masked"):
             await ch.send(ChannelPayload(title="t", body="{}", content_type=ContentType.CARD_JSON))
+
+
+class TestEmailChannelValidation:
+    """Empty host/from_addr/recipient must produce a readable NotificationException,
+    not an opaque aiosmtplib internal error (parallels FeishuWebhookValidation)."""
+
+    @staticmethod
+    def _channel(**overrides) -> EmailChannel:
+        defaults: dict[str, object] = {
+            "type": "email",
+            "enabled": True,
+            "host": "smtp.example.com",
+            "port": 465,
+            "user": "user@example.com",
+            "password": SecretStr("pass"),
+            "from_addr": "from@example.com",
+            "recipient": ["to@example.com"],
+            "starttls": False,
+            "ssl": True,
+        }
+        defaults.update(overrides)
+        return EmailChannel(EmailChannelConfig(**defaults))
+
+    async def test_empty_recipient_raises_readable_error(self) -> None:
+        ch = self._channel(recipient=[])
+        with pytest.raises(NotificationException, match="no recipients"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))
+
+    async def test_empty_host_raises_readable_error(self) -> None:
+        ch = self._channel(host="")
+        with pytest.raises(NotificationException, match="no SMTP host"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))
+
+    async def test_empty_from_addr_raises_readable_error(self) -> None:
+        ch = self._channel(from_addr="")
+        with pytest.raises(NotificationException, match="no from address"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))
