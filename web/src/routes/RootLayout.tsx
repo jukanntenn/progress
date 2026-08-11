@@ -10,7 +10,7 @@ export function RootLayout() {
       <div className="flex-1">
         <Outlet />
       </div>
-      <footer className="text-muted-foreground mx-auto w-full max-w-3xl px-4 py-6 text-center text-xs">
+      <footer className="text-muted-foreground mx-auto w-full max-w-6xl px-4 py-6 text-center text-xs">
         <a
           href="https://github.com/jukanntenn/progress"
           target="_blank"

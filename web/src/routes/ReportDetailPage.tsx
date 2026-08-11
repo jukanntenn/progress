@@ -59,7 +59,7 @@ export default function ReportDetailPage() {
 
   if (error || !data) {
     return (
-      <PageContainer>
+      <PageContainer size="wide">
         <Card>
           <CardContent className="py-12 text-center">
             <div className="text-destructive mb-4 text-lg font-medium">{t('reports.notFound')}</div>

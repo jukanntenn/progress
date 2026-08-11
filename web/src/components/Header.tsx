@@ -65,12 +65,6 @@ function UserMenu() {
             </Menu.Item>
             <div className="bg-border/40 my-1 h-px" />
             <Menu.Item
-              className="focus:bg-accent/50 text-foreground flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors outline-none"
-              onClick={() => navigate('/settings/account')}
-            >
-              {t('settings.changePassword')}
-            </Menu.Item>
-            <Menu.Item
               className="focus:bg-accent/50 text-destructive flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors outline-none"
               onClick={() => {
                 logout()
@@ -92,7 +86,7 @@ export function Header() {
 
   return (
     <header className="glass-navbar sticky top-0 z-40">
-      <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <NavLink to="/reports" className="text-primary text-base font-semibold tracking-tight">
             {t('app.title')}

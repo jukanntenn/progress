@@ -27,7 +27,7 @@ export default function ReportsListPage() {
 
   if (isPending) {
     return (
-      <PageContainer>
+      <PageContainer size="wide">
         <Card>
           <CardContent>
             {Array.from({ length: 5 }).map((_, i) => (
@@ -41,7 +41,7 @@ export default function ReportsListPage() {
 
   if (error) {
     return (
-      <PageContainer>
+      <PageContainer size="wide">
         <Card>
           <CardContent className="py-12 text-center">
             <div className="text-destructive mb-4 text-lg font-medium">
@@ -62,7 +62,7 @@ export default function ReportsListPage() {
   const hasNext = data?.has_next ?? false
 
   return (
-    <PageContainer>
+    <PageContainer size="wide">
       <Card>
         <CardContent>
           {items.length === 0 ? (

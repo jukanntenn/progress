@@ -42,11 +42,28 @@
   "settings": {
     "title": "Settings",
     "group": {
+      "core": "Core",
       "preferences": "Preferences",
       "integrations": "Integrations",
       "notifications": "Notifications",
       "system": "System",
       "account": "Account"
+    },
+    "nav": {
+      "core": "Core",
+      "preferences": "Preferences",
+      "github": "GitHub",
+      "analysis": "AI Analysis",
+      "notification": "Notifications",
+      "markpost": "Markpost",
+      "web": "Web",
+      "auth": "Authentication",
+      "observability": "Observability",
+      "repo": "Repositories",
+      "changelog": "Changelog",
+      "proposal": "Proposals",
+      "feed": "Feed",
+      "account": "Change Password"
     },
     "field": {
       "modified": "Modified",

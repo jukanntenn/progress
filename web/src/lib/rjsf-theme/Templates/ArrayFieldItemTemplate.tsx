@@ -27,7 +27,7 @@ export function ArrayFieldItemTemplate(props: ArrayFieldItemTemplateProps) {
         </span>
         {hasToolbar && <ArrayFieldItemButtonsTemplate {...buttonsProps} />}
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-2">{children}</CardContent>
+      <CardContent className="space-y-4 pt-0">{children}</CardContent>
     </Card>
   )
 }

@@ -11,6 +11,7 @@
  *   bare (the ArrayFieldItemTemplate provides the card).
  */
 
+import { useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import type { ObjectFieldTemplateProps } from '@rjsf/utils'
 import { buttonId, canExpand } from '@rjsf/utils'
@@ -46,6 +47,14 @@ export function ObjectFieldTemplate(props: ObjectFieldTemplateProps) {
     formContext.groupLabels?.[name ?? ''] ??
     (name === undefined ? formContext.rootLabel : prettifyTitle(title))
 
+  const anchorId = useMemo(() => {
+    if (name === undefined || typeof name !== 'string') return undefined
+    return name
+      .replace(/IntegrationConfig$/, '')
+      .replace(/Config$/, '')
+      .toLowerCase()
+  }, [name])
+
   const body = (
     <>
       {properties.map((element) => (
@@ -76,7 +85,10 @@ export function ObjectFieldTemplate(props: ObjectFieldTemplateProps) {
   }
 
   return (
-    <section className="scroll-mt-20">
+    <section
+      {...(anchorId ? { id: anchorId, 'data-section-anchor': anchorId } : {})}
+      className="scroll-mt-20"
+    >
       {heading && (
         <h2 className="text-foreground mb-4 text-xl font-bold">
           {heading}

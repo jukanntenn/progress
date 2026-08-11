@@ -41,11 +41,28 @@
   "settings": {
     "title": "设置",
     "group": {
+      "core": "核心配置",
       "preferences": "偏好",
       "integrations": "集成",
       "notifications": "通知",
       "system": "系统",
       "account": "账户"
+    },
+    "nav": {
+      "core": "核心配置",
+      "preferences": "偏好设置",
+      "github": "GitHub",
+      "analysis": "AI 分析",
+      "notification": "通知",
+      "markpost": "Markpost",
+      "web": "Web",
+      "auth": "认证",
+      "observability": "可观测性",
+      "repo": "仓库",
+      "changelog": "更新日志",
+      "proposal": "提案",
+      "feed": "订阅源",
+      "account": "修改密码"
     },
     "field": {
       "modified": "已修改",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useBlocker, useParams } from 'react-router'
+import { useBlocker, useOutletContext, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { Check, RefreshCw, RotateCcw, Save, Send } from 'lucide-react'
+import { Check, PanelLeft, RefreshCw, RotateCcw, Save, Send } from 'lucide-react'
 import Form from '@rjsf/core'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -18,6 +18,7 @@ import { ConfigForm } from '@/components/config/ConfigForm'
 import { mergeInitialData } from '@/lib/rjsf-theme/mergeInitialData'
 import { useToast } from '@/components/providers/useToast'
 import { changeLocale } from '@/i18n'
+import type { SettingsOutletContext } from './SettingsLayout'
 import { cn } from '@/lib/utils'
 import { $api } from '@/api/client'
 
@@ -78,6 +79,7 @@ export function SettingsConfigSection() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const { section: sectionName } = useParams<{ section: string }>()
+  const { currentLabel, onOpenDrawer } = useOutletContext<SettingsOutletContext>()
   const formRef = useRef<Form>(null)
 
   const configQuery = $api.useQuery('get', '/api/v1/config')
@@ -226,12 +228,48 @@ export function SettingsConfigSection() {
     )
   }
 
+  const PLUGIN_SECTIONS = ['repo', 'changelog', 'proposal', 'feed']
+  const isPlugin = sectionName ? PLUGIN_SECTIONS.includes(sectionName) : false
+  const sectionLabel = isPlugin
+    ? (sectionName ?? '')
+    : sectionName
+      ? t(`settings.nav.${sectionName}`)
+      : ''
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-muted-foreground font-mono text-sm font-semibold tracking-wide uppercase">
-          {sectionName}
-        </h2>
+      <div className="glass-card border-border sticky top-14 z-20 mb-2 flex items-center justify-between gap-2 rounded-xl border px-6 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="text-foreground hidden text-sm font-semibold capitalize lg:block">
+            {sectionLabel}
+          </h2>
+          <button
+            type="button"
+            onClick={onOpenDrawer}
+            className="text-foreground hover:bg-accent/10 flex items-center gap-1.5 rounded-lg text-sm font-semibold capitalize lg:hidden"
+          >
+            <PanelLeft className="h-4 w-4" />
+            <span className="truncate">{currentLabel}</span>
+          </button>
+          <span
+            className={cn(
+              'flex items-center gap-1 text-xs',
+              isDirty ? 'text-warning' : 'text-success',
+            )}
+          >
+            {isDirty ? (
+              <>
+                <span className="bg-warning h-2 w-2 animate-pulse rounded-full" />
+                {t('config.unsavedChanges')}
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                {t('config.noChanges')}
+              </>
+            )}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -240,7 +278,7 @@ export function SettingsConfigSection() {
             disabled={reloadMutation.isPending}
           >
             <RefreshCw className={reloadMutation.isPending ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            {t('config.reload')}
+            <span className="hidden sm:inline">{t('config.reload')}</span>
           </Button>
           {sectionName === 'core' && (
             <Button
@@ -254,7 +292,7 @@ export function SettingsConfigSection() {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              {t('config.testNotification')}
+              <span className="hidden md:inline">{t('config.testNotification')}</span>
             </Button>
           )}
           <Button
@@ -264,7 +302,7 @@ export function SettingsConfigSection() {
             disabled={!isDirty}
           >
             <RotateCcw className="h-4 w-4" />
-            {t('config.reset')}
+            <span className="hidden sm:inline">{t('config.reset')}</span>
           </Button>
           <Button size="sm" onClick={handleSave} disabled={!isDirty || saving}>
             <Save className="h-4 w-4" />
@@ -285,25 +323,6 @@ export function SettingsConfigSection() {
         }}
         onSubmit={handleSubmit}
       />
-
-      <div
-        className={cn(
-          'flex items-center gap-1.5 text-sm',
-          isDirty ? 'text-warning' : 'text-success',
-        )}
-      >
-        {isDirty ? (
-          <>
-            <span className="bg-warning h-2 w-2 animate-pulse rounded-full" />
-            {t('config.unsavedChanges')}
-          </>
-        ) : (
-          <>
-            <Check className="h-4 w-4" />
-            {t('config.noChanges')}
-          </>
-        )}
-      </div>
 
       <Dialog open={leaveBlocked} onOpenChange={(open) => !open && blocker.reset?.()}>
         <DialogContent>

@@ -1,117 +1,91 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Settings as SettingsIcon, User } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
+import { Dialog } from '@base-ui/react'
 import { PageContainer } from '@/components/PageContainer'
 import { $api } from '@/api/client'
 import { cn } from '@/lib/utils'
 
-export interface SidebarItem {
+export interface SettingsOutletContext {
+  currentLabel: string
+  onOpenDrawer: () => void
+}
+
+type JsonSchema = Record<string, unknown>
+
+export interface NavItem {
   section: string
-  title: string
-  group: string
+  navKey: string
   order: number
+  anchorId?: string
+  rawLabel?: string
 }
 
-export interface SidebarGroup {
-  id: string
-  items: SidebarItem[]
-  order: number
+export interface NavGroup {
+  id: 'core' | 'integrations' | 'account'
+  items: NavItem[]
 }
 
-function humanize(key: string): string {
-  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
+const PLUGIN_SECTIONS = ['repo', 'changelog', 'proposal', 'feed'] as const
 
-/**
- * Build the sidebar groups from the backend JSON Schemas' ``ui_group`` /
- * ``ui_order`` annotations (single source of truth):
- *
- * - ``core``: root scalars (language/timezone) form one entry under their
- *   root-level ``ui_group``; each ``$defs`` sub-model with a ``ui_group``
- *   becomes an entry under that group (spec 4.4).
- * - plugin sections: their schema-root ``ui_group`` / ``ui_order`` drive the
- *   entry (D4 — plugin sections carry the annotation at the root, not in
- *   ``$defs``).
- *
- * Every core entry navigates to ``/settings/config/core`` (one Form per
- * section; the page renders all groups), matching the pre-refactor sidebar.
- */
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildSidebarGroups(
-  schemas: Record<string, Record<string, unknown>>,
-  coreLabel: string,
-): SidebarGroup[] {
-  const items: SidebarItem[] = []
+export function buildNavGroups(coreSchema: JsonSchema | undefined): NavGroup[] {
+  const coreTopItem: NavItem = { section: 'core', navKey: 'nav.core', order: 0 }
+  const anchors: NavItem[] = []
 
-  const core = schemas.core
-  if (core) {
-    const rootScalarGroup = findRootGroup(core)
-    if (rootScalarGroup) {
-      items.push({
+  if (coreSchema) {
+    const rootGroup = findRootGroup(coreSchema)
+    if (rootGroup) {
+      anchors.push({
         section: 'core',
-        title: coreLabel,
-        group: rootScalarGroup.group,
-        order: rootScalarGroup.order,
+        navKey: 'nav.preferences',
+        order: rootGroup.order,
+        anchorId: 'preferences',
       })
     }
-    for (const def of Object.values(
-      (core['$defs'] as Record<string, Record<string, unknown>>) ?? {},
-    )) {
+    const defs = (coreSchema.$defs as Record<string, JsonSchema> | undefined) ?? {}
+    for (const [defName, def] of Object.entries(defs)) {
       if (typeof def !== 'object' || def === null) continue
-      const group = def.ui_group as string | undefined
+      const group = (def as JsonSchema).ui_group as string | undefined
       if (!group) continue
-      items.push({
+      const anchorId = defName
+        .replace(/IntegrationConfig$/, '')
+        .replace(/Config$/, '')
+        .toLowerCase()
+      anchors.push({
         section: 'core',
-        title: humanize(
-          (def.title as string | undefined)?.replace(/(Integration)?Config$/, '') ?? '',
-        ),
-        group,
-        order: typeof def.ui_order === 'number' ? def.ui_order : 999,
+        navKey: `nav.${anchorId}`,
+        order:
+          typeof (def as JsonSchema).ui_order === 'number'
+            ? ((def as JsonSchema).ui_order as number)
+            : 999,
+        anchorId,
       })
     }
   }
 
-  for (const [name, schema] of Object.entries(schemas)) {
-    if (name === 'core' || typeof schema !== 'object' || schema === null) continue
-    const group = schema.ui_group as string | undefined
-    if (!group) continue
-    items.push({
-      section: name,
-      title: humanize(
-        (schema.title as string | undefined)?.replace(/(Integration)?Config$/, '') ?? name,
-      ),
-      group,
-      order: typeof schema.ui_order === 'number' ? schema.ui_order : 999,
-    })
-  }
+  const pluginItems: NavItem[] = PLUGIN_SECTIONS.map((section, i) => ({
+    section,
+    navKey: `nav.${section}`,
+    rawLabel: section,
+    order: 100 + i * 10,
+  }))
 
-  const byGroup = new Map<string, SidebarItem[]>()
-  for (const item of items) {
-    const list = byGroup.get(item.group) ?? []
-    list.push(item)
-    byGroup.set(item.group, list)
-  }
-  const groupOrder = ['preferences', 'integrations', 'notifications', 'system']
-  return [...byGroup.entries()]
-    .map(([id, list]) => ({
-      id,
-      items: [...list].sort((a, b) => a.order - b.order),
-      order: groupOrder.indexOf(id) === -1 ? 99 : groupOrder.indexOf(id),
-    }))
-    .sort((a, b) => a.order - b.order)
+  const accountItems: NavItem[] = [{ section: 'account', navKey: 'nav.account', order: 0 }]
+
+  return [
+    { id: 'core', items: [coreTopItem, ...anchors.sort((a, b) => a.order - b.order)] },
+    { id: 'integrations', items: pluginItems },
+    { id: 'account', items: accountItems },
+  ]
 }
 
-/** The root-level ui_group of a section's own scalar properties (core →
- * preferences on language/timezone). */
-function findRootGroup(schema: Record<string, unknown>): { group: string; order: number } | null {
-  const props = (schema.properties as Record<string, Record<string, unknown>> | undefined) ?? {}
+function findRootGroup(schema: JsonSchema): { order: number } | null {
+  const props = (schema.properties as Record<string, JsonSchema> | undefined) ?? {}
   for (const prop of Object.values(props)) {
     if (typeof prop === 'object' && prop !== null && typeof prop.ui_group === 'string') {
-      return {
-        group: prop.ui_group as string,
-        order: typeof prop.ui_order === 'number' ? (prop.ui_order as number) : 999,
-      }
+      return { order: typeof prop.ui_order === 'number' ? (prop.ui_order as number) : 999 }
     }
   }
   return null
@@ -120,106 +94,163 @@ function findRootGroup(schema: Record<string, unknown>): { group: string; order:
 export function SettingsLayout() {
   const { t } = useTranslation()
   const location = useLocation()
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [activeAnchor, setActiveAnchor] = useState<string>('')
 
   const schemaQuery = $api.useQuery('get', '/api/v1/config/schema')
+  const configQuery = $api.useQuery('get', '/api/v1/config')
 
   const groups = useMemo(() => {
-    const schemas = schemaQuery.data?.schemas as Record<string, Record<string, unknown>> | undefined
-    if (!schemas) return []
-    return buildSidebarGroups(schemas, t('config.coreSection'))
-  }, [schemaQuery.data, t])
+    const schemas = schemaQuery.data?.schemas as Record<string, JsonSchema> | undefined
+    return buildNavGroups(schemas?.core)
+  }, [schemaQuery.data])
 
-  const navItem = (to: string, label: string, active: boolean) => (
-    <NavLink
-      to={to}
-      onClick={() => setMobileNavOpen(false)}
-      className={cn(
-        'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-        active
-          ? 'bg-glass-bg-primary/80 text-foreground shadow-sm'
-          : 'text-muted-foreground hover:bg-glass-bg-primary/40 hover:text-foreground',
-      )}
-    >
-      <span className="flex-1">{label}</span>
-      <ChevronRight className="h-3.5 w-3.5 opacity-50" />
-    </NavLink>
-  )
+  const activeSection = useMemo(() => {
+    const match = location.pathname.match(/^\/settings\/(?:config\/([^/]+)|account)/)
+    if (!match) return 'core'
+    return match[1] ?? 'account'
+  }, [location.pathname])
 
-  const isActive = (prefix: string) =>
-    location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)
+  const isCoreActive = activeSection === 'core'
+
+  useEffect(() => {
+    if (!isCoreActive) {
+      setActiveAnchor('')
+      return
+    }
+    const sections = document.querySelectorAll<HTMLElement>('[data-section-anchor]')
+    if (sections.length === 0) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        if (visible.length > 0) {
+          const target = visible[0]?.target
+          if (target) setActiveAnchor(target.id)
+        }
+      },
+      { rootMargin: '-80px 0px -60% 0px', threshold: [0, 0.25, 0.5, 1] },
+    )
+    sections.forEach((s) => observer.observe(s))
+    return () => observer.disconnect()
+  }, [isCoreActive, configQuery.data, schemaQuery.data])
+
+  const handleAnchorClick = (anchorId: string) => {
+    const el = document.getElementById(anchorId)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setActiveAnchor(anchorId)
+    }
+    setDrawerOpen(false)
+  }
+
+  const handleNavigate = () => setDrawerOpen(false)
+
+  const renderItem = (item: NavItem) => {
+    if (item.anchorId) {
+      const isActive = activeAnchor === item.anchorId
+      return (
+        <button
+          key={`${item.section}-${item.anchorId}`}
+          type="button"
+          onClick={() => item.anchorId && handleAnchorClick(item.anchorId)}
+          className={cn(
+            'flex w-full items-center rounded-lg py-1.5 pr-3 pl-9 text-left text-sm transition-colors',
+            isActive
+              ? 'bg-accent/10 text-foreground font-medium'
+              : 'text-muted-foreground hover:bg-accent/5 hover:text-foreground',
+          )}
+        >
+          {t(`settings.${item.navKey}`)}
+        </button>
+      )
+    }
+
+    const to = item.section === 'account' ? '/settings/account' : `/settings/config/${item.section}`
+    const isActive = activeSection === item.section
+    return (
+      <NavLink
+        key={item.section}
+        to={to}
+        onClick={handleNavigate}
+        className={cn(
+          'relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-accent/10 text-foreground'
+            : 'text-muted-foreground hover:bg-accent/5 hover:text-foreground',
+        )}
+      >
+        {isActive && (
+          <span className="bg-primary absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full" />
+        )}
+        <span className="flex-1 capitalize">{item.rawLabel ?? t(`settings.${item.navKey}`)}</span>
+      </NavLink>
+    )
+  }
+
+  const renderGroup = (group: NavGroup) => {
+    const topLevelItems = group.items.filter((i) => !i.anchorId)
+    const anchorItems = group.items.filter((i) => i.anchorId)
+    const showAnchors = group.id === 'core' && isCoreActive && anchorItems.length > 0
+
+    return (
+      <div key={group.id} className="space-y-0.5">
+        <h2 className="text-muted-foreground mb-1.5 px-3 text-xs font-semibold tracking-wide uppercase">
+          {t(`settings.group.${group.id}`)}
+        </h2>
+        {topLevelItems.map(renderItem)}
+        {showAnchors && (
+          <div className="border-border/40 ml-2 border-l pl-1">{anchorItems.map(renderItem)}</div>
+        )}
+      </div>
+    )
+  }
+
+  const sidebarContent = <nav className="space-y-4">{groups.map(renderGroup)}</nav>
+
+  const currentLabel = useMemo(() => {
+    for (const group of groups) {
+      const item = group.items.find((i) => !i.anchorId && i.section === activeSection)
+      if (item) return item.rawLabel ?? t(`settings.${item.navKey}`)
+    }
+    return t('settings.nav.core')
+  }, [groups, activeSection, t])
+
+  const outletContext: SettingsOutletContext = {
+    currentLabel,
+    onOpenDrawer: () => setDrawerOpen(true),
+  }
 
   return (
-    <PageContainer size="medium">
+    <PageContainer size="wide">
       <div className="mb-6 flex items-center gap-2">
         <SettingsIcon className="text-muted-foreground h-5 w-5" />
         <h1 className="text-foreground text-xl font-bold">{t('settings.title')}</h1>
       </div>
 
-      {/* Mobile: collapsible nav trigger */}
-      <button
-        type="button"
-        className="glass-chip mb-4 flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium lg:hidden"
-        onClick={() => setMobileNavOpen((v) => !v)}
-      >
-        <span>{t('settings.sections')}</span>
-        <ChevronRight
-          className={cn('h-4 w-4 transition-transform', mobileNavOpen && 'rotate-90')}
-        />
-      </button>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
-        {/* Desktop sidebar + mobile collapsible */}
-        <aside className={cn(mobileNavOpen ? 'block' : 'hidden', 'lg:block')}>
-          <nav className="space-y-4 lg:sticky lg:top-24">
-            {groups.map((group) => {
-              const groupLabel = t(`settings.group.${group.id}`, group.id)
-              return (
-                <div key={group.id}>
-                  <h2 className="text-muted-foreground mb-1.5 px-3 text-xs font-semibold tracking-wide uppercase">
-                    {groupLabel}
-                  </h2>
-                  <div className="space-y-0.5">
-                    {group.items.map((item) =>
-                      navItem(
-                        `/settings/config/${item.section}`,
-                        item.title,
-                        isActive(`/settings/config/${item.section}`),
-                      ),
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Account group — front-end only, not schema-driven */}
-            <div>
-              <h2 className="text-muted-foreground mb-1.5 px-3 text-xs font-semibold tracking-wide uppercase">
-                {t('settings.group.account')}
-              </h2>
-              <div className="space-y-0.5">
-                <NavLink
-                  to="/settings/account"
-                  onClick={() => setMobileNavOpen(false)}
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                    isActive('/settings/account')
-                      ? 'bg-glass-bg-primary/80 text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-glass-bg-primary/40 hover:text-foreground',
-                  )}
-                >
-                  <User className="h-4 w-4" />
-                  <span className="flex-1">{t('settings.changePassword')}</span>
-                </NavLink>
-              </div>
-            </div>
-          </nav>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-24">{sidebarContent}</div>
         </aside>
 
         <main className="min-w-0">
-          <Outlet />
+          <Outlet context={outletContext} />
         </main>
       </div>
+
+      <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="animate-fade-in fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
+          <Dialog.Popup className="glass-popover animate-slide-in-left fixed inset-y-0 left-0 z-50 w-[280px] max-w-[75vw] overflow-y-auto p-4">
+            <div className="mb-4 flex items-center gap-2">
+              <SettingsIcon className="text-muted-foreground h-5 w-5" />
+              <span className="text-foreground font-semibold">{t('settings.title')}</span>
+            </div>
+            {sidebarContent}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </PageContainer>
   )
 }

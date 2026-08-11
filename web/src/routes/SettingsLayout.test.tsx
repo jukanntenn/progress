@@ -1,22 +1,15 @@
 /**
- * Unit tests for the Settings sidebar grouping (spec 4.4 / D4).
+ * Unit tests for the Settings two-level navigation builder.
  */
 
 import { describe, expect, it } from 'vitest'
-import { buildSidebarGroups } from './SettingsLayout'
+import { buildNavGroups, type NavGroup } from './SettingsLayout'
 
 const coreSchema = {
   type: 'object',
   properties: {
     language: { type: 'string', ui_group: 'preferences', ui_order: 10 },
     timezone: { type: 'string', ui_group: 'preferences', ui_order: 20 },
-    github: { $ref: '#/$defs/GitHubConfig' },
-    analysis: { $ref: '#/$defs/AnalysisConfig' },
-    notification: { $ref: '#/$defs/NotificationConfig' },
-    markpost: { $ref: '#/$defs/MarkpostConfig' },
-    web: { $ref: '#/$defs/WebConfig' },
-    auth: { $ref: '#/$defs/AuthConfig' },
-    observability: { $ref: '#/$defs/ObservabilityConfig' },
   },
   $defs: {
     GitHubConfig: { title: 'GitHubConfig', ui_group: 'integrations', ui_order: 10 },
@@ -29,73 +22,67 @@ const coreSchema = {
   },
 }
 
-const schemas = {
-  core: coreSchema,
-  repo: { title: 'RepoIntegrationConfig', ui_group: 'integrations', ui_order: 90 },
-  changelog: { title: 'ChangelogIntegrationConfig', ui_group: 'integrations', ui_order: 100 },
-  proposal: { title: 'ProposalIntegrationConfig', ui_group: 'integrations', ui_order: 110 },
-  feed: { title: 'FeedIntegrationConfig', ui_group: 'integrations', ui_order: 120 },
+function groupById(groups: NavGroup[], id: NavGroup['id']): NavGroup {
+  const g = groups.find((x) => x.id === id)
+  if (!g) throw new Error(`group ${id} not found`)
+  return g
 }
 
-describe('buildSidebarGroups', () => {
-  it('places core root scalars under their root-level ui_group', () => {
-    const groups = buildSidebarGroups(schemas, 'Core')
-    const preferences = groups.find((g) => g.id === 'preferences')
-    expect(preferences?.items.map((i) => [i.title, i.section])).toEqual([['Core', 'core']])
+describe('buildNavGroups', () => {
+  it('produces three groups: core, integrations, account', () => {
+    const groups = buildNavGroups(coreSchema)
+    expect(groups.map((g) => g.id)).toEqual(['core', 'integrations', 'account'])
   })
 
-  it('maps core $defs sub-models into their groups (spec 4.4)', () => {
-    const groups = buildSidebarGroups(schemas, 'Core')
-    const byGroup = new Map(groups.map((g) => [g.id, g.items.map((i) => i.title)]))
-    expect(byGroup.get('integrations')?.slice(0, 2)).toEqual(['GitHub', 'Analysis'])
-    expect(byGroup.get('notifications')).toEqual(['Notification'])
-    expect(byGroup.get('system')).toEqual(['Markpost', 'Web', 'Auth', 'Observability'])
+  it('core group has one top-level route item plus anchor sub-items', () => {
+    const groups = buildNavGroups(coreSchema)
+    const core = groupById(groups, 'core')
+    const top = core.items.filter((i) => !i.anchorId)
+    const anchors = core.items.filter((i) => i.anchorId)
+    expect(top).toHaveLength(1)
+    expect(top[0]?.section).toBe('core')
+    expect(top[0]?.navKey).toBe('nav.core')
+    expect(anchors.length).toBe(8)
   })
 
-  it('maps plugin sections from their schema-root ui_group (D4)', () => {
-    const groups = buildSidebarGroups(schemas, 'Core')
-    const integrations = groups.find((g) => g.id === 'integrations')
-    expect(integrations?.items.map((i) => i.title)).toEqual([
-      'GitHub',
-      'Analysis',
-      'Repo',
-      'Changelog',
-      'Proposal',
-      'Feed',
-    ])
-    expect(integrations?.items.map((i) => i.section)).toEqual([
-      'core',
-      'core',
-      'repo',
-      'changelog',
-      'proposal',
-      'feed',
-    ])
-  })
-
-  it('orders groups preferences → integrations → notifications → system', () => {
-    const groups = buildSidebarGroups(schemas, 'Core')
-    expect(groups.map((g) => g.id)).toEqual([
+  it('core anchor items are sorted by ui_order and derive anchorId from def name', () => {
+    const groups = buildNavGroups(coreSchema)
+    const anchors = groupById(groups, 'core').items.filter((i) => i.anchorId)
+    expect(anchors.map((i) => i.anchorId)).toEqual([
       'preferences',
-      'integrations',
-      'notifications',
-      'system',
+      'github',
+      'notification',
+      'markpost',
+      'analysis',
+      'web',
+      'auth',
+      'observability',
     ])
+    expect(anchors.map((i) => i.order)).toEqual(
+      [...anchors.map((i) => i.order)].sort((a, b) => a - b),
+    )
   })
 
-  it('sorts items within a group by ui_order', () => {
-    const groups = buildSidebarGroups(schemas, 'Core')
-    const system = groups.find((g) => g.id === 'system')
-    expect(system?.items.map((i) => i.order)).toEqual([10, 40, 50, 110])
+  it('integrations group has 4 plugin sections', () => {
+    const groups = buildNavGroups(coreSchema)
+    const plugins = groupById(groups, 'integrations')
+    expect(plugins.items.map((i) => i.section)).toEqual(['repo', 'changelog', 'proposal', 'feed'])
+    expect(plugins.items.every((i) => !i.anchorId)).toBe(true)
   })
 
-  it('drops sections without a ui_group annotation', () => {
-    const groups = buildSidebarGroups({ core: coreSchema, orphan: { title: 'X' } }, 'Core')
-    const titles = groups.flatMap((g) => g.items.map((i) => i.title))
-    expect(titles).not.toContain('X')
+  it('account group has one item pointing to account route', () => {
+    const groups = buildNavGroups(coreSchema)
+    const account = groupById(groups, 'account')
+    expect(account.items).toHaveLength(1)
+    expect(account.items[0]?.section).toBe('account')
+    expect(account.items[0]?.navKey).toBe('nav.account')
   })
 
-  it('returns empty for empty schemas', () => {
-    expect(buildSidebarGroups({}, 'Core')).toEqual([])
+  it('handles undefined core schema gracefully', () => {
+    const groups = buildNavGroups(undefined)
+    expect(groups.map((g) => g.id)).toEqual(['core', 'integrations', 'account'])
+    const core = groupById(groups, 'core')
+    expect(core.items).toHaveLength(1)
+    expect(core.items[0]?.navKey).toBe('nav.core')
   })
 })

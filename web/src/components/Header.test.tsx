@@ -56,14 +56,14 @@ afterEach(() => {
 })
 
 describe('Header UserMenu', () => {
-  it('navigates to settings when Change Password is clicked', async () => {
+  it('navigates to settings when Settings is clicked', async () => {
     renderHeader()
     const trigger = await screen.findByText('admin')
     fireEvent.click(trigger)
-    const item = await screen.findByText('Change Password')
+    const item = await screen.findByText('Settings')
     fireEvent.click(item)
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/settings/account')
+      expect(navigateMock).toHaveBeenCalledWith('/settings/config/core')
     })
   })
 
@@ -76,6 +76,15 @@ describe('Header UserMenu', () => {
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalledTimes(1)
       expect(navigateMock).toHaveBeenCalledWith('/login', { replace: true })
+    })
+  })
+
+  it('does not show a Change Password item in the dropdown', async () => {
+    renderHeader()
+    const trigger = await screen.findByText('admin')
+    fireEvent.click(trigger)
+    await waitFor(() => {
+      expect(screen.queryByText('Change Password')).not.toBeInTheDocument()
     })
   })
 })
