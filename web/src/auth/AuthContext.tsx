@@ -13,12 +13,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   const login = useCallback(async (username: string, password: string) => {
-    const { data, response } = await fetchClient.POST('/api/v1/auth/login', {
+    const { data, response, error } = await fetchClient.POST('/api/v1/auth/login', {
       body: { username, password },
     })
     if (!response.ok || !data) {
-      const body = await response.json().catch(() => null)
-      throw new Error(body?.error?.message ?? 'Login failed')
+      const envelope = error as { error?: { message?: string } } | undefined
+      throw new Error(envelope?.error?.message ?? 'Login failed')
     }
     localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
     localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refresh_token)
@@ -28,8 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { Authorization: `Bearer ${data.access_token}` },
     })
     if (!meResponse.response.ok || !meResponse.data) {
-      const body = await meResponse.response.json().catch(() => null)
-      throw new Error(body?.error?.message ?? 'Failed to fetch user profile')
+      const envelope = meResponse.error as { error?: { message?: string } } | undefined
+      throw new Error(envelope?.error?.message ?? 'Failed to fetch user profile')
     }
     setUser(meResponse.data)
   }, [])

@@ -80,11 +80,15 @@ function okResponse<T>(data: T) {
 function errResponse(message: string, status: number) {
   return {
     data: undefined,
+    error: { error: { code: 'client_error', message, details: {} } },
     response: {
       ok: false,
       status,
+      get bodyUsed() {
+        return true
+      },
       async json() {
-        return { error: { message } }
+        throw new TypeError('Body has already been used')
       },
     } as unknown as Response,
   }
@@ -131,6 +135,19 @@ describe('AuthProvider + RequireAuth', () => {
       expect(screen.getByText(/incorrect username or password/i)).toBeInTheDocument()
     })
     expect((screen.getByLabelText(/username/i) as HTMLInputElement).value).toBe('admin')
+  })
+
+  it('shows invalidCredentials for a wrong username (not the generic loginFailed)', async () => {
+    mockPost.mockResolvedValue(errResponse('Incorrect username or password', 401))
+    renderWithProviders()
+    await waitFor(() => screen.getByLabelText(/username/i))
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'nonexistent' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'whatever' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/incorrect username or password/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/unable to sign in/i)).not.toBeInTheDocument()
   })
 
   it('toggles password visibility via the eye button', async () => {
