@@ -8,7 +8,9 @@
   "paths": {
     "/healthz": {
       "get": {
-        "tags": ["system"],
+        "tags": [
+          "system"
+        ],
         "summary": "Healthz",
         "description": "Liveness probe — no DB hit (spec 12).",
         "operationId": "healthz_healthz_get",
@@ -28,7 +30,9 @@
     },
     "/readyz": {
       "get": {
-        "tags": ["system"],
+        "tags": [
+          "system"
+        ],
         "summary": "Readyz",
         "description": "Readiness probe — pings the DB (spec 12).\n\nReturns the ``ReadyResponse`` model on both 200 and 503 so the\n``response_model`` validation always applies (no raw ``JSONResponse``\nbypass). The status code is driven via the injected ``Response`` object.",
         "operationId": "readyz_readyz_get",
@@ -58,7 +62,10 @@
     },
     "/api/v1/version": {
       "get": {
-        "tags": ["system", "system"],
+        "tags": [
+          "system",
+          "system"
+        ],
         "summary": "Version",
         "description": "Runtime version info (spec 12).",
         "operationId": "version_api_v1_version_get",
@@ -78,7 +85,9 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Login",
         "description": "Authenticate and issue JWTs.",
         "operationId": "login_api_v1_auth_login_post",
@@ -118,7 +127,9 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Refresh Token",
         "description": "Issue a new access/refresh pair from a valid refresh token.",
         "operationId": "refresh_token_api_v1_auth_refresh_post",
@@ -158,7 +169,9 @@
     },
     "/api/v1/auth/me": {
       "get": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Me",
         "description": "Return the authenticated user's profile.",
         "operationId": "me_api_v1_auth_me_get",
@@ -183,7 +196,9 @@
     },
     "/api/v1/auth/change-password": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Change Password",
         "description": "Change the current user's password.",
         "operationId": "change_password_api_v1_auth_change_password_post",
@@ -228,7 +243,9 @@
     },
     "/api/v1/reports": {
       "get": {
-        "tags": ["reports"],
+        "tags": [
+          "reports"
+        ],
         "summary": "List Reports",
         "description": "Paginated list of report summaries (newest first).",
         "operationId": "list_reports_api_v1_reports_get",
@@ -304,7 +321,9 @@
     },
     "/api/v1/reports/{report_id}": {
       "get": {
-        "tags": ["reports"],
+        "tags": [
+          "reports"
+        ],
         "summary": "Get Report",
         "description": "Single report detail with rendered HTML (spec 12).",
         "operationId": "get_report_api_v1_reports__report_id__get",
@@ -350,7 +369,9 @@
     },
     "/api/v1/reports/{report_id}/raw": {
       "get": {
-        "tags": ["reports"],
+        "tags": [
+          "reports"
+        ],
         "summary": "Get Report Raw",
         "description": "Raw markdown body for the report (spec 12).",
         "operationId": "get_report_raw_api_v1_reports__report_id__raw_get",
@@ -396,7 +417,9 @@
     },
     "/api/v1/config": {
       "get": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Get All Sections",
         "description": "Return ``{core, plugins}`` in plaintext (internal fields stripped).",
         "operationId": "get_all_sections_api_v1_config_get",
@@ -421,7 +444,9 @@
     },
     "/api/v1/config/language": {
       "get": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Get Language",
         "description": "Return the configured UI/notifications language (``core.language``).\n\nThe SPA fetches this on boot so its initial locale matches the server\nconfig, closing the gap where the web UI stayed English even though\n``core.language = zh-Hans`` was set (the SPA previously only honoured\nlocalStorage / the browser's Accept-Language).",
         "operationId": "get_language_api_v1_config_language_get",
@@ -444,7 +469,9 @@
         ]
       },
       "put": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Set Language",
         "description": "Update ``core.language`` atomically (used by the language switcher).\n\nMerges the new value into the existing ``[core]`` section so the rest of\nthe core config (tokens, markpost url, …) is preserved, then refreshes\n``app.state.cfg`` so the LocaleMiddleware picks up the new language on the\nvery next request — no restart needed.",
         "operationId": "set_language_api_v1_config_language_put",
@@ -489,7 +516,9 @@
     },
     "/api/v1/config/schema": {
       "get": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Get Schema",
         "description": "Return per-section JSON Schemas for the frontend config editor.",
         "operationId": "get_schema_api_v1_config_schema_get",
@@ -514,7 +543,9 @@
     },
     "/api/v1/config/{section}": {
       "put": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Put Section",
         "description": "Validate ``data`` against the section's Pydantic model and upsert it.",
         "operationId": "put_section_api_v1_config__section__put",
@@ -570,7 +601,9 @@
     },
     "/api/v1/config/reload": {
       "post": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Reload Config",
         "description": "Re-read DB-stored core config and refresh ``app.state.cfg``.",
         "operationId": "reload_config_api_v1_config_reload_post",
@@ -595,7 +628,9 @@
     },
     "/api/v1/config/notifications/test": {
       "post": {
-        "tags": ["config"],
+        "tags": [
+          "config"
+        ],
         "summary": "Test Notifications",
         "description": "Send a test notification to all enabled channels; report per-channel results.\n\nUsed by the config console to verify channel reachability. Renders a fixed\ni18n test message (localized per the request's Accept-Language via\n``LocaleMiddleware``) and dispatches via the same ``Dispatcher`` the report\npipeline uses.",
         "operationId": "test_notifications_api_v1_config_notifications_test_post",
@@ -620,7 +655,9 @@
     },
     "/api/v1/integrations": {
       "get": {
-        "tags": ["integrations"],
+        "tags": [
+          "integrations"
+        ],
         "summary": "List Integrations",
         "description": "Registered integration list (spec 12).",
         "operationId": "list_integrations_api_v1_integrations_get",
@@ -649,7 +686,9 @@
     },
     "/api/v1/integrations/{name}/status": {
       "get": {
-        "tags": ["integrations"],
+        "tags": [
+          "integrations"
+        ],
         "summary": "Integration Status",
         "description": "Return one integration's status summary (spec 12).",
         "operationId": "integration_status_api_v1_integrations__name__status_get",
@@ -695,7 +734,9 @@
     },
     "/api/v1/rss": {
       "get": {
-        "tags": ["rss"],
+        "tags": [
+          "rss"
+        ],
         "summary": "Get Rss",
         "description": "RSS 2.0 feed of the most recent reports.",
         "operationId": "get_rss_api_v1_rss_get",
@@ -770,7 +811,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["current_password", "new_password"],
+        "required": [
+          "current_password",
+          "new_password"
+        ],
         "title": "ChangePasswordRequest"
       },
       "ConfigReloadResponse": {
@@ -804,7 +848,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["schemas"],
+        "required": [
+          "schemas"
+        ],
         "title": "ConfigSchemaResponse",
         "description": "``{section: JSON Schema}`` map for ``GET /api/v1/config/schema``."
       },
@@ -822,7 +868,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["section", "data"],
+        "required": [
+          "section",
+          "data"
+        ],
         "title": "ConfigSectionResponse",
         "description": "Per-section config dump with secrets masked (SecretStr → ``**********``)."
       },
@@ -836,7 +885,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ConfigUpdateRequest",
         "description": "Body for ``PUT /api/v1/config/{section}``."
       },
@@ -880,7 +931,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "title": "IntegrationSummary",
         "description": "One registered integration in ``GET /api/v1/integrations``."
       },
@@ -893,7 +946,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["language"],
+        "required": [
+          "language"
+        ],
         "title": "LanguageResponse",
         "description": "Configured UI/notifications language for ``GET /api/v1/config/language``.\n\nThe SPA reads this on boot so its initial locale matches the server's\n``core.language`` (instead of only honouring localStorage / the browser's\nAccept-Language, which left the UI in English even when zh-Hans was\nconfigured). Returned unmasked — language is not a secret."
       },
@@ -906,7 +961,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["language"],
+        "required": [
+          "language"
+        ],
         "title": "LanguageUpdateRequest",
         "description": "Body for ``PUT /api/v1/config/language``.\n\nA dedicated single-field endpoint (rather than ``PUT /api/v1/config/core``)\nso the language switcher can change language atomically without having to\nround-trip the whole (masked) core section."
       },
@@ -926,7 +983,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["username", "password"],
+        "required": [
+          "username",
+          "password"
+        ],
         "title": "LoginRequest"
       },
       "PaginatedResponse_ReportSummary_": {
@@ -965,7 +1025,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "PaginatedResponse[ReportSummary]"
       },
       "RawMarkdownResponse": {
@@ -989,7 +1051,12 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["id", "report_type", "title", "markdown"],
+        "required": [
+          "id",
+          "report_type",
+          "title",
+          "markdown"
+        ],
         "title": "RawMarkdownResponse",
         "description": "Raw markdown response for ``GET /api/v1/reports/{id}/raw``."
       },
@@ -1021,7 +1088,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["refresh_token"],
+        "required": [
+          "refresh_token"
+        ],
         "title": "RefreshRequest"
       },
       "ReportDetail": {
@@ -1147,7 +1216,14 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["id", "report_type", "title", "commit_hash", "commit_count", "created_at"],
+        "required": [
+          "id",
+          "report_type",
+          "title",
+          "commit_hash",
+          "commit_count",
+          "created_at"
+        ],
         "title": "ReportSummary",
         "description": "Lightweight report representation for list responses."
       },
@@ -1175,7 +1251,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["channel", "ok"],
+        "required": [
+          "channel",
+          "ok"
+        ],
         "title": "TestChannelResult",
         "description": "Per-channel outcome of a test notification dispatch."
       },
@@ -1195,7 +1274,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["results", "summary"],
+        "required": [
+          "results",
+          "summary"
+        ],
         "title": "TestNotificationResponse",
         "description": "Aggregated outcome of ``POST /api/v1/config/notifications/test``."
       },
@@ -1217,7 +1299,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["access_token", "refresh_token"],
+        "required": [
+          "access_token",
+          "refresh_token"
+        ],
         "title": "TokenResponse"
       },
       "UserResponse": {
@@ -1245,7 +1330,13 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["id", "username", "email", "is_active", "is_superuser"],
+        "required": [
+          "id",
+          "username",
+          "email",
+          "is_active",
+          "is_superuser"
+        ],
         "title": "UserResponse"
       },
       "ValidationError": {
@@ -1281,7 +1372,11 @@
           }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       },
       "VersionResponse": {

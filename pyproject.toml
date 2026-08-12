@@ -169,6 +169,9 @@ split-on-trailing-comma = true
 "tests/e2e/**/*.py" = ["S603", "S404", "S607", "N802"]
 # One-off scripts legitimately call subprocess without shell-escape hardening.
 "scripts/**/*.py" = ["S603", "S404", "INP001"]
+# Agent hook helpers are standalone script modules shared across agents
+# (imported via sys.path, not a package); no __init__.py by design.
+".agents/hooks/*.py" = ["INP001"]
 # Root-level conftest pokes agent private state for test isolation.
 "conftest.py" = ["SLF001"]
 # tortoise-orm generates these; class-level mutable defaults are inherent to
@@ -191,7 +194,9 @@ skip_covered = true
 
 [tool.deptry]
 # The project package itself is first-party (src-layout, name == import name).
-known_first_party = ["progress"]
+# `_core` is the shared agent-hook helper (.agents/hooks/_core.py), imported by
+# the per-agent hook shells via sys.path — it is our code, not a third-party dep.
+known_first_party = ["progress", "_core"]
 
 # Distributions whose import name differs from their PyPI name, or that back a
 # single import shared across multiple distributions (e.g. the opentelemetry-*

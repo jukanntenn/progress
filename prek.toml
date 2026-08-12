@@ -2,10 +2,17 @@
 # Run `prek install` once per clone to wire the hooks into `git commit`.
 
 # Out of scope for every hook: AI-agent config dirs, the local contexts cache,
-# the venv, runtime data, and worktrees. prek uses `git ls-files` so it already
-# honors .gitignore; this exclude covers untracked-but-present working dirs that
-# gitignore alone wouldn't suppress.
-exclude = '^(\.agents|\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/'
+# the venv, runtime data, worktrees, AND committed generated artifacts. prek
+# uses `git ls-files` so it already honors .gitignore; this exclude also covers
+# untracked-but-present working dirs and tracked generated files that must stay
+# verbatim — their bytes are owned by the generator, not by any hook (see
+# web/.prettierignore and the agent-hooks design in docs/agent-hooks.md).
+exclude = '''(?x)^(
+    (?:\.agents|\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/
+  | src/progress/locales/.*\.pot$
+  | web/openapi\.json$
+  | web/src/api/schema\.ts$
+)'''
 
 # ---- ruff (backend lint + format) ----------------------------------------
 # Local hooks calling `uv run ruff` so the version is pinned by pyproject's
@@ -19,6 +26,7 @@ name = "ruff check --fix"
 language = "system"
 entry = "uv run ruff check --fix"
 files = "\\.py$"
+groups = ["lint"]
 
 [[repos.hooks]]
 id = "ruff-format"
@@ -26,6 +34,7 @@ name = "ruff format"
 language = "system"
 entry = "uv run ruff format"
 files = "\\.py$"
+groups = ["format"]
 
 # ---- ty (backend type check) ---------------------------------------------
 [[repos.hooks]]
@@ -48,6 +57,7 @@ language = "system"
 entry = "bash web/run-hook.sh eslint --fix --max-warnings 0"
 files = "^web/.*\\.(ts|tsx|js|jsx)$"
 pass_filenames = true
+groups = ["lint"]
 
 [[repos.hooks]]
 id = "prettier"
@@ -56,6 +66,7 @@ language = "system"
 entry = "bash web/run-hook.sh prettier --write"
 files = "^web/.*\\.(ts|tsx|js|jsx|json|css|md)$"
 pass_filenames = true
+groups = ["format"]
 
 # ---- builtin hygiene (Rust-native, zero network) -------------------------
 [[repos]]
@@ -63,9 +74,11 @@ repo = "builtin"
 
 [[repos.hooks]]
 id = "trailing-whitespace"
+groups = ["format"]
 
 [[repos.hooks]]
 id = "end-of-file-fixer"
+groups = ["format"]
 
 [[repos.hooks]]
 id = "check-yaml"
@@ -81,6 +94,7 @@ id = "check-merge-conflict"
 
 [[repos.hooks]]
 id = "mixed-line-ending"
+groups = ["format"]
 
 [[repos.hooks]]
 id = "check-added-large-files"

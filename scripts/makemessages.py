@@ -43,22 +43,6 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
     return result
 
 
-def _normalize_eol(path: Path) -> None:
-    """Ensure ``path`` ends with exactly one trailing newline.
-
-    Babel writes .pot/.po files ending in two newlines (a trailing blank line).
-    The prek ``end-of-file-fixer`` hook rewrites that to a single trailing
-    newline on commit, so without this normalization the freshly generated
-    artifact would always differ from the committed copy and the .pot drift
-    check would never go green. Mirroring the hook here keeps generation,
-    commit, and drift check all in sync.
-    """
-    text = path.read_text(encoding="utf-8")
-    normalized = text.rstrip("\n") + "\n"
-    if normalized != text:
-        path.write_text(normalized, encoding="utf-8")
-
-
 def main() -> int:
     LOCALE_DIR.mkdir(parents=True, exist_ok=True)
     pot_path = LOCALE_DIR / f"{DOMAIN}.pot"
@@ -79,7 +63,6 @@ def main() -> int:
             ".",
         ]
     )
-    _normalize_eol(pot_path)
     print(f"[makemessages] pot file: {pot_path}")
 
     for locale in LOCALES:
@@ -100,8 +83,6 @@ def main() -> int:
                 locale,
             ]
         )
-        po_path = LOCALE_DIR / locale / "LC_MESSAGES" / f"{DOMAIN}.po"
-        _normalize_eol(po_path)
 
     print("[makemessages] done. translate fuzzy entries, then compile catalogs:")
     print("  uv run python scripts/compile_messages.py")

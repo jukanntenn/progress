@@ -1,170 +1,124 @@
 # AI Agent Hooks
 
-Project-local lifecycle hooks for Claude Code, Codex, ZCode, Trae, and OpenCode
-that keep the code the agents write clean, and refuse to let an agent finish
-while `ruff check` fails.
+Project-local lifecycle hooks for Claude Code, Codex, ZCode, and OpenCode that
+keep the code the agents write clean, and refuse to let an agent finish while
+lint fails.
 
-Most agents share the hook scripts in `.claude/hooks/` as a single source —
-only the command string differs per agent (Claude/Trae inject a project-dir
-env var). Trae additionally reads `.claude/settings.json` natively, so no
-separate `.trae/hooks.json` is needed (and would cause each hook to run twice
-via merge). **Codex and ZCode are the exceptions**: Codex edits files through
-a single freeform `apply_patch` tool (not Claude-style `Edit`/`Write`), and
-ZCode's runtime ignores workspace-scope hook configs — each ships independent
-scripts tailored to its own hook contract (see the Codex and ZCode sections
-below).
+## Design: prek is the single source of truth
 
-| Agent | Hooks config | Scripts |
-|-------|--------------|---------|
-| Claude Code | `.claude/settings.json` | `.claude/hooks/post_tool_use.py`, `.claude/hooks/stop.py` |
-| Codex | `.codex/hooks.json` | `.codex/hooks/post_tool_use.py`, `.codex/hooks/stop.py` |
-| ZCode | `~/.zcode/cli/config.json` | `.zcode/hooks/post_tool_use.py`, `.zcode/hooks/stop.py` |
-| Trae | reads `.claude/settings.json` natively | (same `.claude/hooks/` scripts) |
-| OpenCode | `.opencode/plugins/hooks.ts` (auto-loaded) | (self-contained; no shared scripts) |
+Every hook delegates formatting and linting to **prek** (the project's pre-commit
+runner). `prek.toml` defines two hook groups:
 
-## OpenCode — `.opencode/plugins/hooks.ts`
+- **`format`** — byte-mutating formatters that never fail: `ruff-format`,
+  `prettier`, `trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`.
+- **`lint`** — linters that can fail (and `--fix` what they can): `ruff-check`,
+  `eslint`.
 
-OpenCode has no declarative hooks system; its Plugin SDK is the only way to
-intercept tool execution and session lifecycle. The plugin is **auto-loaded**
-from `.opencode/plugins/` (no `opencode.json` registration needed) and is
-self-contained — it runs `ruff` directly via Bun's shell API instead of
-delegating to any Python script.
+The agent-agnostic operations live in **`.agents/hooks/_core.py`**, which just
+runs prek:
 
-OpenCode already ships a built-in Format service that runs `ruff format`
-(by extension) after every `write`/`edit`/`apply_patch`, so the plugin does
-**not** re-implement formatting. It closes the two gaps the built-in leaves
-open:
+```python
+format(paths)            # prek run --group format --files <paths>          (best-effort)
+lint(*paths, all_files=) # prek run --group lint   --files <paths> | --all-files
+```
 
-- **`tool.execute.after` — per-file `ruff check --fix`.** After every
-  `write`/`edit`/`apply_patch` it extracts the edited path(s) — for
-  `apply_patch`, by parsing the patch text the same way the built-in does
-  (`*** Update File:` / `*** Add File:` headers, `*** Move to:` resolved to the
-  destination) — and runs `ruff format` + `ruff check --fix` on each `.py`/`.pyi`
-  file via a `switch` on the extension (other extensions are no-ops today, new
-  cases drop in later). It is silent and idempotent: `.quiet().nothrow()` means
-  a ruff failure never blocks the agent.
+The function names mirror the group names 1:1. prek's own per-hook `files`
+filters route correctly (a `.py` path only hits ruff; a `.ts` path only hits
+eslint/prettier), so the agent shells never encode an extension→tool mapping —
+that mapping lives only in `prek.toml`. Adding a new formatter is a one-line
+`prek.toml` change; every agent picks it up automatically.
 
-- **`event` (`session.idle`) + `chat.message` — session-end lint gate.**
-  OpenCode's event hooks are fire-and-forget and cannot return a
-  `{"decision":"block"}` the way Claude's Stop hook can. Instead, on the first
-  `session.idle` of each real user turn the hook re-runs `ruff check --fix`
-  across `src/`; if residual errors remain that ruff cannot auto-fix, it injects
-  a synthetic user message via `client.session.prompt()` so the agent keeps
-  working. This mirrors Claude's `stop_hook_active`: at most **one** feedback
-  per real user prompt — subsequent idles in the same turn stand down, and a
-  fresh non-synthetic user message resets the gate. The one-turn-only latch is
-  a module-level `Map<sessionID, { feedbackGiven }>`; OpenCode plugins are
-  stateful (the module is imported once and the hook object lives for the
-  instance lifetime), so it persists across events within a process.
+## Shells vs core
 
-## Codex — `.codex/hooks/`
+Each agent keeps its **own hook shell** (payload parsing + stdout protocol
+differ per agent — they are NOT unified), and the shells share **only** the
+prek operations via `_core`:
 
-Codex has its own hook scripts under `.codex/hooks/`, separate from
-`.claude/hooks/`. The split is deliberate: Codex edits files through one
-freeform `apply_patch` tool (not Claude-style `Edit`/`Write`), and its hook
-contract differs in ways that matter.
+| Agent | Hooks config | Shell | Payload / protocol |
+|-------|--------------|-------|--------------------|
+| Claude Code | `.claude/settings.json` | `.claude/hooks/post_tool_use.py`, `stop.py` | `tool_input.file_path`; snake_case; block = `{"decision":"block","reason":...}` |
+| Codex | `.codex/hooks.json` | `.codex/hooks/post_tool_use.py`, `stop.py` | `apply_patch` V4A patch text in `tool_input.command`; `stop_hook_active` guard |
+| ZCode | `~/.zcode/cli/config.json` (user-level) | `.zcode/hooks/post_tool_use.py`, `stop.py` | `toolInput.file_path`; camelCase; `stopHookActive`; caps at 3 continuations |
+| OpenCode | `.opencode/plugins/hooks.ts` (auto-loaded) | (self-contained TS) | `args.filePath`/`patchText`; OpenCode events can't block, so it injects a synthetic message |
 
-- **`post_tool_use.py`** (PostToolUse, matcher `apply_patch`): reads the edited
-  paths out of the V4A patch text carried in `tool_input.command` (Codex
-  supplies no `file_path` field — the paths live inside the patch). Only
-  `*** Update File:` and `*** Add File:` paths are formatted; `*** Delete File:`
-  is skipped (the file no longer exists), and `*** Update File:` followed by
-  `*** Move to:` is treated as a rename — the hook formats the *destination*
-  path (the source has been removed). Each `.py`/`.pyi` path gets
-  `ruff format` then `ruff check --fix`. The hook never blocks: it is a silent
-  best-effort fixer (exit 0), and any ruff failure it cannot auto-fix is
-  surfaced as a stderr warning while the turn continues.
+OpenCode runs under Bun, so its shell calls `prek run -C <root> --group ...`
+directly via Bun's shell `` $ `` instead of importing `_core` — but it uses the
+exact same groups and semantics.
 
-- **`stop.py`** (Stop): runs a repo-wide `ruff check --fix` when the agent
-  wants to finish. If residual unfixable lint remains it prints
-  `{"decision":"block","reason":"..."}` (exit 0), and the reason is fed back to
-  the agent as a continuation prompt. The only loop guard is the
-  `stop_hook_active` flag set on the second Stop invocation: when it is
-  truthy the hook stands down and lets the agent stop, leaving the final lint
-  verdict to CI.
+## PostToolUse — per-file format
 
-## ZCode — `.zcode/hooks/`
+Fires after every edit. The shell extracts the edited path(s) and runs
+`_core.format(paths)` then `_core.lint(*paths)` (both best-effort, exit code
+ignored). After the call the file is fully canonical — formatted **and**
+lint-fixed (e.g. unused imports removed) — so a later `prek run` on it is a
+no-op. This is why an agent edit followed by `prek` no longer dirties the tree:
+the agent runs the same prek groups prek itself will run.
 
-ZCode ships its own hook scripts under `.zcode/hooks/`. Like Codex, the split
-is deliberate: ZCode's `Write`/`Edit` tools expose the edited path as a
-structured `file_path` field (not V4A patch text), and its hook stdin uses
-camelCase keys (`toolInput`, `stopHookActive`). Unlike every other agent here,
-the hook config cannot live in the repository at all: the ZCode agent runtime
-(v2.1.0) **strips workspace-scope hooks** from `.zcode/config.json` with a
-"Project hooks were ignored by the security policy" warning, so the config
-must live in the user-level `~/.zcode/cli/config.json`. Because that file
-applies to every workspace, the command strings guard on the existence of
-`.zcode/hooks/` (via `${ZCODE_PROJECT_DIR}`) and silently exit 0 elsewhere.
-See `.zcode/README.md` for the evidence and details.
+## Stop — repo-wide lint gate
 
-- **`post_tool_use.py`** (PostToolUse, matcher `Edit|Write`): reads
-  `toolInput.file_path` and runs `ruff check --fix` then `ruff format` on the
-  edited `.py`/`.pyi` file. Never blocks; ruff failures surface as stderr
-  warnings.
-
-- **`stop.py`** (Stop): identical semantics to the shared stop script, with
-  the loop guard reading the camelCase `stopHookActive` flag. ZCode natively
-  caps Stop continuations at three.
-
-## PostToolUse — `post_tool_use.py`
-
-Fires after every `Edit`/`Write`. Reads `tool_input.file_path` directly
-(Claude Code’s `Edit`/`Write` tools provide the path as a structured field,
-unlike Codex’s `apply_patch` which embeds paths inside V4A patch text). For
-`.py`/`.pyi` files it runs `ruff check --fix` then `ruff format`, reading the
-project’s own `[tool.ruff]` config (no hard-coded rule set, so it stays
-in sync with CI). It **never blocks** the agent - formatting is best-effort.
-A genuine ruff failure is surfaced as a stderr warning and the turn
-continues; the real gate is the Stop hook.
-
-## Stop — `stop.py`
-
-Fires when the agent wants to end the turn. It runs a full `uv run ruff check --fix`:
+Fires when the agent wants to end the turn. The shell runs
+`_core.lint(all_files=True)` (`prek run --group lint --all-files`):
 
 - **Lint clean** → exit 0, no output. The agent stops normally.
-- **Lint dirty** → exit 0, printing `{"decision":"block","reason":"..."}` to
-  stdout. The agent is sent back for another pass with the ruff output as a
-  continuation prompt.
+- **Lint dirty** → the shell prints the agent's block form (Claude/Codex/ZCode:
+  `{"decision":"block","reason":...}` JSON with prek's output; OpenCode: a
+  synthetic user message). The agent is sent back for another pass.
 
-### Why exit 0 + JSON, not exit 2
-
-Both agents document exit-0-plus-JSON as the canonical blocking mechanism.
-Claude's reference states it plainly: *"Instead of exiting with code 2 to
-block, exit 0 and print a JSON object to stdout."* Exit 2 treats the feedback
-as a hard error and discards stdout; the JSON form is structured, neutral, and
-lets `reason` carry the exact diagnostics back to the agent.
+prek treats "a fixer modified a file" as nonzero too (re-stage semantics). In a
+CI-gated clean tree nothing modifies at Stop — the edited files were already
+fixed by PostToolUse — so nonzero cleanly means unfixable lint remains.
 
 ### Infinite-loop guard
 
-If the agent fixes the wrong thing the Stop hook would fire again, block again,
-and the turn would never end. The hook input carries `stop_hook_active`
-(boolean) — it is `false` on the first Stop and `true` on every subsequent one
-within the same turn. When it is `true` the hook **stands down** and lets the
-agent stop. The authoritative lint verdict then belongs to CI, never to a hook
-loop.
+The hook input carries a "stop already active" flag (`stop_hook_active` /
+`stopHookActive`) — `false` on the first Stop, `true` thereafter. When truthy the
+hook stands down and lets the agent stop; the authoritative lint verdict then
+belongs to CI, never to a hook loop.
 
-| `stop_hook_active` | ruff result | Hook action |
-|--------------------|-------------|-------------|
-| `false` | clean | pass (exit 0, no output) |
-| `false` | dirty | block (exit 0 + `{"decision":"block",...}`) |
-| `true` | (any) | pass — let the agent stop |
+## Generated files are exempt
+
+Generated artifacts (`progress.pot`, `web/openapi.json`, `web/src/api/schema.ts`)
+are kept verbatim — their bytes are owned by their generator, not by any hook
+(see the project's drift conventions). They are excluded in two complementary
+places:
+
+- **`prek.toml` `exclude`** — so no prek hook (format, lint, builtin) touches
+  them. The `_core` format/lint calls therefore skip them automatically.
+- **`web/.prettierignore`** (`openapi.json`, `src/api/schema.ts`) and the eslint
+  `ignores` — so `pnpm format` / `pnpm lint` (direct dev invocations, not via
+  prek) skip them too.
+
+`web/pnpm-lock.yaml` and the `.po` catalogs (hand-translated) are the tracked
+exceptions: lockfiles are ignored via `.prettierignore`, and `.po` stays in scope
+for its hygiene + catalog-lint hooks.
+
+## ZCode config is user-level
+
+The ZCode runtime (v2.1.0, WSL) strips workspace-scope hooks from
+`.zcode/config.json` ("Project hooks were ignored by the security policy"). The
+hook config therefore lives in the **user-level** `~/.zcode/cli/config.json` and
+guards on the existence of `.zcode/hooks/` via `${ZCODE_PROJECT_DIR}` so other
+workspaces are unaffected. See `.zcode/README.md` for the evidence.
 
 ## Testing the hooks locally
 
 ```bash
-# format hook on a clean file: no output, exit 0
-echo '{"tool_name":"Edit","tool_input":{"file_path":"src/progress/__init__.py"}}' \
+# PostToolUse on a clean file: no output, exit 0
+echo '{"tool_input":{"file_path":"src/progress/__init__.py"}}' \
   | uv run .claude/hooks/post_tool_use.py
 
-# stop hook, clean tree: no output, exit 0
-echo '{"hook_event_name":"Stop","stop_hook_active":false}' \
-  | uv run .claude/hooks/stop.py
+# Codex PostToolUse (V4A patch text carries the path)
+printf '%s' '{"tool_input":{"command":"*** Update File: src/progress/__init__.py\nprint(1)"}}' \
+  | uv run .codex/hooks/post_tool_use.py
 
-# stop hook, infinite-loop guard active: no output, exit 0
-echo '{"hook_event_name":"Stop","stop_hook_active":true}' \
-  | uv run .claude/hooks/stop.py
+# Stop gate, loop guard active: no output, exit 0
+echo '{"stop_hook_active":true}' | uv run .claude/hooks/stop.py
+
+# Functional: an ill-formatted temp file IS reformatted by the hook
+printf 'x=1\n' > /tmp/_t.py  # (place inside the repo for prek to see it)
+echo '{"tool_input":{"file_path":"_t.py"}}' | uv run .claude/hooks/post_tool_use.py
 ```
 
-To see the block path, temporarily introduce a lint error (e.g. an unused
-import) and re-run the Stop hook — it prints the `{"decision":"block",...}`
-JSON with the ruff diagnostics in `reason`.
+To see the block path, introduce a lint error (e.g. an unused import) and run
+the Stop hook — it prints the `{"decision":"block",...}` JSON with the prek
+diagnostics in `reason`.

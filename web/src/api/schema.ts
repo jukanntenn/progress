@@ -4,1268 +4,1268 @@
  */
 
 export interface paths {
-  '/healthz': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Healthz
-     * @description Liveness probe — no DB hit (spec 12).
-     */
-    get: operations['healthz_healthz_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/readyz': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Readyz
-     * @description Readiness probe — pings the DB (spec 12).
-     *
-     *     Returns the ``ReadyResponse`` model on both 200 and 503 so the
-     *     ``response_model`` validation always applies (no raw ``JSONResponse``
-     *     bypass). The status code is driven via the injected ``Response`` object.
-     */
-    get: operations['readyz_readyz_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/version': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Version
-     * @description Runtime version info (spec 12).
-     */
-    get: operations['version_api_v1_version_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/auth/login': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Login
-     * @description Authenticate and issue JWTs.
-     */
-    post: operations['login_api_v1_auth_login_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/auth/refresh': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Refresh Token
-     * @description Issue a new access/refresh pair from a valid refresh token.
-     */
-    post: operations['refresh_token_api_v1_auth_refresh_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/auth/me': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Me
-     * @description Return the authenticated user's profile.
-     */
-    get: operations['me_api_v1_auth_me_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/auth/change-password': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Change Password
-     * @description Change the current user's password.
-     */
-    post: operations['change_password_api_v1_auth_change_password_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * List Reports
-     * @description Paginated list of report summaries (newest first).
-     */
-    get: operations['list_reports_api_v1_reports_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{report_id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Report
-     * @description Single report detail with rendered HTML (spec 12).
-     */
-    get: operations['get_report_api_v1_reports__report_id__get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{report_id}/raw': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Report Raw
-     * @description Raw markdown body for the report (spec 12).
-     */
-    get: operations['get_report_raw_api_v1_reports__report_id__raw_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get All Sections
-     * @description Return ``{core, plugins}`` in plaintext (internal fields stripped).
-     */
-    get: operations['get_all_sections_api_v1_config_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config/language': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Language
-     * @description Return the configured UI/notifications language (``core.language``).
-     *
-     *     The SPA fetches this on boot so its initial locale matches the server
-     *     config, closing the gap where the web UI stayed English even though
-     *     ``core.language = zh-Hans`` was set (the SPA previously only honoured
-     *     localStorage / the browser's Accept-Language).
-     */
-    get: operations['get_language_api_v1_config_language_get']
-    /**
-     * Set Language
-     * @description Update ``core.language`` atomically (used by the language switcher).
-     *
-     *     Merges the new value into the existing ``[core]`` section so the rest of
-     *     the core config (tokens, markpost url, …) is preserved, then refreshes
-     *     ``app.state.cfg`` so the LocaleMiddleware picks up the new language on the
-     *     very next request — no restart needed.
-     */
-    put: operations['set_language_api_v1_config_language_put']
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config/schema': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Schema
-     * @description Return per-section JSON Schemas for the frontend config editor.
-     */
-    get: operations['get_schema_api_v1_config_schema_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config/{section}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    /**
-     * Put Section
-     * @description Validate ``data`` against the section's Pydantic model and upsert it.
-     */
-    put: operations['put_section_api_v1_config__section__put']
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config/reload': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Reload Config
-     * @description Re-read DB-stored core config and refresh ``app.state.cfg``.
-     */
-    post: operations['reload_config_api_v1_config_reload_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/config/notifications/test': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Test Notifications
-     * @description Send a test notification to all enabled channels; report per-channel results.
-     *
-     *     Used by the config console to verify channel reachability. Renders a fixed
-     *     i18n test message (localized per the request's Accept-Language via
-     *     ``LocaleMiddleware``) and dispatches via the same ``Dispatcher`` the report
-     *     pipeline uses.
-     */
-    post: operations['test_notifications_api_v1_config_notifications_test_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/integrations': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * List Integrations
-     * @description Registered integration list (spec 12).
-     */
-    get: operations['list_integrations_api_v1_integrations_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/integrations/{name}/status': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Integration Status
-     * @description Return one integration's status summary (spec 12).
-     */
-    get: operations['integration_status_api_v1_integrations__name__status_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/rss': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Rss
-     * @description RSS 2.0 feed of the most recent reports.
-     */
-    get: operations['get_rss_api_v1_rss_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Healthz
+         * @description Liveness probe — no DB hit (spec 12).
+         */
+        get: operations["healthz_healthz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readyz
+         * @description Readiness probe — pings the DB (spec 12).
+         *
+         *     Returns the ``ReadyResponse`` model on both 200 and 503 so the
+         *     ``response_model`` validation always applies (no raw ``JSONResponse``
+         *     bypass). The status code is driven via the injected ``Response`` object.
+         */
+        get: operations["readyz_readyz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version
+         * @description Runtime version info (spec 12).
+         */
+        get: operations["version_api_v1_version_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description Authenticate and issue JWTs.
+         */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Token
+         * @description Issue a new access/refresh pair from a valid refresh token.
+         */
+        post: operations["refresh_token_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Me
+         * @description Return the authenticated user's profile.
+         */
+        get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Change the current user's password.
+         */
+        post: operations["change_password_api_v1_auth_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description Paginated list of report summaries (newest first).
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report
+         * @description Single report detail with rendered HTML (spec 12).
+         */
+        get: operations["get_report_api_v1_reports__report_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_id}/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report Raw
+         * @description Raw markdown body for the report (spec 12).
+         */
+        get: operations["get_report_raw_api_v1_reports__report_id__raw_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get All Sections
+         * @description Return ``{core, plugins}`` in plaintext (internal fields stripped).
+         */
+        get: operations["get_all_sections_api_v1_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Language
+         * @description Return the configured UI/notifications language (``core.language``).
+         *
+         *     The SPA fetches this on boot so its initial locale matches the server
+         *     config, closing the gap where the web UI stayed English even though
+         *     ``core.language = zh-Hans`` was set (the SPA previously only honoured
+         *     localStorage / the browser's Accept-Language).
+         */
+        get: operations["get_language_api_v1_config_language_get"];
+        /**
+         * Set Language
+         * @description Update ``core.language`` atomically (used by the language switcher).
+         *
+         *     Merges the new value into the existing ``[core]`` section so the rest of
+         *     the core config (tokens, markpost url, …) is preserved, then refreshes
+         *     ``app.state.cfg`` so the LocaleMiddleware picks up the new language on the
+         *     very next request — no restart needed.
+         */
+        put: operations["set_language_api_v1_config_language_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Schema
+         * @description Return per-section JSON Schemas for the frontend config editor.
+         */
+        get: operations["get_schema_api_v1_config_schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/{section}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Section
+         * @description Validate ``data`` against the section's Pydantic model and upsert it.
+         */
+        put: operations["put_section_api_v1_config__section__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reload Config
+         * @description Re-read DB-stored core config and refresh ``app.state.cfg``.
+         */
+        post: operations["reload_config_api_v1_config_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/notifications/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Notifications
+         * @description Send a test notification to all enabled channels; report per-channel results.
+         *
+         *     Used by the config console to verify channel reachability. Renders a fixed
+         *     i18n test message (localized per the request's Accept-Language via
+         *     ``LocaleMiddleware``) and dispatches via the same ``Dispatcher`` the report
+         *     pipeline uses.
+         */
+        post: operations["test_notifications_api_v1_config_notifications_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Integrations
+         * @description Registered integration list (spec 12).
+         */
+        get: operations["list_integrations_api_v1_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/{name}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Integration Status
+         * @description Return one integration's status summary (spec 12).
+         */
+        get: operations["integration_status_api_v1_integrations__name__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rss
+         * @description RSS 2.0 feed of the most recent reports.
+         */
+        get: operations["get_rss_api_v1_rss_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-export type webhooks = Record<string, never>
+export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    /**
-     * AllConfigResponse
-     * @description ``{section: data}`` map for ``GET /api/v1/config``.
-     */
-    AllConfigResponse: {
-      /** Core */
-      core?: {
-        [key: string]: unknown
-      }
-      /** Plugins */
-      plugins?: {
-        [key: string]: {
-          [key: string]: unknown
-        }
-      }
-    }
-    /** ChangePasswordRequest */
-    ChangePasswordRequest: {
-      /** Current Password */
-      current_password: string
-      /** New Password */
-      new_password: string
-    }
-    /**
-     * ConfigReloadResponse
-     * @description Acknowledgement for ``POST /api/v1/config/reload``.
-     */
-    ConfigReloadResponse: {
-      /**
-       * Status
-       * @default ok
-       */
-      status: string
-      /**
-       * Section
-       * @default core
-       */
-      section: string
-    }
-    /**
-     * ConfigSchemaResponse
-     * @description ``{section: JSON Schema}`` map for ``GET /api/v1/config/schema``.
-     */
-    ConfigSchemaResponse: {
-      /** Schemas */
-      schemas: {
-        [key: string]: {
-          [key: string]: unknown
-        }
-      }
-    }
-    /**
-     * ConfigSectionResponse
-     * @description Per-section config dump with secrets masked (SecretStr → ``**********``).
-     */
-    ConfigSectionResponse: {
-      /** Section */
-      section: string
-      /** Data */
-      data: {
-        [key: string]: unknown
-      }
-    }
-    /**
-     * ConfigUpdateRequest
-     * @description Body for ``PUT /api/v1/config/{section}``.
-     */
-    ConfigUpdateRequest: {
-      /** Data */
-      data: {
-        [key: string]: unknown
-      }
-    }
-    /** HTTPValidationError */
-    HTTPValidationError: {
-      /** Detail */
-      detail?: components['schemas']['ValidationError'][]
-    }
-    /**
-     * HealthResponse
-     * @description Liveness probe response (no auth, no DB hit).
-     */
-    HealthResponse: {
-      /**
-       * Status
-       * @default ok
-       */
-      status: string
-    }
-    /**
-     * IntegrationSummary
-     * @description One registered integration in ``GET /api/v1/integrations``.
-     */
-    IntegrationSummary: {
-      /** Name */
-      name: string
-      /** Config Schema */
-      config_schema?: {
-        [key: string]: unknown
-      }
-    }
-    /**
-     * LanguageResponse
-     * @description Configured UI/notifications language for ``GET /api/v1/config/language``.
-     *
-     *     The SPA reads this on boot so its initial locale matches the server's
-     *     ``core.language`` (instead of only honouring localStorage / the browser's
-     *     Accept-Language, which left the UI in English even when zh-Hans was
-     *     configured). Returned unmasked — language is not a secret.
-     */
-    LanguageResponse: {
-      /** Language */
-      language: string
-    }
-    /**
-     * LanguageUpdateRequest
-     * @description Body for ``PUT /api/v1/config/language``.
-     *
-     *     A dedicated single-field endpoint (rather than ``PUT /api/v1/config/core``)
-     *     so the language switcher can change language atomically without having to
-     *     round-trip the whole (masked) core section.
-     */
-    LanguageUpdateRequest: {
-      /** Language */
-      language: string
-    }
-    /** LoginRequest */
-    LoginRequest: {
-      /** Username */
-      username: string
-      /** Password */
-      password: string
-    }
-    /** PaginatedResponse[ReportSummary] */
-    PaginatedResponse_ReportSummary_: {
-      /** Items */
-      items: components['schemas']['ReportSummary'][]
-      /**
-       * Page
-       * @default 1
-       */
-      page: number
-      /**
-       * Page Size
-       * @default 20
-       */
-      page_size: number
-      /**
-       * Total
-       * @default 0
-       */
-      total: number
-      /**
-       * Has Next
-       * @default false
-       */
-      has_next: boolean
-    }
-    /**
-     * RawMarkdownResponse
-     * @description Raw markdown response for ``GET /api/v1/reports/{id}/raw``.
-     */
-    RawMarkdownResponse: {
-      /** Id */
-      id: number
-      /** Report Type */
-      report_type: string
-      /** Title */
-      title: string
-      /** Markdown */
-      markdown: string
-    }
-    /**
-     * ReadyResponse
-     * @description Readiness probe response (pings DB).
-     */
-    ReadyResponse: {
-      /**
-       * Status
-       * @default ok
-       */
-      status: string
-      /**
-       * Database
-       * @default ok
-       */
-      database: string
-    }
-    /** RefreshRequest */
-    RefreshRequest: {
-      /** Refresh Token */
-      refresh_token: string
-    }
-    /**
-     * ReportDetail
-     * @description Full report including rendered HTML content (spec 12).
-     */
-    ReportDetail: {
-      /** Id */
-      id: number
-      /** Report Type */
-      report_type: string
-      /** Title */
-      title: string
-      /** Commit Hash */
-      commit_hash: string
-      /** Previous Commit Hash */
-      previous_commit_hash?: string | null
-      /** Commit Count */
-      commit_count: number
-      /** Markpost Url */
-      markpost_url?: string | null
-      /** Content */
-      content: string
-      /** Rendered Html */
-      rendered_html: string
-      /** Created At */
-      created_at: string
-    }
-    /**
-     * ReportSummary
-     * @description Lightweight report representation for list responses.
-     */
-    ReportSummary: {
-      /** Id */
-      id: number
-      /** Report Type */
-      report_type: string
-      /** Title */
-      title: string
-      /** Commit Hash */
-      commit_hash: string
-      /** Previous Commit Hash */
-      previous_commit_hash?: string | null
-      /** Commit Count */
-      commit_count: number
-      /** Markpost Url */
-      markpost_url?: string | null
-      /** Created At */
-      created_at: string
-    }
-    /**
-     * TestChannelResult
-     * @description Per-channel outcome of a test notification dispatch.
-     */
-    TestChannelResult: {
-      /** Channel */
-      channel: string
-      /** Ok */
-      ok: boolean
-      /** Error */
-      error?: string | null
-    }
-    /**
-     * TestNotificationResponse
-     * @description Aggregated outcome of ``POST /api/v1/config/notifications/test``.
-     */
-    TestNotificationResponse: {
-      /** Results */
-      results: components['schemas']['TestChannelResult'][]
-      /** Summary */
-      summary: string
-    }
-    /** TokenResponse */
-    TokenResponse: {
-      /** Access Token */
-      access_token: string
-      /** Refresh Token */
-      refresh_token: string
-      /**
-       * Token Type
-       * @default bearer
-       */
-      token_type: string
-    }
-    /** UserResponse */
-    UserResponse: {
-      /** Id */
-      id: number
-      /** Username */
-      username: string
-      /** Email */
-      email: string
-      /** Is Active */
-      is_active: boolean
-      /** Is Superuser */
-      is_superuser: boolean
-    }
-    /** ValidationError */
-    ValidationError: {
-      /** Location */
-      loc: (string | number)[]
-      /** Message */
-      msg: string
-      /** Error Type */
-      type: string
-      /** Input */
-      input?: unknown
-      /** Context */
-      ctx?: Record<string, never>
-    }
-    /**
-     * VersionResponse
-     * @description Version info response.
-     */
-    VersionResponse: {
-      /**
-       * Name
-       * @default progress
-       */
-      name: string
-      /**
-       * Version
-       * @default 0.0.1
-       */
-      version: string
-    }
-  }
-  responses: never
-  parameters: never
-  requestBodies: never
-  headers: never
-  pathItems: never
+    schemas: {
+        /**
+         * AllConfigResponse
+         * @description ``{section: data}`` map for ``GET /api/v1/config``.
+         */
+        AllConfigResponse: {
+            /** Core */
+            core?: {
+                [key: string]: unknown;
+            };
+            /** Plugins */
+            plugins?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** ChangePasswordRequest */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * ConfigReloadResponse
+         * @description Acknowledgement for ``POST /api/v1/config/reload``.
+         */
+        ConfigReloadResponse: {
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
+            /**
+             * Section
+             * @default core
+             */
+            section: string;
+        };
+        /**
+         * ConfigSchemaResponse
+         * @description ``{section: JSON Schema}`` map for ``GET /api/v1/config/schema``.
+         */
+        ConfigSchemaResponse: {
+            /** Schemas */
+            schemas: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /**
+         * ConfigSectionResponse
+         * @description Per-section config dump with secrets masked (SecretStr → ``**********``).
+         */
+        ConfigSectionResponse: {
+            /** Section */
+            section: string;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ConfigUpdateRequest
+         * @description Body for ``PUT /api/v1/config/{section}``.
+         */
+        ConfigUpdateRequest: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HealthResponse
+         * @description Liveness probe response (no auth, no DB hit).
+         */
+        HealthResponse: {
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
+        };
+        /**
+         * IntegrationSummary
+         * @description One registered integration in ``GET /api/v1/integrations``.
+         */
+        IntegrationSummary: {
+            /** Name */
+            name: string;
+            /** Config Schema */
+            config_schema?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * LanguageResponse
+         * @description Configured UI/notifications language for ``GET /api/v1/config/language``.
+         *
+         *     The SPA reads this on boot so its initial locale matches the server's
+         *     ``core.language`` (instead of only honouring localStorage / the browser's
+         *     Accept-Language, which left the UI in English even when zh-Hans was
+         *     configured). Returned unmasked — language is not a secret.
+         */
+        LanguageResponse: {
+            /** Language */
+            language: string;
+        };
+        /**
+         * LanguageUpdateRequest
+         * @description Body for ``PUT /api/v1/config/language``.
+         *
+         *     A dedicated single-field endpoint (rather than ``PUT /api/v1/config/core``)
+         *     so the language switcher can change language atomically without having to
+         *     round-trip the whole (masked) core section.
+         */
+        LanguageUpdateRequest: {
+            /** Language */
+            language: string;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        /** PaginatedResponse[ReportSummary] */
+        PaginatedResponse_ReportSummary_: {
+            /** Items */
+            items: components["schemas"]["ReportSummary"][];
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /**
+         * RawMarkdownResponse
+         * @description Raw markdown response for ``GET /api/v1/reports/{id}/raw``.
+         */
+        RawMarkdownResponse: {
+            /** Id */
+            id: number;
+            /** Report Type */
+            report_type: string;
+            /** Title */
+            title: string;
+            /** Markdown */
+            markdown: string;
+        };
+        /**
+         * ReadyResponse
+         * @description Readiness probe response (pings DB).
+         */
+        ReadyResponse: {
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
+            /**
+             * Database
+             * @default ok
+             */
+            database: string;
+        };
+        /** RefreshRequest */
+        RefreshRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
+        /**
+         * ReportDetail
+         * @description Full report including rendered HTML content (spec 12).
+         */
+        ReportDetail: {
+            /** Id */
+            id: number;
+            /** Report Type */
+            report_type: string;
+            /** Title */
+            title: string;
+            /** Commit Hash */
+            commit_hash: string;
+            /** Previous Commit Hash */
+            previous_commit_hash?: string | null;
+            /** Commit Count */
+            commit_count: number;
+            /** Markpost Url */
+            markpost_url?: string | null;
+            /** Content */
+            content: string;
+            /** Rendered Html */
+            rendered_html: string;
+            /** Created At */
+            created_at: string;
+        };
+        /**
+         * ReportSummary
+         * @description Lightweight report representation for list responses.
+         */
+        ReportSummary: {
+            /** Id */
+            id: number;
+            /** Report Type */
+            report_type: string;
+            /** Title */
+            title: string;
+            /** Commit Hash */
+            commit_hash: string;
+            /** Previous Commit Hash */
+            previous_commit_hash?: string | null;
+            /** Commit Count */
+            commit_count: number;
+            /** Markpost Url */
+            markpost_url?: string | null;
+            /** Created At */
+            created_at: string;
+        };
+        /**
+         * TestChannelResult
+         * @description Per-channel outcome of a test notification dispatch.
+         */
+        TestChannelResult: {
+            /** Channel */
+            channel: string;
+            /** Ok */
+            ok: boolean;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * TestNotificationResponse
+         * @description Aggregated outcome of ``POST /api/v1/config/notifications/test``.
+         */
+        TestNotificationResponse: {
+            /** Results */
+            results: components["schemas"]["TestChannelResult"][];
+            /** Summary */
+            summary: string;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+        };
+        /** UserResponse */
+        UserResponse: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Email */
+            email: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
+        /**
+         * VersionResponse
+         * @description Version info response.
+         */
+        VersionResponse: {
+            /**
+             * Name
+             * @default progress
+             */
+            name: string;
+            /**
+             * Version
+             * @default 0.0.1
+             */
+            version: string;
+        };
+    };
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-export type $defs = Record<string, never>
+export type $defs = Record<string, never>;
 export interface operations {
-  healthz_healthz_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HealthResponse']
-        }
-      }
-    }
-  }
-  readyz_readyz_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReadyResponse']
-        }
-      }
-      /** @description Service Unavailable */
-      503: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReadyResponse']
-        }
-      }
-    }
-  }
-  version_api_v1_version_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['VersionResponse']
-        }
-      }
-    }
-  }
-  login_api_v1_auth_login_post: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['LoginRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['TokenResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  refresh_token_api_v1_auth_refresh_post: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RefreshRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['TokenResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  me_api_v1_auth_me_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UserResponse']
-        }
-      }
-    }
-  }
-  change_password_api_v1_auth_change_password_post: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ChangePasswordRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UserResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  list_reports_api_v1_reports_get: {
-    parameters: {
-      query?: {
-        page?: number
-        page_size?: number
-        report_type?: string | null
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['PaginatedResponse_ReportSummary_']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_report_api_v1_reports__report_id__get: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        report_id: number
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportDetail']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_report_raw_api_v1_reports__report_id__raw_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        report_id: number
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['RawMarkdownResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_all_sections_api_v1_config_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['AllConfigResponse']
-        }
-      }
-    }
-  }
-  get_language_api_v1_config_language_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['LanguageResponse']
-        }
-      }
-    }
-  }
-  set_language_api_v1_config_language_put: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['LanguageUpdateRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['LanguageResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_schema_api_v1_config_schema_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ConfigSchemaResponse']
-        }
-      }
-    }
-  }
-  put_section_api_v1_config__section__put: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        section: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ConfigUpdateRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ConfigSectionResponse']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  reload_config_api_v1_config_reload_post: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ConfigReloadResponse']
-        }
-      }
-    }
-  }
-  test_notifications_api_v1_config_notifications_test_post: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['TestNotificationResponse']
-        }
-      }
-    }
-  }
-  list_integrations_api_v1_integrations_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['IntegrationSummary'][]
-        }
-      }
-    }
-  }
-  integration_status_api_v1_integrations__name__status_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        name: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['IntegrationSummary']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_rss_api_v1_rss_get: {
-    parameters: {
-      query?: {
-        limit?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
+    healthz_healthz_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    readyz_readyz_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadyResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadyResponse"];
+                };
+            };
+        };
+    };
+    version_api_v1_version_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+        };
+    };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_token_api_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                report_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_ReportSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__report_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_raw_api_v1_reports__report_id__raw_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RawMarkdownResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_all_sections_api_v1_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllConfigResponse"];
+                };
+            };
+        };
+    };
+    get_language_api_v1_config_language_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageResponse"];
+                };
+            };
+        };
+    };
+    set_language_api_v1_config_language_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LanguageUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schema_api_v1_config_schema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigSchemaResponse"];
+                };
+            };
+        };
+    };
+    put_section_api_v1_config__section__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigSectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reload_config_api_v1_config_reload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigReloadResponse"];
+                };
+            };
+        };
+    };
+    test_notifications_api_v1_config_notifications_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestNotificationResponse"];
+                };
+            };
+        };
+    };
+    list_integrations_api_v1_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationSummary"][];
+                };
+            };
+        };
+    };
+    integration_status_api_v1_integrations__name__status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_rss_api_v1_rss_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
 }
