@@ -7,6 +7,12 @@
 # untracked-but-present working dirs and tracked generated files that must stay
 # verbatim — their bytes are owned by the generator, not by any hook (see
 # web/.prettierignore and the agent-hooks design in docs/agent-hooks.md).
+#
+# This is the workspace-root config, so this exclude is applied GLOBALLY before
+# files are distributed to nested projects (e.g. web/prek.toml) — that is why
+# the web/ generated artifacts are listed here rather than only in web/prek.toml
+# (root builtin hooks like end-of-file-fixer would otherwise mutate them).
+# web/prek.toml repeats them for the `cd web && prek run` / `-c` case.
 exclude = '''(?x)^(
     (?:\.agents|\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/
   | src/progress/locales/.*\.pot$
@@ -45,28 +51,11 @@ entry = "uv run ty check"
 files = "\\.py$"
 pass_filenames = false
 
-# ---- frontend (eslint + prettier) ----------------------------------------
-# Scoped to web/ so backend-only commits skip them. web/run-hook.sh cd's into
-# web/ and strips the "web/" prefix from prek-supplied paths, so eslint's flat
-# config and prettier's plugins resolve against web/. Calls the locally
-# installed binaries directly (no pnpm/corepack version negotiation per commit).
-[[repos.hooks]]
-id = "eslint"
-name = "eslint --fix"
-language = "system"
-entry = "bash web/run-hook.sh eslint --fix --max-warnings 0"
-files = "^web/.*\\.(ts|tsx|js|jsx)$"
-pass_filenames = true
-groups = ["lint"]
-
-[[repos.hooks]]
-id = "prettier"
-name = "prettier --write"
-language = "system"
-entry = "bash web/run-hook.sh prettier --write"
-files = "^web/.*\\.(ts|tsx|js|jsx|json|css|md)$"
-pass_filenames = true
-groups = ["format"]
+# ---- frontend (eslint + prettier) → moved to web/prek.toml (workspace) ---
+# prek discovers web/prek.toml as a nested project: eslint/prettier run with
+# CWD = web/ and web-relative paths, so no run-hook.sh shim is needed. The
+# agent hooks' --group {format,lint} routing is unchanged because web/prek.toml
+# keeps the same group names.
 
 # ---- builtin hygiene (Rust-native, zero network) -------------------------
 [[repos]]

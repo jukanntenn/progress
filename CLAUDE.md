@@ -10,7 +10,7 @@ Keep this section up to date with the project structure. Use it as a reference t
 progress/
 ├── pyproject.toml          # uv single source of truth (deps + project config)
 ├── uv.lock                 # uv lockfile
-├── prek.toml               # pre-commit hooks (ruff/ty/eslint/prettier + builtin)
+├── prek.toml               # pre-commit hooks (backend ruff/ty + builtin); frontend in web/prek.toml (workspace)
 ├── babel.cfg               # Babel extraction config (i18n, spec 11)
 ├── config.example.toml     # Example Ansible-class config (spec 02)
 ├── README.md / README_zh.md
@@ -81,6 +81,7 @@ progress/
 │       └── locales/
 │
 ├── web/                    # Frontend (top-level Vite SPA, spec 13) + web/e2e/ (Playwright)
+│   └── prek.toml           # web/ workspace project: eslint + prettier (native CWD, no shim)
 │
 ├── tests/                  # unit/component/e2e test layers (spec 15)
 │   ├── unit/               # pure-function / single-class tests (fakes, no IO)

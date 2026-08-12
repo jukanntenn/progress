@@ -7,7 +7,9 @@ lint fails.
 ## Design: prek is the single source of truth
 
 Every hook delegates formatting and linting to **prek** (the project's pre-commit
-runner). `prek.toml` defines two hook groups:
+runner). prek runs in **workspace mode**: the root `prek.toml` holds the backend
++ builtin hooks, and `web/prek.toml` holds the frontend (eslint/prettier) hooks.
+Both files define the same two group names:
 
 - **`format`** — byte-mutating formatters that never fail: `ruff-format`,
   `prettier`, `trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`.
@@ -23,10 +25,12 @@ lint(*paths, all_files=) # prek run --group lint   --files <paths> | --all-files
 ```
 
 The function names mirror the group names 1:1. prek's own per-hook `files`
-filters route correctly (a `.py` path only hits ruff; a `.ts` path only hits
-eslint/prettier), so the agent shells never encode an extension→tool mapping —
-that mapping lives only in `prek.toml`. Adding a new formatter is a one-line
-`prek.toml` change; every agent picks it up automatically.
+filters and workspace directory routing send each file to the right tool (a
+`.py` path only hits ruff in the root project; a `.ts` path only hits
+eslint/prettier in the web/ project), so the agent shells never encode an
+extension→tool mapping — that mapping lives only in the two `prek.toml` files.
+Adding a new formatter is a one-line config change; every agent picks it up
+automatically.
 
 ## Shells vs core
 
@@ -82,8 +86,12 @@ are kept verbatim — their bytes are owned by their generator, not by any hook
 (see the project's drift conventions). They are excluded in two complementary
 places:
 
-- **`prek.toml` `exclude`** — so no prek hook (format, lint, builtin) touches
-  them. The `_core` format/lint calls therefore skip them automatically.
+- **The prek `exclude`** — the root `prek.toml` lists all of them (it is the
+  workspace-root config, so its exclude is applied globally before files reach
+  any project's hooks, including the root builtin hooks), and `web/prek.toml`
+  repeats the two web/ artifacts for the `cd web && prek run` case. So no prek
+  hook (format, lint, builtin) touches them, and the `_core` format/lint calls
+  skip them automatically.
 - **`web/.prettierignore`** (`openapi.json`, `src/api/schema.ts`) and the eslint
   `ignores` — so `pnpm format` / `pnpm lint` (direct dev invocations, not via
   prek) skip them too.

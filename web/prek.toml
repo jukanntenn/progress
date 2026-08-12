@@ -1,0 +1,46 @@
+# prek configuration for the web/ project — a nested workspace subproject of
+# the root prek.toml (https://github.com/j178/prek, "Workspace Mode").
+#
+# In workspace mode prek runs these hooks with CWD = web/ and passes
+# web-relative paths (src/foo.ts, not web/src/foo.ts), so eslint's flat config
+# and prettier's plugins resolve natively — no run-hook.sh path-stripping shim.
+# Run `prek run` from the repo root to hit every project, or `prek run web/` /
+# `cd web && prek run` for frontend only.
+#
+# The group names (`format`, `lint`) mirror the root config 1:1, so the agent
+# hooks in .agents/hooks/_core.py (`prek run --group {format,lint} --files …`)
+# route web/ files here automatically with no shell-side extension→tool mapping.
+
+# Generated artifacts that must stay verbatim. These are ALSO excluded globally
+# by the root prek.toml (the workspace-root exclude is applied before files are
+# distributed to projects); they are repeated here so `cd web && prek run` or
+# `-c web/prek.toml` — which skip the root exclude — still leave them untouched.
+exclude = '''(?x)^(
+    openapi\.json$
+  | src/api/schema\.ts$
+)'''
+
+# ---- frontend (eslint + prettier) ----------------------------------------
+# Calls the locally installed binaries directly (no pnpm/corepack version
+# negotiation per commit). CWD is web/, so ./node_modules/.bin/<tool> resolves
+# against web/node_modules.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "eslint"
+name = "eslint --fix"
+language = "system"
+entry = "./node_modules/.bin/eslint --fix --max-warnings 0"
+files = "\\.(ts|tsx|js|jsx)$"
+pass_filenames = true
+groups = ["lint"]
+
+[[repos.hooks]]
+id = "prettier"
+name = "prettier --write"
+language = "system"
+entry = "./node_modules/.bin/prettier --write"
+files = "\\.(ts|tsx|js|jsx|json|css|md)$"
+pass_filenames = true
+groups = ["format"]
