@@ -27,6 +27,7 @@ _BUILTIN_INTEGRATIONS: tuple[str, ...] = (
     "progress.integrations.changelog",
     "progress.integrations.proposal",
     "progress.integrations.feed",
+    "progress.integrations.v2ex",
 )
 
 _discovered: bool = False

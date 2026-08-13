@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-11 10:47+0800\n"
+"POT-Creation-Date: 2026-08-12 22:41+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -174,6 +174,8 @@ msgstr "跳过的仓库"
 #: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:28
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:19
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:10
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:24
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:30
 msgid "View Report"
 msgstr "查看报告"
 
@@ -266,19 +268,19 @@ msgstr "展开剩余"
 msgid "repos"
 msgstr "个仓库"
 
-#: src/progress/cli/reports/pipeline.py:456
+#: src/progress/cli/reports/pipeline.py:461
 msgid "This content is too large to publish here. "
 msgstr "此内容过大，无法在此完整发布。"
 
-#: src/progress/cli/reports/pipeline.py:457
+#: src/progress/cli/reports/pipeline.py:462
 msgid "View the complete report in the WebUI"
 msgstr "在 WebUI 中查看完整报告"
 
-#: src/progress/cli/reports/pipeline.py:759
+#: src/progress/cli/reports/pipeline.py:764
 msgid "Progress Report for Open Source Projects"
 msgstr "开源项目进度报告"
 
-#: src/progress/cli/reports/pipeline.py:761
+#: src/progress/cli/reports/pipeline.py:766
 #, python-brace-format
 msgid "This report covered {count} projects with {commits} commits total"
 msgstr "本报告涵盖了 {count} 个项目，总计 {commits} 个提交"
@@ -288,6 +290,7 @@ msgstr "本报告涵盖了 {count} 个项目，总计 {commits} 个提交"
 #: src/progress/cli/reports/templates/reports/aggregated_feed.j2:10
 #: src/progress/cli/reports/templates/reports/aggregated_proposal.j2:10
 #: src/progress/cli/reports/templates/reports/aggregated_repo.j2:24
+#: src/progress/cli/reports/templates/reports/aggregated_v2ex.j2:10
 msgid "More reports will follow in the next batch..."
 msgstr "更多报告将在下一批次中继续..."
 
@@ -316,6 +319,7 @@ msgid "**AI analysis unavailable for this entry**"
 msgstr "**AI 分析不可用**"
 
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:20
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:27
 #, python-brace-format
 msgid "Part {n} of {total}"
 msgstr "第 {n} 部分，共 {total} 部分"
@@ -376,3 +380,21 @@ msgstr "字符"
 #: src/progress/integrations/repo/templates/repo_report.j2:84
 msgid "**AI analysis unavailable**"
 msgstr "**AI 分析不可用**"
+
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:27
+msgid "Why selected"
+msgstr "为何精选"
+
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:27
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:10
+msgid "picks"
+msgstr "精选"
+
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:9
+msgid "pick"
+msgid_plural "picks"
+msgstr[0] "精选"
+
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:17
+msgid "Full report"
+msgstr "完整报告"

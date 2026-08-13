@@ -1,0 +1,28 @@
+{# v2ex Feishu interactive-card v2 (spec v2ex §10).
+
+One card per run: AI title (header) + summary + per-tab grouped post lines
+(linked title + score + muted takeaway) + "View Report" button + footer.
+Visual language reuses the shared ``card`` / ``footer_content`` macros.
+#}
+{% from "_feishu_v2.j2" import card, footer_content %}
+{% set groups = groups or [] %}
+{% set ns = namespace(elements=[]) %}
+{% if summary %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": summary}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% endif %}
+{% for group in groups %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": group.icon ~ " **" ~ group.tab_title ~ "**"}] -%}
+{% for p in group.posts %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "[" ~ p.title ~ "](" ~ p.url ~ ") ⭐" ~ p.score}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "<font color='grey'>" ~ p.takeaway ~ "</font>"}] -%}
+{% endfor %}
+{%- if not loop.last -%}{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}{%- endif -%}
+{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% if markpost_url %}
+{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("View Report") ~ " "}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": markpost_url}]}] -%}
+{% endif %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": footer_content(generated_at), "text_align": "center", "text_size": "notation"}] -%}
+{% set text_tags = [{"tag": "text_tag", "text": {"tag": "plain_text", "content": selected_count ~ " " ~ _("picks")}, "color": "wathet"}] %}
+{{ card(title, ns.elements, markpost_url, "wathet", header_icon_token="news-outlined", header_icon_color="wathet", text_tags=text_tags) }}

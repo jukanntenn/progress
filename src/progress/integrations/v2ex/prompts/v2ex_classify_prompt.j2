@@ -1,0 +1,33 @@
+Your task: For each V2EX topic below, decide whether it matches the reader's interest profile and score how relevant it is, then give a one-sentence reason.
+
+Respond in {{ language }}.
+
+Reader's interest profile (honour BOTH what they want and what they do NOT want, including nuance and negation):
+{{ interest_profile }}
+
+Topics to classify:
+{% for p in posts %}
+- Index: {{ loop.index0 }}
+  Title: {{ p.title }}
+  Node: {{ p.node }}
+  Author: {{ p.author }}
+  Replies: {{ p.replies }}
+  Created: {{ p.created_at }}
+{% endfor %}
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST output ONLY a valid JSON object (no markdown, no code fences, no explanations, no text before or after the JSON).
+2. The JSON MUST contain exactly one key: "posts".
+3. This is a fully autonomous, non-interactive task. You MUST NOT ask questions, request permission, seek clarification, propose to write to files, invoke tools, or wait for user input. Produce the JSON immediately and exit.
+
+Required JSON structure:
+{
+  "posts": [
+    {"post_index": 0, "interested": true, "score": 9, "reason": "[one short sentence in {{ language }} explaining why it matches or does not match the profile]"}
+  ]
+}
+
+Content requirements:
+- posts: one object per topic above, keyed by its "Index" (0-based position in the list above).
+- interested: boolean absolute verdict — does this topic match the profile (true) or not (false)?
+- score: integer 0-10 relevance anchor — 10 = extremely relevant, 7 = fairly relevant, 5 = borderline, 0 = irrelevant. Used only for relative ranking.
+- reason: one concise sentence in {{ language }}; for interested topics explain the match, for uninterested topics explain the miss.

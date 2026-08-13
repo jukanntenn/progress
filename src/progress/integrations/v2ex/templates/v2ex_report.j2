@@ -1,0 +1,36 @@
+{# v2ex integration report section (spec v2ex §9).
+
+Renders one tab's selected posts:
+- H2: tab name, linked to the tab page
+- H3 per post: title as a link to the original topic
+- a small badge line: node · author · replies · score
+- the AI takeaway as the main paragraph
+- the AI reason ("why selected") inside a collapsed <details>
+
+HTML escaping rules (security critical):
+- title / url / author / node are external data → MUST be HTML-escaped with ``| e``
+- reason / takeaway are trusted AI output → rendered verbatim (already
+  downgrade-headings-sanitised by the tracker)
+
+Posts within a section are separated by ``---``; sections themselves are
+joined and footed once by the aggregator (``aggregated_v2ex.j2``).
+#}
+## [V2EX {{ tab_title }}]({{ tab_url | e }})
+
+{% for post in posts %}
+### [{{ post.title | e }}]({{ post.url | e }})
+<small>🏷️ {{ post.node | e }} · 👤 {{ post.author | e }} · 💬 {{ post.replies }} · ⭐ {{ post.score }}</small>
+
+{{ post.takeaway }}
+
+<details>
+<summary>{{ _("Why selected") }}</summary>
+
+{{ post.reason }}
+</details>
+{% if not loop.last %}
+
+---
+
+{% endif %}
+{% endfor %}

@@ -67,6 +67,7 @@ _REPORT_TYPE_MAP: dict[str, str] = {
     "proposal": "proposal",
     "changelog": "changelog",
     "feed": "feed",
+    "v2ex": "v2ex",
 }
 
 
@@ -84,6 +85,8 @@ def _commit_count_for(integration_name: str, report_type: str, sections: list[Re
     - changelog:          total new versions (sum of payload's ``new_entries`` length)
     - feed:               total entries across sections (sum of payload's
       ``entries`` length)
+    - v2ex:               total selected posts across sections (sum of
+      payload's ``posts`` length)
     - others:             len(sections)
     """
     if integration_name == "repo":
@@ -94,6 +97,8 @@ def _commit_count_for(integration_name: str, report_type: str, sections: list[Re
         return sum(len(s.payload.get("new_entries", []) or []) for s in sections)
     if integration_name == "feed":
         return sum(len(s.payload.get("entries", []) or []) for s in sections)
+    if integration_name == "v2ex":
+        return sum(len(s.payload.get("posts", []) or []) for s in sections)
     return len(sections)
 
 

@@ -1,0 +1,17 @@
+{# v2ex plain-text digest (spec v2ex §10). One grouped digest per run. #}
+{{ title }}
+{% if summary %}
+
+{{ summary }}
+{% endif %}
+{% for group in groups %}
+
+{{ group.icon }} {{ group.tab_title }} · {{ group.posts | length }} {{ ngettext("pick", "picks", group.posts | length) }}
+{% for p in group.posts %}
+{{ p.title }}  ⭐{{ p.score }}
+  {{ p.takeaway }}
+  {{ p.url }}
+{% endfor %}{% endfor %}
+{% if markpost_url %}
+
+{{ _("Full report") }} → {{ markpost_url }}{% endif %}
