@@ -1,16 +1,16 @@
 services:
   progress:
-    image: 192.168.5.50:5000/progress:main
+    image: {{ registry_url }}/{{ image_name }}:{{ image_tag }}
     container_name: progress
     ports:
-      - "5053:5000"
+      - "{{ host_port }}:5000"
     volumes:
       - ./config.toml:/app/config.toml:ro
       - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
       - PYTHONUNBUFFERED=1
-      - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
+      - PROGRESS_SCHEDULE_CRON={{ cron }}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5000/healthz"]
       interval: 30s

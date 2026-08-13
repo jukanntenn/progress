@@ -43,16 +43,15 @@
 
 ### 2.1 把 DSN 写入 Vault
 
+每个环境的 secret 以**单变量加密**存于 `devops/ansible/group_vars/<env>/vault.yml`（group 自动加载），vault 密码按环境分两个 vault-id（`progress-test` / `progress-prod`），由 avpm keyring 提供（见 `ansible.cfg` 的 `vault_identity_list`）。向某个环境新增变量（与现有 `gh_token`、`feishu_webhook_url` 等并列）：
+
 ```bash
-ansible-vault edit devops/ansible/vars/vault_main.yml \
-  --vault-password-file ~/.ansible-vault/progress.pwd
+# 单变量加密追加（解密后的明文从 stdin 输入，不落命令行历史）
+ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
+  --stdin-name bugsink_dsn >> devops/ansible/group_vars/test/vault.yml
 ```
 
-新增一行（与现有 `gh_token`、`feishu_webhook_url` 等 secret 并列）：
-
-```yaml
-bugsink_dsn: "http://<public-key>@192.168.5.50:8770/<project-id>"
-```
+值形如 `http://<public-key>@192.168.5.50:8770/<project-id>`。
 
 ### 2.2 在 compose 模板中启用
 

@@ -196,39 +196,49 @@ If you serve Progress under a public URL, set `core.web.base_url` (via the Web U
 ## Building the Image
 
 ```bash
-uv run python docker/build.py                                      # build for the local platform (load)
-uv run python docker/build.py --push --registry ghcr               # build + push multi-platform (alias)
-uv run python docker/build.py --push --registry ghcr.io/youruser   # build + push with explicit host
-uv run python docker/build.py --platform amd64                     # build a specific platform
-uv run python docker/build.py --tags v1.0.0                        # additional tags (replaces default "latest")
-uv run python docker/build.py --no-cache                           # disable the build cache
+uv run python docker/build.py                                        # build for the local platform (load), tag :main
+uv run python docker/build.py --push --all-platforms                # build + push multi-platform (default registry)
+uv run python docker/build.py --push --registry ghcr                # build + push (alias)
+uv run python docker/build.py --platform amd64                      # build a specific platform
+uv run python docker/build.py --tags v1.0.0 20260813                # additional tags (main always included, deduplicated)
+uv run python docker/build.py --no-cache                            # full rebuild, no layer reuse
 ```
 
-Registry targets: aliases `ghcr` → `ghcr.io`, `dockerhub`/`docker` → `docker.io`;
-or any host like `registry.local:5000` (owner auto-derived from git config when possible).
-Run `uv run python docker/build.py --help` for the full list of options. The build uses Docker buildx and requires QEMU binfmt registered for cross-platform builds. Third-party binaries (Caddy, s6-overlay, supercronic) are downloaded with mandatory SHA checksum verification.
+- **Tags**: `main` is always included (the rolling internal tag); `--tags` appends more, duplicates removed.
+- **git_sha injection**: every build passes the current `git rev-parse HEAD` as the `GIT_SHA` build arg; the runtime exposes it via `/api/v1/version`, which the deploy automation compares against the shipped commit to confirm the deployed image is actually live.
+- Registry targets: aliases `ghcr` → `ghcr.io`, `dockerhub`/`docker` → `docker.io`; or any host like `registry.local:5000` (owner auto-derived from git remote for aliases).
+- CI does **not** use this script — GitHub Actions builds with the official `docker/login-action` + `docker/metadata-action` + `docker/build-push-action` (see `release.yml`). This script is the local build tool: buildx with QEMU binfmt registered for cross-platform builds.
+- Third-party binaries (Caddy, s6-overlay, supercronic) are downloaded with mandatory SHA checksum verification.
+- Run `uv run python docker/build.py --help` for the full list of options.
 
 ## Ansible Automation
 
-An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, and (re)starts the container. Variables are encrypted with `ansible-vault` for internal use — external users should replace `devops/ansible/vars/` and `host_vars/` with their own values.
+An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, starts containers, then verifies health from the controller machine. Works from the project root **and** from `devops/ansible/` — the root `ansible.cfg` plus a directory-local one both point at the same files.
+
+Secrets are encrypted as individual `!vault` variables, split per environment in `devops/ansible/group_vars/<env>/vault.yml` (auto-loaded by group). Each environment has its own vault password in the **avpm keyring** — `progress-test` and `progress-prod` — wired via `vault_identity_list = progress-test@~/.local/bin/avpm-client, progress-prod@~/.local/bin/avpm-client` in `ansible.cfg` (ansible calls the avpm client script as `avpm --vault-id <label>`; the matching password is tried first, then the rest in order). Encrypt a value with:
 
 ```bash
-ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
-  --vault-password-file ~/.ansible-vault/progress.pwd
+ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
+  --stdin-name <name> >> devops/ansible/group_vars/test/vault.yml
 ```
 
-Internal production on `fn` pulls the image from the in-network registry at `192.168.5.50:5000` under the **`:main`** tag (the dogfooding `:next` tag is retired). The release flow is **manual** — no git tag is cut and `release.yml` is not involved; cutting a `v*` tag would publish to GHCR instead, which is a separate path. To ship a new build to `fn`:
+Run `avpm unlock` once per session; the agent doing the deploy will tell you if it is missing.
 
 ```bash
-# 1. build + push :main to the in-network registry (run on a host that can reach 192.168.5.50:5000)
-uv run python docker/build.py --push --tags main                   # host platform only (faster)
-uv run python docker/build.py --push --tags main --all-platforms   # amd64 + arm64
-
-# 2. deploy — playbook pulls :main (pull: always) and recreates the container
-ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
-  --vault-password-file ~/.ansible-vault/progress.pwd
+ansible-playbook devops/ansible/main.yml                             # deploy test (fn) — default
+ansible-playbook devops/ansible/main.yml -e target=prod              # deploy production
+ansible-playbook devops/ansible/main.yml -e verify_sha=no            # deploy without the git_sha gate
 ```
+
+**Post-deploy verification** (runs `scripts/check_deploy.py` on the controller): waits for `/readyz` (app up + DB reachable), then compares the deployed `git_sha` — reported by `/api/v1/version` — against the local HEAD. A mismatch fails the playbook: a running container is not proof the new image is live.
+
+Internal test (`fn`) pulls the rolling `:main` tag from the in-network registry at `192.168.5.50:5000` (still hosted by the legacy server until it is migrated — update `registry_url` in `devops/ansible/group_vars/` when it moves). Shipping a new build to `fn`:
+
+```bash
+uv run python docker/build.py --push --all-platforms   # 1. build + push :main
+ansible-playbook devops/ansible/main.yml               # 2. deploy + verify
+```
+
+Inventory: `test` group = `fn` (dogfooding); `prod` group = production (host details pending). External users replace `group_vars/` and `host_vars/` (including the per-environment `vault.yml` files) with their own values.
 
 After each upgrade, verify the DB auto-migration succeeded — startup migrations never crash on schema errors (they log a `migration_failed` metric and degrade), so check `data/observability/metrics.jsonl` and `data/logs/progress.log` rather than relying on the container being up.
-
-The inventory (`hosts.yml`) targets the new server (`fn`); the legacy server (`oect`) is retained until the new build is verified and the old one decommissioned.

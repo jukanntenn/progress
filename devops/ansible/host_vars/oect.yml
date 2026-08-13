@@ -1,3 +1,0 @@
----
-user: "alice"
-home: "/mnt/ssd/{{ user }}"

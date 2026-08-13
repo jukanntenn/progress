@@ -1,0 +1,9 @@
+---
+# Environment configuration for production.
+# Fill in when the production host is brought up.
+registry_url: "192.168.5.50:5000"
+image_name: progress
+image_tag: main
+host_port: 5053
+health_url: "http://192.168.5.200:5053"
+cron: "30 8,22 * * *"

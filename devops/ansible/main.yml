@@ -1,12 +1,22 @@
 ---
+# Deploy progress to an environment.
+#
+# Defaults to the test group; target another environment with -e target=prod.
+# Post-deploy health verification runs scripts/check_deploy.py from the
+# controller machine: waits for /readyz, then compares the deployed git_sha
+# against the local HEAD (skip with -e verify_sha=no).
+#
 # Usage:
-# ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml --vault-password-file ~/.ansible-vault/progress.pwd
+#   ansible-playbook devops/ansible/main.yml
+#   ansible-playbook devops/ansible/main.yml -e target=prod
+#   ansible-playbook devops/ansible/main.yml -e verify_sha=no
 
 - name: Deploy progress
-  hosts: fn
+  hosts: "{{ target | default('test') }}"
   gather_facts: no
-  vars_files:
-    - vars/vault_main.yml
+  # Secrets are per-environment !vault variables in group_vars/<group>/vault.yml
+  # (auto-loaded); the matching password comes from the avpm keyring via the
+  # vault_identity_list in ansible.cfg.
 
   vars:
     app_name: progress
@@ -15,6 +25,7 @@
     compose_file: "{{ app_path }}/docker-compose.yml"
     config_file: "{{ app_path }}/config.toml"
     data_path: "{{ app_path }}/data"
+    check_deploy_script: "{{ playbook_dir }}/../../scripts/check_deploy.py"
 
   tasks:
     - name: Ensure paths
@@ -26,29 +37,43 @@
         - "{{ data_path }}"
 
     - name: Copy docker-compose.yml
-      template:
+      ansible.builtin.template:
         src: docker-compose.yml.j2
         dest: "{{ compose_file }}"
         mode: "0644"
 
     - name: Copy config.toml
-      template:
+      ansible.builtin.template:
         src: config.toml.j2
         dest: "{{ config_file }}"
         mode: "0644"
 
-    - name: Pull images
+    - name: Pull images and start containers
       community.docker.docker_compose_v2:
         project_src: "{{ app_path }}"
         pull: always
         state: present
 
-    - name: Stop containers
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_path }}"
-        state: absent
+    - name: Record expected git sha from local HEAD
+      ansible.builtin.command: git rev-parse HEAD
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      register: local_head
+      when: not (verify_sha | default(false) | bool)
 
-    - name: Start containers
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_path }}"
-        state: present
+    - name: Verify deployment health and image
+      ansible.builtin.command:
+        cmd: "python3 {{ check_deploy_script }} --url {{ health_url }} --sha {{ local_head.stdout }}"
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      when: not (verify_sha | default(false) | bool)
+
+    - name: Verify deployment health
+      ansible.builtin.command:
+        cmd: "python3 {{ check_deploy_script }} --url {{ health_url }}"
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      when: verify_sha | default(false) | bool
