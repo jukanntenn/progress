@@ -2,6 +2,8 @@
 
 Progress is a GitHub project tracking tool that traces multi-repo code changes, runs AI analysis, and generates reports to help users track open-source project progress.
 
+Design and behavior principles — ground conclusions in fact, fix root causes, single source of truth, graceful degradation, etc. — live in [`PRINCIPLES.md`](PRINCIPLES.md). Reach for them when making design or convention decisions.
+
 ## Project Structure
 
 Keep this section up to date with the project structure. Use it as a reference to find files and directories.
@@ -169,6 +171,9 @@ uv run python scripts/migration.py down <app>     # rollback
 uv run python scripts/migration.py drift          # drift check (CI gate)
 ```
 
+Ship (commit → build & push → deploy → report): use the `shipping` skill. Deploy
+defaults to `test` (`fn`); target another environment with `-e target=<env>`.
+
 Generate DB migrations (low-level, prefer the wrapper above):
 
 ```bash
@@ -262,7 +267,7 @@ GitHub Actions workflows under `.github/workflows/`:
 
 - `ci.yml` — lint (ruff), type-check (ty), tests (unit/component/e2e, feed e2e included via Docker compose), frontend (lint/typecheck/test/build), drift checks (`scripts/check_drift.py` — deptry / import-linter / OpenAPI / TS types / i18n .pot + catalog / migrations), Docker build smoke. Runs on every push to `main` and every PR.
 - `codeql.yml` — security analysis (Python).
-- `release.yml` — multi-arch Docker image to GHCR on `v*` tags + GitHub Release.
+- `release.yml` — multi-arch Docker image to GHCR **and Docker Hub** on `v*` tags (official login/metadata/build-push actions, native amd64+arm64 runners) + GitHub Release.
 - `e2e.yml` — Playwright browser e2e against the production container; fires only when `src/`, `web/src/`, `docker/`, or `web/e2e/` change (docs-only edits do not trigger it).
 
 ## User & password management

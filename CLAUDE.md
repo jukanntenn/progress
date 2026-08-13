@@ -2,6 +2,8 @@
 
 Progress is a GitHub project tracking tool that traces multi-repo code changes, runs AI analysis, and generates reports to help users track open-source project progress.
 
+Design and behavior principles — ground conclusions in fact, fix root causes, single source of truth, graceful degradation, etc. — live in [`PRINCIPLES.md`](PRINCIPLES.md). Reach for them when making design or convention decisions.
+
 ## Project Structure
 
 Keep this section up to date with the project structure. Use it as a reference to find files and directories.

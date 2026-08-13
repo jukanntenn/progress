@@ -132,3 +132,25 @@ entry = "uv run lint-imports --no-cache"
 language = "system"
 pass_filenames = false
 files = "^src/progress/.*\\.py$"
+
+# ---- drift / regression checks (mirror CI's drift-checks job) -------------
+# Identical command to CI (scripts/check_drift.py is the single source of
+# truth), so a green local commit cannot fail the CI drift-checks job:
+# deptry / import-linter / OpenAPI / frontend types / i18n .pot + catalog /
+# migration drift. Also the lockfile check CI runs in its own job.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "drift-check"
+name = "drift checks (same command as CI)"
+entry = "uv run python scripts/check_drift.py"
+language = "system"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "lock-check"
+name = "uv lock --check"
+entry = "uv lock --check"
+language = "system"
+pass_filenames = false
