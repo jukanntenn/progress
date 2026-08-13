@@ -26,7 +26,7 @@ from pathlib import Path
 import sentry_sdk
 
 from progress.observability.logging import configure_structlog
-from progress.observability.metrics import observe_span, observed, record_business_event
+from progress.observability.metrics import mark_span_outcome, observe_span, observed, record_business_event
 from progress.observability.scrub import scrub_event, scrub_secrets
 from progress.observability.telemetry import (
     instrument_fastapi_app,
@@ -96,6 +96,7 @@ def shutdown_observability() -> None:
 
 __all__ = [
     "instrument_fastapi_app",
+    "mark_span_outcome",
     "observe_span",
     "observed",
     "record_business_event",

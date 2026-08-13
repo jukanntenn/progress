@@ -32,7 +32,7 @@ from progress.cli.reports.pipeline import run as run_reports, run_for_integratio
 from progress.errors import ProgressException
 from progress.integrations.base import Components, Integration, RunResult
 from progress.integrations.registry import discover_integrations
-from progress.observability import observe_span, record_business_event
+from progress.observability import mark_span_outcome, observe_span, record_business_event
 
 if TYPE_CHECKING:
     import aiohttp
@@ -78,6 +78,14 @@ async def run(
                     attributes={"integration": integration_name},
                 ):
                     result = await _run_integration(integration, cfg)
+                    # integrations swallow their own errors and surface them via
+                    # RunResult.status; mirror that onto the span so a partial/
+                    # failed run is visible in traces (observe_span only marks
+                    # ERROR when an exception actually escapes).
+                    mark_span_outcome(
+                        result.status,
+                        error_message=f"integration {integration_name} failed",
+                    )
                 outcome.add(integration_name, result)
                 record_business_event(
                     "progress.integration.run",

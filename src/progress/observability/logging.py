@@ -169,6 +169,12 @@ def configure_structlog(
     for noisy in ("httpx", "httpcore", "openai", "markdown_it", "openai._base_client"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
+    # aiosqlite logs every SQL statement + connection repr at DEBUG ("executing
+    # functools.partial(<...Connection...>, 'SELECT ...')" / "operation ...
+    # completed"). tortoise is already raised to WARNING above; without this the
+    # raw-driver noise dominates the file sink and buries business logs.
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+
     logging.captureWarnings(True)
     # aiohttp emits a misleading RuntimeWarning about TLS-in-TLS being disabled
     # on Python <3.11 even on 3.12+ where it works fine (the warning text checks

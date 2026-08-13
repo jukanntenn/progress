@@ -104,6 +104,21 @@ async def observe_span(name: str, *, attributes: dict[str, str] | None = None) -
             _duration_histogram(name).record(perf_counter() - start, attrs)
 
 
+def mark_span_outcome(status: str, *, error_message: str = "") -> None:
+    """Mirror a business outcome onto the currently active OTel span.
+
+    Integrations (and other swallowed-error flows) report success/failure via a
+    status string rather than by propagating an exception. ``observe_span`` only
+    marks a span ERROR when an exception escapes, so a partial/failed run would
+    otherwise look successful in traces. This records ``status`` as a span
+    attribute always, and marks the span ERROR on a hard ``"failed"``.
+    """
+    span = trace.get_current_span()
+    span.set_attribute("result.status", status)
+    if status == "failed":
+        span.set_status(trace.Status(trace.StatusCode.ERROR, error_message or "operation failed"))
+
+
 def record_business_event(name: str, *, value: float = 1, attributes: dict[str, str] | None = None) -> None:
     """Record a discrete business event as a counter increment.
 
