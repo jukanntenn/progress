@@ -18,8 +18,7 @@ Environment requirements (not auto-resolved):
 Exit codes:
   0 - Success
   1 - Build failure
-  2 - Environment check failure
-  3 - Invalid arguments
+  2 - Environment check / invalid arguments
 """
 
 import argparse
@@ -31,6 +30,7 @@ import subprocess
 import sys
 
 DEFAULT_REGISTRY = "192.168.5.50:5000"
+DEFAULT_TAG = "main"
 ALL_PLATFORMS = ("linux/amd64", "linux/arm64")
 
 PLATFORM_ALIASES = {
@@ -88,7 +88,7 @@ def parse_args():
         nargs="+",
         action="extend",
         default=[],
-        help='Image tags (default: "latest"). Replaces the default.',
+        help=f'Additional image tags (default: "{DEFAULT_TAG}"). "{DEFAULT_TAG}" is always included, duplicates removed.',
     )
     parser.add_argument(
         "--platform",
@@ -167,6 +167,19 @@ def _resolve_owner_from_git() -> str:
         )
         sys.exit(2)
     return m.group(1)
+
+
+def resolve_tags(args) -> list[str]:
+    """Default tag + user tags, deduplicated, main always first."""
+    tags = [DEFAULT_TAG, *getattr(args, "tags", [])]
+    return list(dict.fromkeys(tags))
+
+
+def resolve_git_sha() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        return "unknown"
 
 
 def resolve_platforms(args) -> list[str]:
@@ -327,7 +340,7 @@ def build_image(args):
     else:
         registry_prefix = registry
 
-    all_tags = args.tags or ["latest"]
+    all_tags = resolve_tags(args)
     full_image_names = []
     cmd = ["docker", "buildx", "build"]
     for tag in all_tags:
@@ -339,12 +352,10 @@ def build_image(args):
 
     if args.push:
         cmd.append("--push")
-        cache_ref = f"{registry_prefix}/{IMAGE_NAME}:cache"
-        if not args.no_cache:
-            cmd.extend(["--cache-from", f"type=registry,ref={cache_ref}"])
-            cmd.extend(["--cache-to", f"type=registry,ref={cache_ref},mode=max"])
     else:
         cmd.append("--load")
+
+    cmd.extend(["--build-arg", f"GIT_SHA={resolve_git_sha()}"])
 
     if args.no_cache:
         cmd.append("--no-cache")

@@ -58,6 +58,10 @@ export interface paths {
         /**
          * Version
          * @description Runtime version info (spec 12).
+         *
+         *     ``git_sha`` is injected at image build time via the ``GIT_SHA`` build arg
+         *     (``unknown`` outside a container). Deploy automation compares it against
+         *     the expected commit to confirm the new image is actually live.
          */
         get: operations["version_api_v1_version_get"];
         put?: never;
@@ -727,6 +731,11 @@ export interface components {
              * @default 0.0.1
              */
             version: string;
+            /**
+             * Git Sha
+             * @default unknown
+             */
+            git_sha: string;
         };
     };
     responses: never;

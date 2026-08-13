@@ -67,7 +67,7 @@
           "system"
         ],
         "summary": "Version",
-        "description": "Runtime version info (spec 12).",
+        "description": "Runtime version info (spec 12).\n\n``git_sha`` is injected at image build time via the ``GIT_SHA`` build arg\n(``unknown`` outside a container). Deploy automation compares it against\nthe expected commit to confirm the new image is actually live.",
         "operationId": "version_api_v1_version_get",
         "responses": {
           "200": {
@@ -1390,6 +1390,11 @@
             "type": "string",
             "title": "Version",
             "default": "0.0.1"
+          },
+          "git_sha": {
+            "type": "string",
+            "title": "Git Sha",
+            "default": "unknown"
           }
         },
         "additionalProperties": false,

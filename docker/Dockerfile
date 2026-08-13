@@ -59,6 +59,7 @@ RUN pnpm build
 FROM ${PYTHON_IMAGE} AS runtime
 
 ARG TARGETARCH
+ARG GIT_SHA=unknown
 ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG CADDY_VERSION=v2.9.1
 ARG CADDY_SHA512=""
@@ -168,7 +169,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
     TZ=UTC \
     S6_KEEP_ENV=1 \
-    CONFIG_FILE=/app/config.toml
+    CONFIG_FILE=/app/config.toml \
+    GIT_SHA=${GIT_SHA}
 
 # HEALTHCHECK (spec 14): hit the unauthenticated liveness endpoint via the
 # public Caddy port. Caddy reverse-proxies /healthz to FastAPI; a 200 means
