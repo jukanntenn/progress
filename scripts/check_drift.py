@@ -38,6 +38,7 @@ from collections.abc import Callable
 import difflib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,22 @@ def _tempfile(suffix: str) -> Path:
     fd, name = tempfile.mkstemp(prefix="drift-", suffix=suffix)
     os.close(fd)
     return Path(name)
+
+
+def _pnpm() -> str:
+    """Locate pnpm; falls back to nvm-installed binaries for shells whose PATH
+    lacks them (e.g. prek's hook environment) — CI always has pnpm on PATH.
+    Prepends the node bin dir to PATH so node is reachable for the spawned
+    subprocesses too."""
+    found = shutil.which("pnpm")
+    if found:
+        return "pnpm"
+    candidates = sorted(Path.home().glob(".nvm/versions/node/*/bin"))
+    if candidates:
+        node_bin = candidates[-1]
+        os.environ["PATH"] = str(node_bin) + os.pathsep + os.environ.get("PATH", "")
+        return str(node_bin / "pnpm")
+    return "pnpm"
 
 
 def _strip_pot_creation_date(text: str) -> str:
@@ -122,7 +139,7 @@ def check_frontend_type_drift() -> int:
     """Generate schema.ts to a temp file (raw) and diff against the committed copy."""
     tmp = _tempfile(".ts")
     try:
-        gen = _run_captured(["pnpm", "--dir", "web", "exec", "openapi-typescript", "openapi.json", "-o", str(tmp)])
+        gen = _run_captured([_pnpm(), "--dir", "web", "exec", "openapi-typescript", "openapi.json", "-o", str(tmp)])
         if gen.returncode != 0:
             print(gen.stderr or gen.stdout)
             return gen.returncode
