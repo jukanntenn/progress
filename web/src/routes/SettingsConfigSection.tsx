@@ -228,8 +228,7 @@ export function SettingsConfigSection() {
     )
   }
 
-  const PLUGIN_SECTIONS = ['repo', 'changelog', 'proposal', 'feed']
-  const isPlugin = sectionName ? PLUGIN_SECTIONS.includes(sectionName) : false
+  const isPlugin = sectionName !== 'core'
   const sectionLabel = isPlugin
     ? (sectionName ?? '')
     : sectionName

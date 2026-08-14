@@ -27,10 +27,9 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-const PLUGIN_SECTIONS = ['repo', 'changelog', 'proposal', 'feed'] as const
-
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildNavGroups(coreSchema: JsonSchema | undefined): NavGroup[] {
+export function buildNavGroups(schemas: Record<string, JsonSchema> | undefined): NavGroup[] {
+  const coreSchema = schemas?.core
   const coreTopItem: NavItem = { section: 'core', navKey: 'nav.core', order: 0 }
   const anchors: NavItem[] = []
 
@@ -65,7 +64,9 @@ export function buildNavGroups(coreSchema: JsonSchema | undefined): NavGroup[] {
     }
   }
 
-  const pluginItems: NavItem[] = PLUGIN_SECTIONS.map((section, i) => ({
+  const pluginSections = Object.keys(schemas ?? {}).filter((section) => section !== 'core')
+
+  const pluginItems: NavItem[] = pluginSections.map((section, i) => ({
     section,
     navKey: `nav.${section}`,
     rawLabel: section,
@@ -102,7 +103,7 @@ export function SettingsLayout() {
 
   const groups = useMemo(() => {
     const schemas = schemaQuery.data?.schemas as Record<string, JsonSchema> | undefined
-    return buildNavGroups(schemas?.core)
+    return buildNavGroups(schemas)
   }, [schemaQuery.data])
 
   const activeSection = useMemo(() => {
