@@ -60,7 +60,7 @@
       delegate_to: localhost
       run_once: true
       register: local_head
-      when: not (verify_sha | default(false) | bool)
+      when: verify_sha | default(true) | bool
 
     - name: Verify deployment health and image
       ansible.builtin.command:
@@ -68,7 +68,7 @@
       changed_when: false
       delegate_to: localhost
       run_once: true
-      when: not (verify_sha | default(false) | bool)
+      when: verify_sha | default(true) | bool
 
     - name: Verify deployment health
       ansible.builtin.command:
@@ -76,4 +76,4 @@
       changed_when: false
       delegate_to: localhost
       run_once: true
-      when: verify_sha | default(false) | bool
+      when: not (verify_sha | default(true) | bool)
