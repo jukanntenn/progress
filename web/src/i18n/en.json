@@ -63,7 +63,8 @@
       "changelog": "Changelog",
       "proposal": "Proposals",
       "feed": "Feed",
-      "account": "Change Password"
+      "account": "Change Password",
+      "schemas": "Raw schemas"
     },
     "field": {
       "modified": "Modified",

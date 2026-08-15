@@ -107,6 +107,7 @@ export function SettingsLayout() {
   }, [schemaQuery.data])
 
   const activeSection = useMemo(() => {
+    if (location.pathname === '/settings/integrations') return 'schemas'
     const match = location.pathname.match(/^\/settings\/(?:config\/([^/]+)|account)/)
     if (!match) return 'core'
     return match[1] ?? 'account'
@@ -194,6 +195,7 @@ export function SettingsLayout() {
     const topLevelItems = group.items.filter((i) => !i.anchorId)
     const anchorItems = group.items.filter((i) => i.anchorId)
     const showAnchors = group.id === 'core' && isCoreActive && anchorItems.length > 0
+    const schemaLinkActive = activeSection === 'schemas'
 
     return (
       <div key={group.id} className="space-y-0.5">
@@ -203,6 +205,20 @@ export function SettingsLayout() {
         {topLevelItems.map(renderItem)}
         {showAnchors && (
           <div className="border-border/40 ml-2 border-l pl-1">{anchorItems.map(renderItem)}</div>
+        )}
+        {group.id === 'integrations' && (
+          <NavLink
+            to="/settings/integrations"
+            onClick={handleNavigate}
+            className={cn(
+              'mt-1 px-3 py-1 pl-9 text-xs transition-colors',
+              schemaLinkActive
+                ? 'text-foreground font-medium'
+                : 'text-muted-foreground/70 hover:text-foreground',
+            )}
+          >
+            {t('settings.nav.schemas')}
+          </NavLink>
         )}
       </div>
     )

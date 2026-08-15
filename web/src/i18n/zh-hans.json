@@ -62,7 +62,8 @@
       "changelog": "更新日志",
       "proposal": "提案",
       "feed": "订阅源",
-      "account": "修改密码"
+      "account": "修改密码",
+      "schemas": "原始 Schema"
     },
     "field": {
       "modified": "已修改",

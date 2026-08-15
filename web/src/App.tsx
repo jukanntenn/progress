@@ -94,7 +94,7 @@ const router = createBrowserRouter([
           },
           // Legacy redirects — old entry points now funnel into Settings.
           { path: 'config', element: <Navigate to="/settings/config/core" replace /> },
-          { path: 'integrations-old', element: <Navigate to="/settings/integrations" replace /> },
+          { path: 'integrations', element: <Navigate to="/settings/integrations" replace /> },
         ],
       },
       {
