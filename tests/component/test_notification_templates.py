@@ -26,6 +26,7 @@ _TEMPLATE_DIRS = [
     "src/progress/integrations/feed/templates/notifications",
     "src/progress/integrations/proposal/templates/notifications",
     "src/progress/integrations/repo/templates/notifications",
+    "src/progress/integrations/v2ex/templates/notifications",
 ]
 
 
@@ -408,6 +409,61 @@ class TestFeedEmail:
         assert "Lobsters" in html
         assert "new articles" in html
         assert "View Report" in html
+
+
+class TestV2exCard:
+    """High-density v2ex digest (spec v2ex §10): AI summary + per-tab counts +
+    top-post one-liners (score/replies). Takeaways stay in the report — the
+    card must never duplicate them."""
+
+    def _vars(self) -> dict[str, object]:
+        return {
+            "title": "V2EX Digest",
+            "summary": "three picks",
+            "markpost_url": "https://markpost.example/v/1",
+            "tabs": [
+                {"tab_title": "热门", "icon": "🔥", "count": 2},
+                {"tab_title": "技术", "icon": "⚙", "count": 1},
+            ],
+            "top_posts": [
+                {"title": "Rust const generics", "url": "https://v2ex.com/t/1", "score": 9, "replies": 156},
+                {"title": "Go 1.24 stacks", "url": "https://v2ex.com/t/2", "score": 8, "replies": 89},
+                {"title": "RPi5 NPU", "url": "https://v2ex.com/t/3", "score": 8, "replies": 47},
+            ],
+            "selected_count": 3,
+            "generated_at": "2026-08-15 15:04:00 CST",
+        }
+
+    def test_card_renders_counts_top_posts_and_cta(self, env) -> None:
+        card = json.loads(env.get_template("v2ex/card_json.j2").render(**self._vars()))
+        assert card["schema"] == "2.0"
+        blob = json.dumps(card, ensure_ascii=False)
+        assert "three picks" in blob
+        # per-tab count badges + top-post one-liners with score/replies
+        assert "热门" in blob and "技术" in blob
+        assert "Rust const generics" in blob
+        assert "⭐9" in blob and "💬156" in blob
+        assert "takeaway" not in blob
+        # CTA + footer
+        assert card["card_link"]["url"] == "https://markpost.example/v/1"
+        assert any(e.get("tag") == "button" for e in card["body"]["elements"])
+        assert "2026-08-15 15:04:00 CST" in blob
+
+    def test_email_renders_dense_list_with_cta(self, env) -> None:
+        html = env.get_template("v2ex/html.j2").render(**self._vars())
+        assert "three picks" in html
+        assert "热门" in html
+        assert 'href="https://v2ex.com/t/1"' in html
+        assert "⭐ 9" in html and "💬 156" in html
+        assert "View Report" in html
+        assert "takeaway" not in html
+
+    def test_plain_text_is_one_liner_digest(self, env) -> None:
+        text = env.get_template("v2ex/plain_text.j2").render(**self._vars())
+        assert "3 picks" in text
+        assert "🔥 热门 2 · ⚙ 技术 1" in text
+        assert "1. Rust const generics ⭐9 💬156" in text
+        assert "Full report → https://markpost.example/v/1" in text
 
 
 class TestStatusSingleSourceConsistency:

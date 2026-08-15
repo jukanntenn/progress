@@ -318,30 +318,34 @@ class V2exIntegration:
     ) -> list[NotificationEvent]:
         if not reports:
             return []
-        groups: list[dict[str, Any]] = []
+        tabs: list[dict[str, Any]] = []
+        top_posts: list[dict[str, Any]] = []
         selected_count = 0
         for section in result.reports:
             posts = section.payload.get("posts") or []
             if not posts:
                 continue
             selected_count += len(posts)
-            groups.append(
+            tabs.append(
                 {
                     "tab_title": section.payload.get("tab_title") or "",
                     "icon": section.payload.get("tab_icon") or "",
-                    "posts": [
-                        {
-                            "title": p["title"],
-                            "url": p["url"],
-                            "score": p["score"],
-                            "takeaway": p["takeaway"],
-                        }
-                        for p in posts
-                    ],
+                    "count": len(posts),
                 }
             )
-        if not groups:
+            top_posts.extend(
+                {
+                    "title": p["title"],
+                    "url": p["url"],
+                    "score": p["score"],
+                    "replies": p["replies"],
+                }
+                for p in posts
+            )
+        if not tabs:
             return []
+        # Same precedence as the per-section report ordering: score, then replies.
+        top_posts.sort(key=lambda p: (-p["score"], -p["replies"]))
         integration_report = reports[0]
         return [
             NotificationEvent(
@@ -351,7 +355,7 @@ class V2exIntegration:
                 markpost_url=integration_report.markpost_url,
                 batch_index=integration_report.batch_index,
                 total_batches=integration_report.total_batches,
-                data={"groups": groups, "selected_count": selected_count},
+                data={"tabs": tabs, "top_posts": top_posts[:3], "selected_count": selected_count},
             )
         ]
 

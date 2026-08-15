@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-12 22:41+0800\n"
+"POT-Creation-Date: 2026-08-15 11:00+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -174,8 +174,8 @@ msgstr ""
 #: src/progress/integrations/proposal/templates/notifications/proposal/html.j2:28
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/card_json.j2:19
 #: src/progress/integrations/repo/templates/notifications/discovered_repo/html.j2:10
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:24
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:30
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:27
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:31
 msgid "View Report"
 msgstr ""
 
@@ -320,7 +320,7 @@ msgid "**AI analysis unavailable for this entry**"
 msgstr ""
 
 #: src/progress/integrations/feed/templates/notifications/feed/html.j2:20
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:27
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:28
 #, python-brace-format
 msgid "Part {n} of {total}"
 msgstr ""
@@ -387,18 +387,18 @@ msgstr ""
 msgid "Why selected"
 msgstr ""
 
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:27
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:10
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:30
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:12
 msgid "picks"
 msgstr ""
 
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:9
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:3
 msgid "pick"
 msgid_plural "picks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:17
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/plain_text.j2:16
 msgid "Full report"
 msgstr ""
 

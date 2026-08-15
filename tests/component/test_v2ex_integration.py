@@ -540,12 +540,14 @@ class TestBuildNotification:
         assert event.summary == "two picks"
         assert event.markpost_url == "https://mp/1"
         assert event.data["selected_count"] == 2
-        group = event.data["groups"][0]
-        assert group["tab_title"] == "酷工作"
-        assert len(group["posts"]) == 2
-        # data posts carry NO reason (low-redundancy notification contract)
-        assert "reason" not in group["posts"][0]
-        assert set(group["posts"][0]) == {"title", "url", "score", "takeaway"}
+        tab = event.data["tabs"][0]
+        assert tab["tab_title"] == "酷工作"
+        assert tab["count"] == 2
+        top = event.data["top_posts"]
+        assert len(top) == 2
+        # high-density one-liner contract: no takeaway/reason (they stay in the report)
+        assert set(top[0]) == {"title", "url", "score", "replies"}
+        assert top[0]["score"] >= top[1]["score"]
 
 
 # --- pipeline touchpoints ----------------------------------------------------
