@@ -59,9 +59,11 @@ Light-tint background for a badge foreground color is looked up by name via
 </td>
 {%- endmacro -%}
 
-{# A 3-tile stats row. ``stats`` is a list of {label,value,bg,value_color}. #}
+{# A 3-tile stats row. ``stats`` is a list of {label,value,bg,value_color}.
+   ``table-layout:fixed`` makes the ``width="33%"`` cells exactly equal —
+   auto layout would let a long label widen its tile and squeeze neighbors. #}
 {%- macro stats_row(stats) -%}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:6px;margin:16px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0;">
   <tr>
   {%- for s in stats -%}
   {{ stat_tile(s.label, s.value, s.bg|default("grey"), s.value_color|default("")) }}
@@ -101,7 +103,7 @@ Light-tint background for a badge foreground color is looked up by name via
 <body style="margin:0;padding:0;background-color:#F2F3F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F2F3F5;">
   <tr><td align="center" style="padding:24px 12px;">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
       {# Header bar #}
       <tr>
         <td style="background-color:{{ _accent(accent) }};padding:20px 24px;">

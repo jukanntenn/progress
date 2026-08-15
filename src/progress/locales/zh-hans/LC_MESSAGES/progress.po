@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-15 11:00+0800\n"
+"POT-Creation-Date: 2026-08-15 11:01+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -102,7 +102,7 @@ msgid "proposal_status_unknown"
 msgstr "未知"
 
 #: src/progress/cli/notifications/channels/console_card.py:154
-#: src/progress/cli/notifications/templates/_email.j2:124
+#: src/progress/cli/notifications/templates/_email.j2:126
 #: src/progress/cli/notifications/templates/_feishu_v2.j2:70
 #: src/progress/cli/reports/templates/reports/report_base.j2:2
 #, python-format
