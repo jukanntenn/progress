@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-15 11:01+0800\n"
+"POT-Creation-Date: 2026-08-16 07:29+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -381,9 +381,13 @@ msgstr "字符"
 msgid "**AI analysis unavailable**"
 msgstr "**AI 分析不可用**"
 
-#: src/progress/integrations/v2ex/templates/v2ex_report.j2:27
-msgid "Why selected"
-msgstr "为何精选"
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:33
+msgid "View original post"
+msgstr "查看原帖"
+
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:38
+msgid "Original truncated — open the title link for the full post."
+msgstr "原文过长已截断，完整内容见标题链接。"
 
 #: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:30
 #: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:12

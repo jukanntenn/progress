@@ -14,6 +14,27 @@ from dataclasses import dataclass
 
 from progress.integrations.v2ex.parser import RawTopic
 
+#: Token budget the title/summary AI may spend on the aggregated report's
+#: original-post content (the report pipeline feeds it the whole aggregate).
+#: ~60% of a 200K-token context, CJK conservatively at ~1 token per character.
+V2EX_AI_TOKEN_BUDGET: int = 120_000
+
+#: Floor for the per-post cap so the limit never regresses below the old
+#: fixed summarize budget, whatever ``max_summaries`` is configured to.
+V2EX_MIN_CONTENT_LIMIT: int = 4_000
+
+
+def v2ex_content_limit(max_posts: int) -> int:
+    """Per-post original-content cap that keeps the worst case inside budget.
+
+    The same markdown original feeds both the report payload and the AI calls,
+    and the title/summary AI receives the full aggregated report — so the
+    worst case is ``max_summaries`` posts at the cap. Dividing the budget by
+    the configured post count bounds that worst case while leaving typical
+    V2EX posts (a few thousand characters) effectively untruncated.
+    """
+    return max(V2EX_MIN_CONTENT_LIMIT, V2EX_AI_TOKEN_BUDGET // max(1, max_posts))
+
 
 @dataclass
 class ClassifiedPost:
@@ -80,10 +101,13 @@ def select_top_k(items: list[ClassifiedPost], k: int) -> list[ClassifiedPost]:
 
 
 __all__ = [
+    "V2EX_AI_TOKEN_BUDGET",
+    "V2EX_MIN_CONTENT_LIMIT",
     "ClassifiedPost",
     "filter_new_topics",
     "max_topic_id",
     "parse_source",
     "select_top_k",
     "source_key",
+    "v2ex_content_limit",
 ]

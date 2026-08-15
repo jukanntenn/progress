@@ -10,6 +10,7 @@ dependencies = [
     "feedgen>=0.9.0",
     "jinja2>=3.1.0",
     "markdown-it-py>=3.0.0",
+    "markdownify>=1.2.3",
     "nh3>=0.2.0",
     "tortoise-orm>=1.1.7",
     "aiosqlite>=0.20.0",

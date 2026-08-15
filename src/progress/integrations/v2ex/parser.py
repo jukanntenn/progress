@@ -1,9 +1,20 @@
-"""Pure HTML parser for V2EX tab pages (spec v2ex §2).
+"""Pure HTML parsing for V2EX pages (spec v2ex §2).
 
 ``parse_tab_page`` turns a tab page's HTML (``GET /?tab=<id>``) into a list of
 :class:`RawTopic` — decoded plain text, no HTML tags. It is a pure function
 (no IO), so it is unit-testable with a captured fixture. Selectors were
 verified against the live V2EX markup.
+
+``html_to_markdown`` converts a fetched topic body (the ``topic_content``
+element HTML) into markdown through a three-stage allowlist chain, so the
+untrusted external content can never re-emerge as raw HTML in reports:
+
+1. ``nh3.clean`` strips unknown tags/attributes (children text kept) and
+   enforces the URL-scheme allowlist;
+2. ``markdownify`` with ``convert=`` converts only allowlisted tags — anything
+   else is unwrapped to its text, never emitted;
+3. ``escape_misc`` escapes ``& < > ` [ ] \\ ~ = + |`` in text nodes, so a
+   literal ``<script>`` typed as text cannot become markup downstream.
 
 The tab page sorts topics by last-active (a new reply bumps a topic), NOT by
 topic id, so the newest-created topic can sit anywhere in the 50-item list —
@@ -19,11 +30,110 @@ import logging
 import re
 
 import lxml.html
+from markdownify import ATX as ATX_HEADING, MarkdownConverter
+import nh3
 
 logger = logging.getLogger(__name__)
 
 _TOPIC_ID_RE = re.compile(r"/t/(\d+)")
 _REPLY_ANCHOR_RE = re.compile(r"#reply(\d+)")
+_CODE_LANGUAGE_CLASS_RE = re.compile(r"^(?:language|lang)-(\S+)$")
+
+#: Tags the converter understands; anything else is stripped by nh3 (children
+#: kept) or unwrapped by markdownify's ``convert`` allowlist. Mirrors the
+#: V2EX ``markdown_body`` rendering subset.
+_TOPIC_CONTENT_TAGS: frozenset[str] = frozenset(
+    {
+        "a",
+        "b",
+        "blockquote",
+        "br",
+        "code",
+        "del",
+        "em",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "hr",
+        "i",
+        "img",
+        "li",
+        "ol",
+        "p",
+        "pre",
+        "s",
+        "strong",
+        "sub",
+        "sup",
+        "u",
+        "ul",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+    }
+)
+_TOPIC_CONTENT_ATTRIBUTES: dict[str, set[str]] = {
+    "a": {"href", "title"},
+    "code": {"class"},
+    "img": {"src", "alt", "title", "width", "height"},
+    "td": {"align"},
+    "th": {"align"},
+}
+_TOPIC_CONTENT_URL_SCHEMES: frozenset[str] = frozenset({"http", "https", "mailto"})
+
+
+def _classes_of(el) -> str:
+    """Normalise a bs4 ``class`` attribute (str or multi-valued list) to text."""
+    raw = el.get("class")
+    if not raw:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    return " ".join(str(c) for c in raw)
+
+
+def _code_language(el) -> str:
+    """Extract a fenced-code language from a ``language-*`` class on ``pre`` or its ``code`` child."""
+    class_texts = [_classes_of(el)]
+    code = el.find("code") if hasattr(el, "find") else None
+    if code is not None:
+        class_texts.append(_classes_of(code))
+    for classes in class_texts:
+        for cls in classes.split():
+            match = _CODE_LANGUAGE_CLASS_RE.match(cls)
+            if match:
+                return match.group(1)
+    return ""
+
+
+_MARKDOWNIFIER = MarkdownConverter(
+    heading_style=ATX_HEADING,
+    bullets="-",
+    autolinks=False,
+    escape_misc=True,
+    convert=sorted(_TOPIC_CONTENT_TAGS),
+    code_language_callback=_code_language,
+)
+
+
+def html_to_markdown(html: str) -> str:
+    """Sanitise topic-content HTML and convert it to markdown (spec v2ex §2)."""
+    if not html or not html.strip():
+        return ""
+    cleaned = nh3.clean(
+        html,
+        tags=_TOPIC_CONTENT_TAGS,
+        attributes=_TOPIC_CONTENT_ATTRIBUTES,
+        url_schemes=_TOPIC_CONTENT_URL_SCHEMES,
+    )
+    return _MARKDOWNIFIER.convert(cleaned).strip()
 
 
 @dataclass(frozen=True)
@@ -159,4 +269,4 @@ def _last_replier(cell) -> str:
     return _strip(repliers[-1].text_content()) if repliers else ""
 
 
-__all__ = ["RawTopic", "parse_tab_page"]
+__all__ = ["RawTopic", "html_to_markdown", "parse_tab_page"]

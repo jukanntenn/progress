@@ -62,10 +62,12 @@ class V2exClient:
         return await self._get(f"{self._base_url}/?tab={tab}", what=f"tab {tab}")
 
     async def fetch_topic_body(self, topic_id: int) -> str:
-        """GET ``{base_url}/t/{topic_id}`` → the ``topic_content`` body text.
+        """GET ``{base_url}/t/{topic_id}`` → the ``topic_content`` element HTML.
 
         Only the topic's own content is extracted (replies are out of scope,
-        spec v2ex §2). Returns the decoded plain text.
+        spec v2ex §2). Returns the raw element HTML (wrapper included);
+        sanitisation + markdown conversion happen once, in
+        :func:`progress.integrations.v2ex.parser.html_to_markdown`.
         """
         html = await self._get(f"{self._base_url}/t/{topic_id}", what=f"topic {topic_id}")
         return _extract_topic_content(html)
@@ -95,12 +97,12 @@ class V2exClient:
 
 
 def _extract_topic_content(html: str) -> str:
-    """Pull the ``div.topic_content`` text out of a topic page (spec v2ex §2)."""
+    """Pull the ``div.topic_content`` element HTML out of a topic page (spec v2ex §2)."""
     tree = lxml.html.fromstring(html)
     nodes = tree.xpath('//div[contains(@class, "topic_content")]')
     if not nodes:
         return ""
-    return nodes[0].text_content().strip()
+    return lxml.html.tostring(nodes[0], encoding="unicode").strip()
 
 
 __all__ = [

@@ -70,10 +70,10 @@ class TestFetchTab:
 
 
 class TestFetchTopicBody:
-    async def test_extracts_topic_content(self, session: aiohttp.ClientSession, httpserver: HTTPServer) -> None:
+    async def test_extracts_topic_content_html(self, session: aiohttp.ClientSession, httpserver: HTTPServer) -> None:
         httpserver.expect_request("/t/100").respond_with_data(TOPIC_BODY_HTML)
         body = await _client(session, httpserver).fetch_topic_body(100)
-        assert "Rust backend, remote." in body
+        assert "<p>Rust backend, remote.</p>" in body
 
     async def test_missing_topic_content_returns_empty(
         self, session: aiohttp.ClientSession, httpserver: HTTPServer

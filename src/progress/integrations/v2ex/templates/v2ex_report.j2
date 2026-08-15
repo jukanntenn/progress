@@ -3,14 +3,18 @@
 Renders one tab's selected posts:
 - H2: tab name, linked to the tab page
 - H3 per post: title as a link to the original topic
-- a small badge line: node · author · replies · score
-- the AI takeaway as the main paragraph
-- the AI reason ("why selected") inside a collapsed <details>
+- a small badge line: node · author (score/replies stay internal signals)
+- the AI reason ("why selected") as a bare blockquote — no label copy
+- the AI takeaway as the main paragraph — no label copy
+- the topic's original body (sanitised HTML→markdown, see
+  ``parser.html_to_markdown``) inside a collapsed <details>
 
 HTML escaping rules (security critical):
 - title / url / author / node are external data → MUST be HTML-escaped with ``| e``
 - reason / takeaway are trusted AI output → rendered verbatim (already
   downgrade-headings-sanitised by the tracker)
+- content is external text sanitised upstream (nh3 + markdownify allowlist
+  chain) before entering the payload → rendered verbatim
 
 Posts within a section are separated by ``---``; sections themselves are
 joined and footed once by the aggregator (``aggregated_v2ex.j2``).
@@ -19,14 +23,20 @@ joined and footed once by the aggregator (``aggregated_v2ex.j2``).
 
 {% for post in posts %}
 ### [{{ post.title | e }}]({{ post.url | e }})
-<small>🏷️ {{ post.node | e }} · 👤 {{ post.author | e }} · 💬 {{ post.replies }} · ⭐ {{ post.score }}</small>
+<small>🏷️ {{ post.node | e }} · 👤 {{ post.author | e }}</small>
+
+> {{ post.reason.splitlines() | join("\n> ") }}
 
 {{ post.takeaway }}
 
 <details>
-<summary>{{ _("Why selected") }}</summary>
+<summary>{{ _("View original post") }}</summary>
 
-{{ post.reason }}
+{{ post.content }}
+{% if post.content_truncated %}
+
+*{{ _("Original truncated — open the title link for the full post.") }}*
+{% endif %}
 </details>
 {% if not loop.last %}
 
