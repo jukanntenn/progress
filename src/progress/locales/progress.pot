@@ -25,13 +25,13 @@ msgstr ""
 msgid "Tracked GitHub repository changes and analyses"
 msgstr ""
 
-#: src/progress/cli/notifications/renderer.py:162
+#: src/progress/cli/notifications/renderer.py:164
 #: src/progress/cli/notifications/templates/test/card_json.j2:7
 #: src/progress/cli/notifications/templates/test/html.j2:2
 msgid "Test Notification"
 msgstr ""
 
-#: src/progress/cli/notifications/renderer.py:172
+#: src/progress/cli/notifications/renderer.py:174
 msgid "✅ Test Notification from Progress"
 msgstr ""
 

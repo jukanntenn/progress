@@ -164,6 +164,38 @@ class TestDiscoveredRepoFlat:
         assert "Expand remaining" not in out
 
 
+class TestFooterTimestamp:
+    def test_metadata_generated_at_is_reused(self) -> None:
+        # The renderer threads its localized timestamp through metadata so all
+        # channels print the same clock; the card must reuse it verbatim.
+        event = NotificationEvent(kind="repo_update", title="t", data={"repo_statuses": {"a/b": "success"}})
+        payload = ChannelPayload(
+            title=event.title,
+            body="",
+            content_type=ContentType.PLAIN_TEXT,
+            metadata={"event": event, "generated_at": "2026-08-15 15:04:11 CST"},
+        )
+        card = render_console_card(payload)
+        assert card is not None
+        buf = io.StringIO()
+        RichConsole(file=buf, force_terminal=False, width=80, record=True).print(card)
+        assert "2026-08-15 15:04:11 CST" in buf.getvalue()
+
+    def test_missing_generated_at_falls_back_to_utc_now(self) -> None:
+        event = NotificationEvent(kind="repo_update", title="t", data={"repo_statuses": {"a/b": "success"}})
+        payload = ChannelPayload(
+            title=event.title,
+            body="",
+            content_type=ContentType.PLAIN_TEXT,
+            metadata={"event": event},
+        )
+        card = render_console_card(payload)
+        assert card is not None
+        buf = io.StringIO()
+        RichConsole(file=buf, force_terminal=False, width=80, record=True).print(card)
+        assert "UTC" in buf.getvalue()
+
+
 class TestRenderDefensive:
     def test_unknown_kind_returns_none(self) -> None:
         event = NotificationEvent(kind="never_heard_of_it", title="t", data={})

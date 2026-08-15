@@ -110,7 +110,9 @@ class JinjaRenderer:
     The originating ``event`` is attached to ``metadata["event"]`` so the
     console channel can re-derive structured rich output from the same data
     the templates consumed (without it the channel only has the rendered
-    plain-text body, which is too flat to reconstruct a rich card).
+    plain-text body, which is too flat to reconstruct a rich card). The
+    localized ``generated_at`` is attached alongside it so every channel's
+    footer prints the same timestamp from the same clock.
 
     ``cfg`` (optional) provides the configured timezone so the per-render
     ``generated_at`` footer timestamp reflects the user's locale instead of
@@ -137,7 +139,7 @@ class JinjaRenderer:
         except Exception:
             body = _fallback_text(event)
         title = _derive_title(event)
-        metadata: dict[str, Any] = {"event": event}
+        metadata: dict[str, Any] = {"event": event, "generated_at": generated_at}
         if isinstance(event, NotificationEvent) and event.markpost_url:
             metadata["report_url"] = event.markpost_url
         elif isinstance(event, ReportEvent) and event.report_url:

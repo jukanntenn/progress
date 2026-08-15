@@ -73,9 +73,10 @@ def format_now_local(timezone: str) -> str:
 def format_now_utc() -> str:
     """Format ``now`` in UTC for the notification-card footer.
 
-    Used where no configured timezone is reachable: the console card renders
-    without ``CoreConfig``, and ``JinjaRenderer`` falls back here when it was
-    constructed without one (e.g. unit tests). Precision to the second; ``%Z``
-    yields ``UTC``.
+    Fallback only: ``JinjaRenderer`` computes the localized footer timestamp
+    (``format_now_local``) whenever a ``CoreConfig`` is reachable and threads
+    it to every channel via the payload metadata. This is used when no
+    configured timezone is reachable — e.g. unit tests building payloads
+    without a renderer. Precision to the second; ``%Z`` yields ``UTC``.
     """
     return now_utc().strftime("%Y-%m-%d %H:%M:%S %Z")

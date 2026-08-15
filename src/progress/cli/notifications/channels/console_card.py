@@ -382,7 +382,8 @@ def render_console_card(payload: ChannelPayload) -> RenderableType | None:
     if renderer is None:
         return None
     try:
-        return renderer(event, format_now_utc())
+        generated_at = payload.metadata.get("generated_at") or format_now_utc()
+        return renderer(event, generated_at)
     except Exception:
         return None
 

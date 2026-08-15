@@ -25,13 +25,13 @@ msgstr "Progress 报告"
 msgid "Tracked GitHub repository changes and analyses"
 msgstr "追踪的 GitHub 仓库变更与分析"
 
-#: src/progress/cli/notifications/renderer.py:162
+#: src/progress/cli/notifications/renderer.py:164
 #: src/progress/cli/notifications/templates/test/card_json.j2:7
 #: src/progress/cli/notifications/templates/test/html.j2:2
 msgid "Test Notification"
 msgstr "测试通知"
 
-#: src/progress/cli/notifications/renderer.py:172
+#: src/progress/cli/notifications/renderer.py:174
 msgid "✅ Test Notification from Progress"
 msgstr "✅ Progress 测试通知"
 
