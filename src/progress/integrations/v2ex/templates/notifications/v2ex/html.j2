@@ -1,10 +1,11 @@
 {# v2ex email HTML (spec v2ex §10).
 
 Reuses the shared ``email_shell`` frame + ``cta_button``. High-density body:
-AI summary + per-tab count badges + top posts as one-liners (linked title +
-score/replies badge pills). Takeaways live in the report — never duplicated
-here. All styles are inline / table-based for email-client compatibility
-(see ``_email.j2``). External data (title/url) escaped.
+AI summary + per-tab count badges + top posts as bare linked titles
+(score/replies are internal selection signals users don't care about).
+Takeaways live in the report — never duplicated here. All styles are inline /
+table-based for email-client compatibility (see ``_email.j2``). External data
+(title/url) escaped.
 #}
 {% from "_email.j2" import email_shell, cta_button, badge %}
 {% set tabs = tabs or [] %}
@@ -19,7 +20,6 @@ here. All styles are inline / table-based for email-client compatibility
   <tr>
     <td valign="middle" style="background-color:#F7F8FA;border-radius:8px;padding:10px 14px;font-size:14px;color:#1D2129;">
       <a href="{{ p.url }}" style="color:#0091FF;text-decoration:none;font-weight:600;word-break:break-word;">{{ p.title }}</a>
-      　{{ badge("⭐ " ~ p.score, "blue") }} {{ badge("💬 " ~ p.replies, "grey") }}
     </td>
   </tr>
   {% endfor %}

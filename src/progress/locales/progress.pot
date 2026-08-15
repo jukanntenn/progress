@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-16 07:29+0800\n"
+"POT-Creation-Date: 2026-08-16 07:30+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -392,7 +392,7 @@ msgid "Original truncated — open the title link for the full post."
 msgstr ""
 
 #: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:30
-#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:12
+#: src/progress/integrations/v2ex/templates/notifications/v2ex/html.j2:13
 msgid "picks"
 msgstr ""
 

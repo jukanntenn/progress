@@ -10,7 +10,7 @@
 
 {{ counts.parts | join(" · ") }}
 {% for p in top_posts %}
-{{ loop.index }}. {{ p.title }} ⭐{{ p.score }} 💬{{ p.replies }}
+{{ loop.index }}. {{ p.title }}
 {% endfor %}{% if markpost_url %}
 
 {{ _("Full report") }} → {{ markpost_url }}{% endif %}

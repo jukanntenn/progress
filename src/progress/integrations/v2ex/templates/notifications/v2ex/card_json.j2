@@ -1,9 +1,9 @@
 {# v2ex Feishu interactive-card v2 (spec v2ex §10).
 
-High-density digest: AI summary + per-tab count badges + top posts as
-one-liners (linked title + score/replies). Takeaways live in the report —
-the card never duplicates them. Visual language reuses the shared ``card`` /
-``footer_content`` macros.
+High-density digest: AI summary + per-tab count badges + top posts as bare
+linked titles (score/replies are internal selection signals users don't
+care about). Takeaways live in the report — the card never duplicates them.
+Visual language reuses the shared ``card`` / ``footer_content`` macros.
 #}
 {% from "_feishu_v2.j2" import card, footer_content %}
 {% set tabs = tabs or [] %}
@@ -20,7 +20,7 @@ the card never duplicates them. Visual language reuses the shared ``card`` /
 {%- set ns.elements = ns.elements + [{"tag": "markdown", "content": counts.parts | join("　")}] -%}
 {%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
 {% for p in top_posts %}
-{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "[" ~ p.title ~ "](" ~ p.url ~ ")　<font color='grey'>⭐" ~ p.score ~ " 💬" ~ p.replies ~ "</font>"}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "[" ~ p.title ~ "](" ~ p.url ~ ")"}] -%}
 {% endfor %}
 {%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
 {% if markpost_url %}

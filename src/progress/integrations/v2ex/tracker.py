@@ -333,19 +333,11 @@ class V2exIntegration:
                     "count": len(posts),
                 }
             )
-            top_posts.extend(
-                {
-                    "title": p["title"],
-                    "url": p["url"],
-                    "score": p["score"],
-                    "replies": p["replies"],
-                }
-                for p in posts
-            )
+            top_posts.extend({"title": p["title"], "url": p["url"]} for p in posts)
         if not tabs:
             return []
-        # Same precedence as the per-section report ordering: score, then replies.
-        top_posts.sort(key=lambda p: (-p["score"], -p["replies"]))
+        # Payload order already equals the report's section order (score, then
+        # replies — sorted in _build_section); no re-sort here.
         integration_report = reports[0]
         return [
             NotificationEvent(

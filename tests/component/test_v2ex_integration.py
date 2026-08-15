@@ -545,9 +545,11 @@ class TestBuildNotification:
         assert tab["count"] == 2
         top = event.data["top_posts"]
         assert len(top) == 2
-        # high-density one-liner contract: no takeaway/reason (they stay in the report)
-        assert set(top[0]) == {"title", "url", "score", "replies"}
-        assert top[0]["score"] >= top[1]["score"]
+        # high-density one-liner contract: bare titles (score/replies stay
+        # internal), no takeaway/reason (they stay in the report); payload
+        # order equals the report's section order (score, then replies).
+        assert set(top[0]) == {"title", "url"}
+        assert [p["title"] for p in top] == ["A", "B"]
 
 
 # --- pipeline touchpoints ----------------------------------------------------
