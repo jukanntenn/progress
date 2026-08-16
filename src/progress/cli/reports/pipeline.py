@@ -25,7 +25,9 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
+from jinja2 import StrictUndefined
 from pydantic import ValidationError
+import sentry_sdk
 from tortoise.transactions import in_transaction
 
 from progress.cli.ai import (
@@ -127,7 +129,7 @@ def _get_env() -> Any:
     """
     global _env
     if _env is None:
-        env = create_environment(_collect_integration_template_dirs(), autoescape=False)
+        env = create_environment(_collect_integration_template_dirs(), autoescape=False, undefined=StrictUndefined)
         env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # ty:ignore[no-matching-overload]
         env.globals.update({"status_label": status_label})  # ty:ignore[no-matching-overload]
         _env = env
@@ -307,6 +309,7 @@ def render_sections(ctx: ReportContext) -> list[Section]:
             # repo sections) — without this event, template/variable bugs show
             # up only as mysteriously blank sections with no signal.
             logger.warning("failed to render section for %s: %s", ctx.integration_name, e, exc_info=True)
+            sentry_sdk.capture_exception(e)
             record_business_event(
                 "progress.report.section_render_failed",
                 attributes={

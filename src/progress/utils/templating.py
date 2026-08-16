@@ -34,7 +34,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescape
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, Undefined, select_autoescape
 
 AUTOESCAPE_EXTENSIONS = ("html", "htm", "xml", "j2")
 
@@ -44,6 +44,7 @@ def create_environment(
     *,
     enable_async: bool = False,
     autoescape: bool = True,
+    undefined: type[Undefined] = Undefined,
 ) -> Environment:
     """Build a Jinja2 ``Environment`` rooted at ``search_paths``.
 
@@ -54,6 +55,11 @@ def create_environment(
     ``autoescape`` defaults to ``True`` (HTML notification templates). Report
     templates pass ``False`` because they produce markdown that is sanitized
     downstream — see the module docstring.
+
+    ``undefined`` defaults to the silent ``Undefined``; report templates pass
+    ``StrictUndefined`` so a missing payload key raises at render time and is
+    caught by the section-level graceful-degradation handler instead of
+    silently rendering an empty string.
     """
     paths = [str(p) for p in search_paths]
     escape_policy = (
@@ -62,10 +68,11 @@ def create_environment(
     # escape_policy is select_autoescape(...) when autoescape=True (the default,
     # used by HTML notification templates); it is only False for markdown-producing
     # report templates whose output is sanitized downstream by nh3 (backend) +
-    # rehype-sanitize (frontend). See module docstring.
+    # rehype-sanitize (frontend). See the module docstring.
     env = Environment(
         loader=ChoiceLoader([FileSystemLoader(p) for p in paths]) if len(paths) > 1 else FileSystemLoader(paths),
         autoescape=escape_policy,  # nosec B701
+        undefined=undefined,
         trim_blocks=True,
         lstrip_blocks=True,
         enable_async=enable_async,

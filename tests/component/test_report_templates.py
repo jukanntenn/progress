@@ -8,6 +8,7 @@ Guards against drift in the report markdown that gets persisted and published.
 
 from __future__ import annotations
 
+from jinja2 import StrictUndefined
 import pytest
 
 from progress.cli.notifications.status import status_label
@@ -26,7 +27,7 @@ _TEMPLATE_DIRS = [
 
 @pytest.fixture(scope="module")
 def env():
-    env = create_environment(_TEMPLATE_DIRS, autoescape=False)
+    env = create_environment(_TEMPLATE_DIRS, autoescape=False, undefined=StrictUndefined)
     env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
     env.globals.update({"status_label": status_label})  # type: ignore
     return env
@@ -46,6 +47,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "## [django/django](https://github.com/django/django)" in out
         assert "🌿 `main`" in out
@@ -74,6 +78,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "🚀 5.0 🏷️ 5.0" in out
         assert "Click to view detailed release analysis" in out
@@ -94,6 +101,9 @@ class TestRepoReport:
             truncated=True,
             original_diff_length=1000,
             analyzed_diff_length=200,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "<small>⚠️" in out
         assert "Diff truncated" in out
@@ -113,6 +123,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "**AI analysis unavailable**" in out
 
@@ -130,6 +143,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "<div>fix: typo</div>" in out
         assert "<details>" not in out.split("<div>fix: typo</div>")[0].rsplit("<small>", 1)[-1]
@@ -148,6 +164,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "<details>" in out
         assert "<summary>feat: add X</summary>" in out
@@ -167,6 +186,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert out.count("Same") == 1
         assert "<div>Same</div>" in out
@@ -185,6 +207,9 @@ class TestRepoReport:
             truncated=False,
             original_diff_length=0,
             analyzed_diff_length=0,
+            status="success",
+            releases_truncated=False,
+            releases_total_available=0,
         )
         assert "<script>" not in out
         assert "&lt;script&gt;" in out

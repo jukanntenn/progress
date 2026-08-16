@@ -68,6 +68,12 @@ def _make_outcome_with_reports() -> RunOutcome:
                 "commits": [{"subject": "fix: thing", "body": ""}],
                 "analysis_summary": "",
                 "analysis_detail": "",
+                "status": "success",
+                "truncated": False,
+                "original_diff_length": 0,
+                "analyzed_diff_length": 0,
+                "releases_truncated": False,
+                "releases_total_available": 0,
                 "releases": None,
             },
         )
@@ -134,6 +140,7 @@ class TestRenderSections:
                             "description": "A unified framework.",
                             "readme_summary": "AI summary",
                             "readme_detail": "AI detail",
+                            "discovered_at": "2026-08-16",
                         }
                     ],
                 },
@@ -148,6 +155,39 @@ class TestRenderSections:
         assert "bytedance/UniVR" in rendered
         assert "AI summary" in rendered
         assert "commit_count" not in rendered
+
+    def test_missing_payload_key_degrades_gracefully(self) -> None:
+        """StrictUndefined + a payload missing a template key must degrade, not
+        crash: the section falls back to its raw ``content``, a
+        ``section_render_failed`` business event is recorded, and the exception
+        is reported to Bugsink. Guards the silent-empty-section bug class (an
+        unwired v2ex report payload field shipped blank blocks to prod)."""
+        outcome = RunOutcome()
+        result = RunResult(name="repo", status="success")
+        result.reports.append(
+            ReportSection(
+                title="vitejs/vite",
+                content="# Vite\n\nbody",
+                payload={
+                    "repo_name": "vitejs/vite",
+                    "repo_web_url": "https://github.com/vitejs/vite",
+                    # commit_count / status / truncated / ... intentionally absent
+                    "commits": [],
+                },
+            )
+        )
+        outcome.add("repo", result)
+        ctx = collect_outcome(outcome, generation_time="test")[0]
+        with (
+            patch("progress.cli.reports.pipeline.record_business_event") as record_event,
+            patch("progress.cli.reports.pipeline.sentry_sdk.capture_exception") as capture,
+        ):
+            sections = render_sections(ctx)
+        assert len(sections) == 1
+        assert sections[0].content == "# Vite\n\nbody"
+        events = [c.args[0] for c in record_event.call_args_list]
+        assert "progress.report.section_render_failed" in events
+        capture.assert_called_once()
 
 
 class TestRenderAggregated:

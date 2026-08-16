@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-16 07:30+0800\n"
+"POT-Creation-Date: 2026-08-16 17:45+0800\n"
 "PO-Revision-Date: 2026-07-03 00:00+0000\n"
 "Last-Translator: Progress <progress@example.com>\n"
 "Language: zh_Hans\n"
@@ -268,19 +268,19 @@ msgstr "展开剩余"
 msgid "repos"
 msgstr "个仓库"
 
-#: src/progress/cli/reports/pipeline.py:461
+#: src/progress/cli/reports/pipeline.py:464
 msgid "This content is too large to publish here. "
 msgstr "此内容过大，无法在此完整发布。"
 
-#: src/progress/cli/reports/pipeline.py:462
+#: src/progress/cli/reports/pipeline.py:465
 msgid "View the complete report in the WebUI"
 msgstr "在 WebUI 中查看完整报告"
 
-#: src/progress/cli/reports/pipeline.py:764
+#: src/progress/cli/reports/pipeline.py:767
 msgid "Progress Report for Open Source Projects"
 msgstr "开源项目进度报告"
 
-#: src/progress/cli/reports/pipeline.py:766
+#: src/progress/cli/reports/pipeline.py:769
 #, python-brace-format
 msgid "This report covered {count} projects with {commits} commits total"
 msgstr "本报告涵盖了 {count} 个项目，总计 {commits} 个提交"
