@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Progress 0.0.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-16 17:45+0800\n"
+"POT-Creation-Date: 2026-08-16 17:46+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -383,12 +383,16 @@ msgstr ""
 msgid "**AI analysis unavailable**"
 msgstr ""
 
-#: src/progress/integrations/v2ex/templates/v2ex_report.j2:33
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:34
 msgid "View original post"
 msgstr ""
 
-#: src/progress/integrations/v2ex/templates/v2ex_report.j2:38
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:40
 msgid "Original truncated — open the title link for the full post."
+msgstr ""
+
+#: src/progress/integrations/v2ex/templates/v2ex_report.j2:44
+msgid "No post body — open the title link to view the original."
 msgstr ""
 
 #: src/progress/integrations/v2ex/templates/notifications/v2ex/card_json.j2:30

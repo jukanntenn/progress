@@ -44,7 +44,10 @@ class ClassifiedPost:
     (spec v2ex §6): ``interested`` is the absolute match verdict, ``score``
     (0-10) drives global top-K ranking. ``takeaway`` is empty until the
     summarize stage fills it; an unfilled takeaway degrades to ``reason`` at
-    render time.
+    render time. ``content`` / ``content_truncated`` carry the sanitised
+    original body (``parser.html_to_markdown``) capped to the per-post budget
+    (:func:`v2ex_content_limit`) — empty when the body fetch failed or the
+    topic has no body text.
     """
 
     topic: RawTopic
@@ -52,6 +55,8 @@ class ClassifiedPost:
     score: int = 0
     reason: str = ""
     takeaway: str = ""
+    content: str = ""
+    content_truncated: bool = False
 
 
 def source_key(tab: str) -> str:

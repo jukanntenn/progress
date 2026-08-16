@@ -10,11 +10,14 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from typing import Any
 
 import aiohttp
+from jinja2 import StrictUndefined, UndefinedError
 import pytest
 from werkzeug.wrappers import Response
 
+from progress.cli.notifications.status import status_label
 from progress.cli.reports.pipeline import (
     IntegrationReport,
     _commit_count_for,
@@ -33,8 +36,19 @@ from progress.integrations.v2ex.tracker import (
     V2exPostSummary,
     V2exSummaryResult,
 )
+from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
+from progress.utils.templating import create_environment
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "v2ex"
+
+_TEMPLATE_DIRS = [
+    "src/progress/cli/reports/templates/reports",
+    "src/progress/integrations/repo/templates",
+    "src/progress/integrations/changelog/templates",
+    "src/progress/integrations/feed/templates",
+    "src/progress/integrations/proposal/templates",
+    "src/progress/integrations/v2ex/templates",
+]
 
 
 # --- HTML fixtures -----------------------------------------------------------
@@ -111,12 +125,13 @@ def _patch_ai(
     summarize: V2exSummaryResult | None = None,
     classify_error: Exception | None = None,
     summarize_error: Exception | None = None,
-) -> dict[str, int]:
-    state: dict[str, int] = {"n": 0}
+) -> dict[str, Any]:
+    state: dict[str, Any] = {"n": 0, "prompts": []}
     monkeypatch.setattr("progress.integrations.v2ex.tracker.build_model_string", lambda _cfg: "stub:model")
 
-    async def _run(_agent, _prompt, **_kw):
+    async def _run(_agent, prompt, **_kw):
         state["n"] += 1
+        state["prompts"].append(prompt)
         if state["n"] == 1:
             if classify_error is not None:
                 raise classify_error
@@ -229,7 +244,7 @@ class TestRunHappyPath:
         httpserver,
     ) -> None:
         _patch_jitter(monkeypatch)
-        _patch_ai(
+        state = _patch_ai(
             monkeypatch,
             classify=_classification((0, True, 9), (1, True, 8), (2, True, 7)),
             summarize=_summary((0, "takeaway-0"), (1, "takeaway-1")),
@@ -237,7 +252,9 @@ class TestRunHappyPath:
         httpserver.expect_request("/").respond_with_data(
             _tab_html(_cell(100, "Rust backend"), _cell(101, "Go backend"), _cell(102, "Java backend"))
         )
-        httpserver.expect_request("/t/100").respond_with_data(_topic_html("rust body"))
+        httpserver.expect_request("/t/100").respond_with_data(
+            _topic_html("rust <b>body</b> with <script>alert(1)</script>")
+        )
         httpserver.expect_request("/t/101").respond_with_data(_topic_html("go body"))
 
         integration = await _make(db, session, plugin_cfg=_configured(httpserver, max_summaries=2))
@@ -253,10 +270,50 @@ class TestRunHappyPath:
         assert posts[0]["score"] == 9 and posts[1]["score"] == 8
         assert posts[0]["takeaway"] == "takeaway-0"
         assert posts[0]["reason"] == "reason-0"
+        # sanitised markdown original wired into the payload (not raw HTML);
+        # <script> content is dropped entirely, <b> becomes bold markdown
+        assert posts[0]["content"] == "rust **body** with"
+        assert posts[0]["content_truncated"] is False
+        assert posts[1]["content"] == "go body"
+        # the summarize AI sees the same markdown, never the raw HTML
+        summarize_prompt = state["prompts"][1]
+        assert "rust **body** with" in summarize_prompt
+        assert "<script>" not in summarize_prompt
+        assert "<b>" not in summarize_prompt
         # water mark advanced to max of ALL new topics (102), not just winners
         tracker = await V2exTracker.get(source="tab:jobs")
         assert tracker.last_topic_id == 102
         assert tracker.last_check_time is not None
+
+    async def test_body_over_budget_truncates_and_flags(
+        self,
+        db: str,
+        session: aiohttp.ClientSession,
+        monkeypatch,
+        httpserver,
+    ) -> None:
+        _patch_jitter(monkeypatch)
+        state = _patch_ai(
+            monkeypatch,
+            classify=_classification((0, True, 9)),
+            summarize=_summary((0, "takeaway-0")),
+        )
+        # budget 30 over 2 posts → limit 15 (floor 10): a 100-char body must cap
+        monkeypatch.setattr("progress.integrations.v2ex.fetcher.V2EX_AI_TOKEN_BUDGET", 30)
+        monkeypatch.setattr("progress.integrations.v2ex.fetcher.V2EX_MIN_CONTENT_LIMIT", 10)
+        body = "x" * 100
+        httpserver.expect_request("/").respond_with_data(_tab_html(_cell(100, "Rust backend")))
+        httpserver.expect_request("/t/100").respond_with_data(_topic_html(body))
+
+        integration = await _make(db, session, plugin_cfg=_configured(httpserver, max_summaries=2))
+        result = await integration.run()
+
+        post = result.reports[0].payload["posts"][0]
+        assert post["content"] == "x" * 15
+        assert post["content_truncated"] is True
+        # the AI gets the same capped markdown, not the full body
+        assert "x" * 15 in state["prompts"][1]
+        assert "x" * 16 not in state["prompts"][1]
 
     async def test_classify_is_sharded_into_batches_and_merged(
         self,
@@ -487,6 +544,95 @@ class TestBodyFetchFailure:
         posts = {p["title"]: p for p in result.reports[0].payload["posts"]}
         assert posts["A"]["takeaway"] == "reason-0"  # body failed → degrade to reason
         assert posts["B"]["takeaway"] == "t1"
+        assert posts["A"]["content"] == ""
+        assert posts["A"]["content_truncated"] is False
+        assert posts["B"]["content"] == "b body"
+
+
+# --- tracker payload → report template seam ----------------------------------
+
+
+class TestReportTemplateSeam:
+    """Render the payload the tracker actually builds through the real report
+    template under the production Jinja environment (StrictUndefined). This is
+    the seam the empty 'View original post' bug slipped through: template tests
+    used hand-built payloads while the tracker built others."""
+
+    @pytest.fixture(scope="class")
+    def env(self):
+        env = create_environment(
+            _TEMPLATE_DIRS,
+            autoescape=False,
+            undefined=StrictUndefined,
+        )
+        env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
+        env.globals.update({"status_label": status_label})  # type: ignore
+        return env
+
+    @staticmethod
+    def _render(env, payload: dict[str, object]) -> str:
+        return env.get_template("v2ex_report.j2").render(
+            tab_title=payload["tab_title"],
+            tab_url=payload["tab_url"],
+            posts=payload["posts"],
+        )
+
+    async def test_tracker_payload_renders_original_body(
+        self,
+        db: str,
+        session: aiohttp.ClientSession,
+        monkeypatch,
+        httpserver,
+        env,
+    ) -> None:
+        _patch_jitter(monkeypatch)
+        _patch_ai(
+            monkeypatch,
+            classify=_classification((0, True, 9)),
+            summarize=_summary((0, "takeaway-0")),
+        )
+        httpserver.expect_request("/").respond_with_data(_tab_html(_cell(100, "Rust backend")))
+        httpserver.expect_request("/t/100").respond_with_data(_topic_html("rust body"))
+
+        integration = await _make(db, session, plugin_cfg=_configured(httpserver))
+        result = await integration.run()
+
+        rendered = self._render(env, result.reports[0].payload)
+        assert "View original post" in rendered
+        assert "rust body" in rendered
+        assert "No post body" not in rendered
+
+    def test_empty_body_renders_fallback_line(self, env) -> None:
+        post = {
+            "title": "t",
+            "url": "https://v2ex.com/t/1",
+            "node": "jobs",
+            "author": "a",
+            "replies": 0,
+            "score": 5,
+            "reason": "r",
+            "takeaway": "k",
+            "content": "",
+            "content_truncated": False,
+            "created_at": "2026-08-16T00:00:00+00:00",
+        }
+        rendered = self._render(env, {"tab_title": "jobs", "tab_url": "https://v2ex.com/?tab=jobs", "posts": [post]})
+        assert "No post body — open the title link to view the original." in rendered
+
+    def test_missing_content_key_raises_under_strict_undefined(self, env) -> None:
+        post = {
+            "title": "t",
+            "url": "https://v2ex.com/t/1",
+            "node": "jobs",
+            "author": "a",
+            "replies": 0,
+            "score": 5,
+            "reason": "r",
+            "takeaway": "k",
+            "created_at": "2026-08-16T00:00:00+00:00",
+        }
+        with pytest.raises(UndefinedError):
+            self._render(env, {"tab_title": "jobs", "tab_url": "https://v2ex.com/?tab=jobs", "posts": [post]})
 
 
 # --- build_notification ------------------------------------------------------

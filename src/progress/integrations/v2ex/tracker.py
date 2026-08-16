@@ -60,9 +60,10 @@ from progress.integrations.v2ex.fetcher import (
     max_topic_id,
     select_top_k,
     source_key,
+    v2ex_content_limit,
 )
 from progress.integrations.v2ex.models import V2exTracker
-from progress.integrations.v2ex.parser import RawTopic, parse_tab_page
+from progress.integrations.v2ex.parser import RawTopic, html_to_markdown, parse_tab_page
 from progress.observability import observe_span, record_business_event
 from progress.utils.markdown import downgrade_headings
 from progress.utils.timezone import now_utc
@@ -71,10 +72,6 @@ if TYPE_CHECKING:
     from progress.cli.reports.pipeline import IntegrationReport
 
 logger = logging.getLogger(__name__)
-
-#: Max characters of a topic body fed to the summarize AI (spec v2ex §7.1).
-#: The topic's gist lives in its opening; truncation bounds context + cost.
-V2EX_SUMMARY_BODY_LIMIT: int = 4000
 
 #: Max topics per classify AI call (spec v2ex §7.1 batch-sharding extension).
 #: The classify batch is sharded so each call's *output* stays small. A reasoning
@@ -267,14 +264,20 @@ class V2exIntegration:
         bodies: dict[int, str] = {}
         if winners:
             logger.info("v2ex: fetching %d topic body(ies) serially with jitter", len(winners))
+        content_limit = v2ex_content_limit(self._plugin_cfg.max_summaries)
         for winner in winners:
             await asyncio.sleep(random.uniform(V2EX_REQUEST_MIN_DELAY, V2EX_REQUEST_MAX_DELAY))
             try:
-                bodies[winner.topic.topic_id] = await client.fetch_topic_body(winner.topic.topic_id)
-                logger.info("v2ex: fetched topic body %d", winner.topic.topic_id)
+                raw = await client.fetch_topic_body(winner.topic.topic_id)
             except (ExternalServiceException, ProgressException) as e:
                 result.errors.append(e)
                 logger.warning("v2ex: body fetch failed for topic %d: %s", winner.topic.topic_id, e)
+                continue
+            markdown = html_to_markdown(raw)
+            winner.content = markdown[:content_limit]
+            winner.content_truncated = len(markdown) > content_limit
+            bodies[winner.topic.topic_id] = winner.content
+            logger.info("v2ex: fetched topic body %d (%d chars markdown)", winner.topic.topic_id, len(markdown))
 
         summarize_input = [w for w in winners if w.topic.topic_id in bodies]
         if summarize_input:
@@ -450,7 +453,7 @@ class V2exIntegration:
                 {
                     "index": i,
                     "title": w.topic.title,
-                    "body": (bodies.get(w.topic.topic_id, "") or "")[:V2EX_SUMMARY_BODY_LIMIT],
+                    "body": bodies.get(w.topic.topic_id, "") or "",
                 }
                 for i, w in enumerate(winners)
             ],
@@ -512,6 +515,8 @@ class V2exIntegration:
                 "score": w.score,
                 "reason": downgrade_headings(w.reason),
                 "takeaway": downgrade_headings(w.takeaway),
+                "content": w.content,
+                "content_truncated": w.content_truncated,
                 "created_at": w.topic.created_at.isoformat(),
             }
             for w in ordered
@@ -575,7 +580,6 @@ class V2exIntegration:
 
 __all__ = [
     "V2EX_CLASSIFY_BATCH_SIZE",
-    "V2EX_SUMMARY_BODY_LIMIT",
     "V2exClassificationResult",
     "V2exIntegration",
     "V2exPostClassification",
