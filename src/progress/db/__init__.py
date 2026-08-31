@@ -28,7 +28,7 @@ from progress.db.models.config import Config
 from progress.db.tortoise_config import build_db_url, build_tortoise_config
 from progress.errors import ConfigException
 from progress.integrations.registry import discover_integrations
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,7 @@ async def _apply_migrations(config: dict[str, Any]) -> None:
                             name,
                             e,
                         )
+                        report_severe(e)
                         record_business_event(
                             "progress.db.migration_failed",
                             attributes={"app": app_label, "name": name, "error": str(e)[:200]},
@@ -121,6 +122,7 @@ async def _apply_migrations(config: dict[str, Any]) -> None:
                 app_label,
                 e,
             )
+            report_severe(e)
             record_business_event(
                 "progress.db.migration_failed",
                 attributes={"app": app_label, "name": "setup", "error": str(e)[:200]},
@@ -182,7 +184,8 @@ def _get_section_model(section: str) -> type[BaseModel] | None:
         return CoreConfig
     try:
         integration_cls = discover_integrations().get(section)
-    except Exception:
+    except Exception as e:
+        report_severe(e)
         return None
     if integration_cls is None:
         return None

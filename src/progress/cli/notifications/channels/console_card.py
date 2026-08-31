@@ -27,6 +27,7 @@ from rich.table import Table
 from rich.text import Text
 
 from progress.cli.notifications.status import status_color, status_label
+from progress.observability import report_severe
 from progress.utils.i18n import gettext as _
 from progress.utils.timezone import format_now_utc
 
@@ -384,7 +385,8 @@ def render_console_card(payload: ChannelPayload) -> RenderableType | None:
     try:
         generated_at = payload.metadata.get("generated_at") or format_now_utc()
         return renderer(event, generated_at)
-    except Exception:
+    except Exception as e:
+        report_severe(e)
         return None
 
 

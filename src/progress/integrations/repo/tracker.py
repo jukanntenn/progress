@@ -67,7 +67,7 @@ from progress.integrations.repo.release import (
     ReleaseCheckResult,
     check_releases,
 )
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.markdown import downgrade_headings, render_markdown
 from progress.utils.timezone import now_utc
 
@@ -125,6 +125,7 @@ class RepoIntegration:
                 )
             except ProgressException as e:
                 logger.warning("GitHub client unavailable; repo run will skip API calls: %s", e)
+                report_severe(e)
                 self._gh = None
         else:
             logger.warning(
@@ -243,6 +244,7 @@ class RepoIntegration:
                 await task
             except ProgressException as e:
                 logger.warning("repo tracking failed: %s", e)
+                report_severe(e)
                 record_business_event("progress.repos.checked", attributes={"status": "failed"})
                 result.errors.append(e)
                 result.status = "partial"
@@ -316,6 +318,7 @@ class RepoIntegration:
                             "stage": "commit",
                         },
                     )
+                    report_severe(e)
                     commit_result = None
                     commit_failed_reason = str(e)
                     result.errors.append(e)
@@ -419,6 +422,7 @@ class RepoIntegration:
             )
         except Exception as e:
             logger.warning("release check failed for %s; continuing to commit analysis: %s", ref.slug, e)
+            report_severe(e)
             record_business_event(
                 "progress.git.release_listing_failed",
                 attributes={
@@ -598,6 +602,7 @@ class RepoIntegration:
                 discovery = await self._discover_for_owner(owner, known_repo_urls)
             except ProgressException as e:
                 logger.warning("owner discovery failed for %s: %s", owner.name, e)
+                report_severe(e)
                 result.errors.append(e)
                 result.status = "partial"
                 continue
@@ -685,6 +690,7 @@ class RepoIntegration:
             return RepoIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid repo plugin config; falling back to defaults: %s", e)
+            report_severe(e)
             return RepoIntegrationConfig()
 
     async def build_notification(
@@ -768,7 +774,8 @@ async def _get_head_safely(dest: Path) -> str | None:
 
     try:
         return await get_head_commit(dest)
-    except ProgressException:
+    except ProgressException as e:
+        report_severe(e)
         return None
 
 

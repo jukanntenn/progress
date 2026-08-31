@@ -32,7 +32,7 @@ from progress.cli.reports.pipeline import run as run_reports, run_for_integratio
 from progress.errors import ProgressException
 from progress.integrations.base import Components, Integration, RunResult
 from progress.integrations.registry import discover_integrations
-from progress.observability import mark_span_outcome, observe_span, record_business_event
+from progress.observability import mark_span_outcome, observe_span, record_business_event, report_severe
 
 if TYPE_CHECKING:
     import aiohttp
@@ -126,6 +126,7 @@ async def run(
                             await queue.put(event)
                     except Exception as e:
                         logger.warning("build_notification failed for %s: %s", integration_name, e)
+                        report_severe(e)
             except ProgressException as e:
                 outcome.add(
                     integration_name, RunResult(name=integration_name, status="failed", summary=str(e), errors=[e])
@@ -177,6 +178,7 @@ async def run(
                             logger.warning("notification send error: %s", error)
                 except Exception as e:
                     logger.warning("dispatch failed for %s: %s", type(event).__name__, e)
+                    report_severe(e)
 
         async with observe_span(
             "progress.run",
@@ -209,6 +211,7 @@ async def run(
                 await integration.teardown()
             except Exception as e:
                 logger.warning("integration %s teardown failed: %s", integration.name, e)
+                report_severe(e)
 
         return outcome
 
@@ -253,6 +256,7 @@ async def _build_notification_events(
         produced = await integration.build_notification(result=result, reports=integration_reports)
     except Exception as e:
         logger.warning("integration %s build_notification failed: %s", integration.name, e)
+        report_severe(e)
         return []
     # ``build_notification`` is contractually typed to return list[NotificationEvent]
     # (base.py); trust that contract rather than re-filtering, which previously
@@ -318,6 +322,7 @@ async def run_notifications(
             dispatch_outcome = await dispatcher.dispatch(event)
         except Exception as e:
             logger.warning("notification dispatch failed for %s: %s", type(event).__name__, e)
+            report_severe(e)
             continue
         for result in dispatch_outcome.results:
             kind = getattr(event, "kind", "unknown")
@@ -364,6 +369,7 @@ async def _collect_notification_events(
             produced = await integration.build_notification(result=result, reports=integration_reports)
         except Exception as e:
             logger.warning("integration %s build_notification failed: %s", name, e)
+            report_severe(e)
             continue
         events.extend(event for event in produced if isinstance(event, NotificationEvent))
     return events

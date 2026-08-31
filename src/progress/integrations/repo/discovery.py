@@ -26,6 +26,7 @@ from progress.cli.git.url import parse_repo_url
 from progress.cli.notifications.events import DiscoveredRepoEvent
 from progress.errors import GitHubNotFoundException, ProgressException
 from progress.integrations.repo.analysis import analyze_readme, truncate_readme
+from progress.observability import report_severe
 from progress.utils.timezone import parse_created_at
 
 if TYPE_CHECKING:
@@ -72,6 +73,7 @@ async def discover_owner_repos(
             repos.append(repo)
     except ProgressException as e:
         logger.warning("owner repo enumeration failed for %s: %s", owner_name, e)
+        report_severe(e)
         return []
     return repos
 
@@ -126,6 +128,7 @@ async def process_new_repo(
             return None
         except ProgressException as e:
             logger.warning("README fetch failed for %s: %s", repo.full_name, e)
+            report_severe(e)
             return None
     except ValueError:
         return None

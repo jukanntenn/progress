@@ -20,6 +20,7 @@ from typing import Any
 
 from progress.config.root import CoreConfig
 from progress.integrations.registry import discover_integrations
+from progress.observability import report_severe
 
 # 编辑可见字段集合（core 段中允许前端编辑的字段）
 # state_home / auth.secret_key / auth.initial_admin_password 不在其中
@@ -70,6 +71,6 @@ def get_config_json_schema() -> dict[str, dict[str, Any]]:
             if config_schema is None:
                 continue
             schemas[name] = config_schema.model_json_schema()
-    except Exception:
-        pass
+    except Exception as e:
+        report_severe(e)
     return schemas

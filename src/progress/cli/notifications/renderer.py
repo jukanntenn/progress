@@ -24,6 +24,7 @@ FeishuMessage × proposal variants) with a declarative template matrix.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,12 +36,15 @@ from progress.cli.notifications.events import (
 )
 from progress.cli.notifications.status import status_color, status_icon, status_label
 from progress.integrations.registry import discover_integrations
+from progress.observability import report_severe
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
 from progress.utils.timezone import format_now_local, format_now_utc
 
 if TYPE_CHECKING:
     from progress.config.root import CoreConfig
+
+logger = logging.getLogger(__name__)
 
 _NOTIFICATIONS_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -136,7 +140,9 @@ class JinjaRenderer:
         try:
             template = _get_env().get_template(template_name)
             body = template.render(**template_vars)
-        except Exception:
+        except Exception as e:
+            logger.warning("notification render failed for %s; using fallback text", template_name, exc_info=True)
+            report_severe(e)
             body = _fallback_text(event)
         title = _derive_title(event)
         metadata: dict[str, Any] = {"event": event, "generated_at": generated_at}

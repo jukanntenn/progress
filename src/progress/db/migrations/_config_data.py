@@ -19,6 +19,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from progress.observability import report_severe
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ async def migrate_config_data() -> int:
                 await set_config("core", core)
             except Exception as e:
                 logger.error("config data migration: failed to persist core fixes: %s", e)
+                report_severe(e)
                 return total
             total += fixed
     if total:
@@ -59,6 +62,7 @@ async def _fix_repo_deprecated_fields() -> int:
         await set_config("repo", cleaned)
     except Exception as e:
         logger.error("config data migration: failed to persist repo fixes: %s", e)
+        report_severe(e)
         return 0
     logger.warning("migrated repo config: removed deprecated keys %s", removed)
     return len(removed)

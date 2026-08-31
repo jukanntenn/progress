@@ -21,6 +21,7 @@ import tomlkit
 from progress.config.root import CoreConfig
 from progress.db import get_config, set_config
 from progress.errors import ConfigException
+from progress.observability import report_severe
 
 
 def load_config(config_path: str | None = None) -> CoreConfig:
@@ -116,6 +117,7 @@ async def seed_from_file(config_path: str | None) -> None:
         seed = load_seed(seed_path)
     except Exception as e:
         logger.warning("failed to load seed file %s: %s", seed_path, e)
+        report_severe(e)
         return
     for section, seed_data in seed.items():
         if not isinstance(seed_data, dict) or not seed_data:
@@ -126,6 +128,7 @@ async def seed_from_file(config_path: str | None) -> None:
             await set_config(section, merged)
         except Exception as e:
             logger.warning("failed to seed config section '%s': %s", section, e)
+            report_severe(e)
 
 
 async def apply_db_and_seed(cfg: CoreConfig, config_path: str | None) -> CoreConfig:
@@ -158,6 +161,7 @@ async def apply_db_and_seed(cfg: CoreConfig, config_path: str | None) -> CoreCon
         return merge_db_config(cfg, merged_core)
     except Exception as e:
         logger.warning("failed to merge DB/seed core config; using ansible-file values: %s", e)
+        report_severe(e)
         return cfg
 
 
@@ -175,6 +179,7 @@ def _load_seed_core(config_path: str | None) -> dict[str, Any]:
         seed = load_seed(seed_path)
     except Exception as e:
         logger.warning("failed to load seed file %s: %s", seed_path, e)
+        report_severe(e)
         return {}
     core = seed.get("core")
     if not isinstance(core, dict):

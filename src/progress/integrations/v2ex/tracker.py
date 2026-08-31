@@ -64,7 +64,7 @@ from progress.integrations.v2ex.fetcher import (
 )
 from progress.integrations.v2ex.models import V2exTracker
 from progress.integrations.v2ex.parser import RawTopic, html_to_markdown, parse_tab_page
-from progress.observability import observe_span, record_business_event
+from progress.observability import observe_span, record_business_event, report_severe
 from progress.utils.markdown import downgrade_headings
 from progress.utils.timezone import now_utc
 
@@ -200,6 +200,7 @@ class V2exIntegration:
             try:
                 html = await client.fetch_tab(tab)
             except (ExternalServiceException, ProgressException) as e:
+                report_severe(e)
                 if self._is_forbidden(e):
                     logger.error("v2ex fetch forbidden for tab %s (possible ban): %s", tab, e)
                 else:
@@ -272,6 +273,7 @@ class V2exIntegration:
             except (ExternalServiceException, ProgressException) as e:
                 result.errors.append(e)
                 logger.warning("v2ex: body fetch failed for topic %d: %s", winner.topic.topic_id, e)
+                report_severe(e)
                 continue
             markdown = html_to_markdown(raw)
             winner.content = markdown[:content_limit]
@@ -409,6 +411,7 @@ class V2exIntegration:
                     )
         except Exception as e:
             logger.warning("v2ex classify failed (batch %d/%d): %s", batch_no, len(chunks), e)
+            report_severe(e)
             return None
         return mapping
 
@@ -467,6 +470,7 @@ class V2exIntegration:
                 raw = await self._invoke(prompt, V2exSummaryResult, cfg)
         except Exception as e:
             logger.warning("v2ex summarize failed: %s", e)
+            report_severe(e)
             return {}
         if raw is None:
             return {}
@@ -563,6 +567,7 @@ class V2exIntegration:
             return V2exIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid v2ex plugin config; using defaults: %s", e)
+            report_severe(e)
             return V2exIntegrationConfig()
 
     @staticmethod

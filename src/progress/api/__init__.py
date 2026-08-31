@@ -33,6 +33,7 @@ from progress.db import close_db, init_db
 from progress.db.migrations._config_data import migrate_config_data
 from progress.observability import (
     instrument_fastapi_app,
+    report_severe,
     setup_observability,
     shutdown_observability,
 )
@@ -140,6 +141,7 @@ def _lifespan_factory(config_path: str | None):
                     await app.state.session_ctx.__aexit__(None, None, None)
                 except Exception as e:
                     logger.warning("api session close failed: %s", e)
+                    report_severe(e)
             shutdown_observability()
             await close_db()
 

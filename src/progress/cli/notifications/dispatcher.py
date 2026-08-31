@@ -15,6 +15,7 @@ import logging
 
 from progress.cli.notifications.base import Channel, ChannelPayload, ContentType, Renderer, SendResult
 from progress.cli.notifications.events import Event
+from progress.observability import report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ class Dispatcher:
                     channel_name,
                     result,
                 )
+                report_severe(result)
                 outcome.results.append(SendResult(channel=channel_name, ok=False, error=str(result)))
             else:
                 assert isinstance(result, SendResult)

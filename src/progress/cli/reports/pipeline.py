@@ -47,7 +47,7 @@ from progress.db.models.report import Report
 from progress.errors import ProgressException
 from progress.integrations.base import ReportSection
 from progress.integrations.registry import discover_integrations
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.markdown import downgrade_headings
 from progress.utils.templating import create_environment
@@ -422,6 +422,7 @@ async def generate_title_summary(
         return TitleSummary.model_validate(result)
     except (ProgressException, ValidationError) as e:
         logger.warning("AI title/summary generation failed (downgraded): %s", e)
+        report_severe(e)
         return TitleSummary(title=DEFAULT_TITLE, summary="")
 
 
@@ -578,10 +579,12 @@ async def run(
         for ctx in contexts:
             await _run_one_integration(ctx, cfg, session=session, outcome=result)
     except ProgressException as e:
+        report_severe(e)
         result.add_error(e)
         if result.status == "success":
             result.status = "partial"
     except Exception as e:
+        report_severe(e)
         result.add_error(ProgressException(f"report pipeline failed: {e}"))
         result.status = "failed"
     return result
@@ -607,10 +610,12 @@ async def run_for_integration(
         for ctx in contexts:
             await _run_one_integration(ctx, cfg, session=session, outcome=result)
     except ProgressException as e:
+        report_severe(e)
         result.add_error(e)
         if result.status == "success":
             result.status = "partial"
     except Exception as e:
+        report_severe(e)
         result.add_error(ProgressException(f"report pipeline failed for {integration_name}: {e}"))
         result.status = "failed"
     return result
@@ -807,6 +812,7 @@ async def _run_one_integration(
                 )
                 outcome.add_error(ProgressException(reason))
             except ProgressException as e:
+                report_severe(e)
                 outcome.add_error(e)
         outcome.by_integration.append(
             IntegrationReport(
@@ -820,8 +826,10 @@ async def _run_one_integration(
             )
         )
     except ProgressException as e:
+        report_severe(e)
         outcome.add_error(e)
     except Exception as e:
+        report_severe(e)
         outcome.add_error(ProgressException(f"integration {ctx.integration_name} report pipeline failed: {e}"))
 
 

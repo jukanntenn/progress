@@ -20,7 +20,7 @@ from pathlib import Path
 import shutil
 
 from progress.errors import CommandException
-from progress.observability import observe_span
+from progress.observability import observe_span, report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +250,8 @@ async def get_commit_count(
     out = await _run_git(["rev-list", "--count", rev_range], cwd=repo_path)
     try:
         return int(out.strip())
-    except ValueError:
+    except ValueError as e:
+        report_severe(e)
         return 0
 
 
@@ -444,7 +445,8 @@ async def get_total_commit_count(repo_path: Path, *, ref: str = "HEAD") -> int:
     out = await _run_git(["rev-list", "--count", ref], cwd=repo_path)
     try:
         return int(out.strip())
-    except ValueError:
+    except ValueError as e:
+        report_severe(e)
         return 0
 
 
@@ -461,7 +463,8 @@ async def is_shallow_repository(repo_path: Path) -> bool:
             cwd=repo_path,
         )
         return out.strip() == "true"
-    except CommandException:
+    except CommandException as e:
+        report_severe(e)
         return False
 
 

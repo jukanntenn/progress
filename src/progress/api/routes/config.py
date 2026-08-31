@@ -49,7 +49,7 @@ from progress.db import get_all_config, get_config, set_config
 from progress.db.models import User
 from progress.errors import ConfigException
 from progress.integrations.registry import discover_integrations
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,7 @@ async def set_language(body: LanguageUpdateRequest, request: Request) -> Languag
         request.app.state.cfg = cfg.model_copy(update={"language": new_language})
     except Exception as e:
         logger.warning("language update merge failed; keeping current cfg: %s", e)
+        report_severe(e)
     record_business_event(
         "progress.config.language_changed",
         attributes={"language": new_language},
@@ -175,6 +176,7 @@ async def put_section(
                 request.app.state.cfg = merge_db_config(request.app.state.cfg, db_core)
             except Exception as e:
                 logger.warning("config refresh after PUT failed; keeping current cfg: %s", e)
+                report_severe(e)
 
     record_business_event(
         "progress.config.updated",
@@ -202,6 +204,7 @@ async def reload_config(request: Request) -> ConfigReloadResponse:
             request.app.state.cfg = merge_db_config(cfg, db_core)
         except Exception as e:
             logger.warning("config reload merge failed; keeping current cfg: %s", e)
+            report_severe(e)
             return ConfigReloadResponse(status="noop", section="core")
     return ConfigReloadResponse(status="ok", section="core")
 

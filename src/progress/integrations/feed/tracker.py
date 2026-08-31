@@ -50,7 +50,7 @@ from progress.integrations.feed.fetcher import (
 )
 from progress.integrations.feed.models import FeedTracker
 from progress.integrations.registry import register
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.i18n import gettext as _
 from progress.utils.markdown import downgrade_headings
 from progress.utils.timezone import now_utc
@@ -119,6 +119,7 @@ class FeedIntegration:
             raw_entries = await self._client.get_unread_entries()
         except ExternalServiceException as e:
             logger.warning("feed integration: miniflux fetch failed: %s", e)
+            report_severe(e)
             result.errors.append(e)
             result.status = "failed"
             return result
@@ -209,6 +210,7 @@ class FeedIntegration:
             result = await run_extraction(agent, prompt)
         except (ProgressException, Exception) as e:
             logger.warning("feed AI analysis failed for %s: %s", feed.title, e)
+            report_severe(e)
             return _degraded_analysis(feed, reason=_("AI analysis unavailable"))
         if isinstance(result, FeedAnalysis):
             return result
@@ -216,6 +218,7 @@ class FeedIntegration:
             return FeedAnalysis.model_validate(result)
         except Exception as e:
             logger.warning("feed AI analysis parse failed for %s: %s", feed.title, e)
+            report_severe(e)
             return _degraded_analysis(feed, reason=_("AI analysis unavailable"))
 
     async def _maintain_trackers(self, grouped: dict[int, list[RawEntry]]) -> None:
@@ -312,6 +315,7 @@ class FeedIntegration:
             return FeedIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid feed plugin config; using defaults: %s", e)
+            report_severe(e)
             return FeedIntegrationConfig()
 
     async def build_notification(
