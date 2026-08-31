@@ -2,8 +2,8 @@
 
 Covers:
 - Release tracking (spec §6): first-run latest-only, incremental strict->,
-  draft/prerelease filtering, published_at parsing, release diff truncation,
-  checkpoint independence (release vs commit).
+  prereleases included / drafts filtered (client-level), published_at parsing,
+  release diff truncation, checkpoint independence (release vs commit).
 - Owner discovery (spec §7): first-run latest-only, incremental strict->,
   fork filtering, dedup against Repository table, README 404 skip,
   discovery events emitted.
@@ -225,7 +225,6 @@ class TestReleaseCheckAlgorithm:
                 _make_release_payload(tag="v1.0.0", published_at="2024-01-15T00:00:00Z"),
                 _make_release_payload(tag="v0.9.0", published_at="2023-12-01T00:00:00Z"),
                 _make_release_payload(tag="v0.5.0", published_at="2023-06-01T00:00:00Z", prerelease=True),
-                _make_release_payload(tag="v0.4.0", published_at="2023-05-01T00:00:00Z", draft=True),
             ]:
                 yield _parse_release(r)
 
@@ -244,6 +243,72 @@ class TestReleaseCheckAlgorithm:
         assert len(result.candidates) == 1
         assert result.candidates[0].tag == "v1.0.0"
         assert result.latest_tag == "v1.0.0"
+
+    async def test_first_run_picks_latest_prerelease(
+        self,
+        db: None,
+        tmp_state_home: str,
+    ) -> None:
+        """A repo whose latest (or only) releases are prereleases must still
+        surface one on first run — the deepseek-harness regression."""
+
+        ref = RepoRef(owner="deepseek-ai", name="deepseek-harness")
+
+        async def _iter_releases(_ref):
+            for r in [
+                _make_release_payload(tag="dsh-v0.1.1-rc.2", published_at="2026-08-21T12:35:08Z", prerelease=True),
+                _make_release_payload(tag="dsh-v0.1.1-rc.1", published_at="2026-08-21T07:12:39Z", prerelease=True),
+            ]:
+                yield _parse_release(r)
+
+        gh = AsyncMock(spec=GitHubClient)
+        gh.iter_releases = _iter_releases
+        gh.get_release_commit_sha = AsyncMock(return_value="b150a55")
+
+        result = await check_releases(
+            ref=ref,
+            gh=gh,
+            repos_dir=Path(tmp_state_home) / "repos",
+            last_release_tag=None,
+            last_release_commit_hash=None,
+            last_release_check_time=None,
+        )
+        assert result is not None
+        assert len(result.candidates) == 1
+        assert result.candidates[0].tag == "dsh-v0.1.1-rc.2"
+        assert result.latest_tag == "dsh-v0.1.1-rc.2"
+
+    async def test_incremental_picks_new_prerelease(
+        self,
+        db: None,
+        tmp_state_home: str,
+    ) -> None:
+
+        ref = RepoRef(owner="vitejs", name="vite")
+        checkpoint_dt = datetime(2026, 8, 20, tzinfo=UTC)
+
+        async def _iter_releases(_ref):
+            for r in [
+                _make_release_payload(tag="v1.0.0", published_at="2026-08-19T00:00:00Z"),
+                _make_release_payload(tag="v1.1.0-rc.1", published_at="2026-08-21T00:00:00Z", prerelease=True),
+            ]:
+                yield _parse_release(r)
+
+        gh = AsyncMock(spec=GitHubClient)
+        gh.iter_releases = _iter_releases
+        gh.get_release_commit_sha = AsyncMock(return_value="abc789")
+
+        result = await check_releases(
+            ref=ref,
+            gh=gh,
+            repos_dir=Path(tmp_state_home) / "repos",
+            last_release_tag="v1.0.0",
+            last_release_commit_hash="prev",
+            last_release_check_time=checkpoint_dt,
+        )
+        assert result is not None
+        assert [c.tag for c in result.candidates] == ["v1.1.0-rc.1"]
+        assert result.latest_tag == "v1.1.0-rc.1"
 
     async def test_incremental_strict_greater_than(
         self,
