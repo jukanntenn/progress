@@ -20,8 +20,7 @@ A helper wraps auth + base URL so each call stays short and the token never appe
 bash .claude/skills/bugsink-triage/scripts/bugsink.sh GET "/projects/"
 ```
 
-If `~/.bugsink_token` is missing, ask the user to create a token in the Bugsink UI and store it:
-`printf '%s' '<token>' > ~/.bugsink_token && chmod 600 ~/.bugsink_token`.
+If `~/.bugsink_token` is missing, ask the user to create a token in the Bugsink UI and store it: `printf '%s' '<token>' > ~/.bugsink_token && chmod 600 ~/.bugsink_token`.
 
 ## The workflow
 
