@@ -1,5 +1,6 @@
 # prek configuration — native prek format (https://github.com/j178/prek).
-# Run `prek install` once per clone to wire the hooks into `git commit`.
+# Run `prek install` once per clone to wire the hooks into `git commit`
+# (pre-commit + commit-msg).
 
 # Out of scope for every hook: AI-agent config dirs, the local contexts cache,
 # the venv, runtime data, worktrees, AND committed generated artifacts. prek
@@ -8,17 +9,25 @@
 # verbatim — their bytes are owned by the generator, not by any hook (see
 # web/.prettierignore and the agent-hooks design in docs/agent-hooks.md).
 #
+# Under .agents/ only skills/ (a byte-for-byte mirror owned by
+# agent-instructions-sync) and hooks/ (agent hook shells, same category as
+# .claude/.codex/.zcode) stay excluded; prfcs/ is hand-written content and is
+# gated like any other Markdown (see the doc-check hook).
+#
 # This is the workspace-root config, so this exclude is applied GLOBALLY before
 # files are distributed to nested projects (e.g. web/prek.toml) — that is why
 # the web/ generated artifacts are listed here rather than only in web/prek.toml
 # (root builtin hooks like end-of-file-fixer would otherwise mutate them).
 # web/prek.toml repeats them for the `cd web && prek run` / `-c` case.
 exclude = '''(?x)^(
-    (?:\.agents|\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/
+    (?:\.claude|\.codex|\.zcode|\.local|\.venv|data|\.worktrees)/
+  | \.agents/(?:skills|hooks)/
   | src/progress/locales/.*\.pot$
   | web/openapi\.json$
   | web/src/api/schema\.ts$
 )'''
+
+default_install_hook_types = ["pre-commit", "commit-msg"]
 
 # ---- ruff (backend lint + format) ----------------------------------------
 # Local hooks calling `uv run ruff` so the version is pinned by pyproject's
@@ -154,3 +163,52 @@ name = "uv lock --check"
 entry = "uv lock --check"
 language = "system"
 pass_filenames = false
+
+# ---- agent-instruction mirrors --------------------------------------------
+# Byte-identical AGENTS.md/CLAUDE.md pairs (scripts/agentlib.py) plus the
+# .agents/skills -> .zcode/skills mirror. Self-healing: a single-sided edit
+# is copied over the stale twin and staged; only a both-sides-changed
+# conflict or a deletion fails, with guidance in the error output.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "agent-instructions-sync"
+name = "Agent instructions in sync"
+language = "system"
+entry = "uv run python scripts/check_agent_instructions.py"
+files = "(^|/)(AGENTS|CLAUDE)\\.md$|^\\.agents/skills/|^\\.zcode/skills/"
+pass_filenames = false
+stages = ["pre-commit"]
+
+# ---- documentation gates ----------------------------------------------------
+# scripts/doc_sync.py runs the Markdown gates (links / wrap / current-state
+# prose / PRFC format / word budgets) over the staged files only — prek
+# stashes unstaged changes during hook runs, so a wider scan would see a
+# stale tree; the full corpus is CI's job (same command). The .zcode/skills
+# mirror and the app's gettext catalogs sit outside doc scope; .agents/skills
+# is globally excluded above, so it is gated by CI's full run only.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "doc-check"
+name = "documentation gates (doc_sync)"
+language = "system"
+entry = "uv run python scripts/doc_sync.py"
+files = "\\.md$"
+exclude = "^\\.zcode/|^\\.local/|^data/"
+pass_filenames = true
+stages = ["pre-commit"]
+
+# ---- commit-msg: Conventional Commits ---------------------------------------
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "conventional-commits"
+name = "commit message format"
+language = "system"
+entry = "uv run python scripts/check_commit_msg.py"
+pass_filenames = true
+stages = ["commit-msg"]

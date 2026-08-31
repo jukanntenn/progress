@@ -126,7 +126,7 @@ jobs:
           fail_ci_if_error: false
 
   drift-checks:
-    name: Drift checks (OpenAPI / types / i18n / migrations)
+    name: Drift + docs checks (OpenAPI / types / i18n / migrations / docs)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -156,6 +156,13 @@ jobs:
       # drift apart.
       - name: Drift checks (deptry / import-linter / OpenAPI / types / i18n / migrations)
         run: uv run python scripts/check_drift.py
+
+      # Documentation gates over the full corpus (links / wrap /
+      # current-state prose / PRFC format / word budgets) — the prek
+      # doc-check hook runs the same script on staged files only, so CI
+      # owns the full-corpus truth. Same local/CI parity as check_drift.
+      - name: Documentation gates (doc_sync)
+        run: uv run python scripts/doc_sync.py
 
   docker-build:
     name: Docker image build (smoke)

@@ -196,8 +196,10 @@ skip_covered = true
 [tool.deptry]
 # The project package itself is first-party (src-layout, name == import name).
 # `_core` is the shared agent-hook helper (.agents/hooks/_core.py), imported by
-# the per-agent hook shells via sys.path — it is our code, not a third-party dep.
-known_first_party = ["progress", "_core"]
+# the per-agent hook shells via sys.path; `agentlib` / `doclib` are scripts/
+# helpers imported flat by the other scripts via the script directory on
+# sys.path. All are our code, not third-party deps.
+known_first_party = ["progress", "_core", "agentlib", "doclib"]
 
 # Distributions whose import name differs from their PyPI name, or that back a
 # single import shared across multiple distributions (e.g. the opentelemetry-*
