@@ -184,8 +184,8 @@ docker exec progress tail -n 20 /app/data/logs/progress.log
 
 清空 DSN 即可关闭 Bugsink 上报，**无需回滚镜像**：
 
-**A. 仅关闭 Bugsink（保留镜像）**：编辑 `docker-compose.yml.j2`，删除（或留空）`PROGRESS_OBSERVABILITY__BUGSINK__DSN`，重跑 §4 部署。重启后不再联网上报（OTel 文件仍写本地）。
-**B. 完全回滚**：部署上一版镜像并移除上述 env。
+- **A. 仅关闭 Bugsink（保留镜像）**：编辑 `docker-compose.yml.j2`，删除（或留空）`PROGRESS_OBSERVABILITY__BUGSINK__DSN`，重跑 §4 部署。重启后即停止联网上报（OTel 文件仍写本地）。
+- **B. 完全回滚**：部署上一版镜像并移除上述 env。
 
 回滚后已写入的 `*.jsonl` 与 Bugsink 中已入库的事件保留，不影响业务。
 

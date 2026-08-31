@@ -1,8 +1,6 @@
 # Web E2E Tests (Playwright)
 
-End-to-end browser tests that drive the real production container (Caddy +
-FastAPI, single image) with zero mocking. Playwright runs on the host; the
-container is brought up with the project's local acceptance compose file.
+End-to-end browser tests that drive the real production container (Caddy + FastAPI, single image) with zero mocking. Playwright runs on the host; the container is brought up with the project's local acceptance compose file.
 
 ```
 ┌──────────────┐     ┌──────────────────────────┐
@@ -15,11 +13,7 @@ container is brought up with the project's local acceptance compose file.
 
 ## Why a separate package
 
-`web/` runs Vitest component tests with jsdom + MSW. Playwright here drives the
-full stack through a real browser against the production image, so it lives in
-its own package (`web/e2e/`) with its own `@playwright/test` dependency. This
-keeps the two concerns — unit/component vs. end-to-end — and their dependency
-footprints isolated.
+`web/` runs Vitest component tests with jsdom + MSW. Playwright here drives the full stack through a real browser against the production image, so it lives in its own package (`web/e2e/`) with its own `@playwright/test` dependency. This keeps the two concerns — unit/component vs. end-to-end — and their dependency footprints isolated.
 
 ## Prerequisites
 
@@ -92,9 +86,7 @@ web/e2e/
 
 ## CI
 
-`.github/workflows/e2e.yml` brings the compose stack up, installs Playwright,
-runs the suite, and tears down on every PR that touches `src/`, `web/src/`,
-`docker/`, or `web/e2e/`. Documentation-only changes do not trigger it.
+`.github/workflows/e2e.yml` brings the compose stack up, installs Playwright, runs the suite, and tears down on every PR that touches `src/`, `web/src/`, `docker/`, or `web/e2e/`. Documentation-only changes do not trigger it.
 
 ## Troubleshooting
 

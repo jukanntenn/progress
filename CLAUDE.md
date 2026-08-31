@@ -4,6 +4,8 @@ Progress is a GitHub project tracking tool that traces multi-repo code changes, 
 
 Design and behavior principles — ground conclusions in fact, fix root causes, single source of truth, graceful degradation, etc. — live in [`PRINCIPLES.md`](PRINCIPLES.md). Reach for them when making design or convention decisions.
 
+Subtree orders supplement this file and never repeat it: [`web/AGENTS.md`](web/AGENTS.md) (pnpm, frontend stack, Playwright e2e). The documentation standard lives in [`docs/AGENTS.md`](docs/AGENTS.md).
+
 ## Project Structure
 
 Keep this section up to date with the project structure. Use it as a reference to find files and directories.
@@ -16,8 +18,8 @@ progress/
 ├── babel.cfg               # Babel extraction config (i18n, spec 11)
 ├── config.example.toml     # Example Ansible-class config (spec 02)
 ├── README.md / README_zh.md
-├── AGENTS.md               # This file (workspace instructions)
-├── CLAUDE.md               # Mirrors AGENTS.md verbatim
+├── AGENTS.md               # This file (standing orders every session loads)
+├── CLAUDE.md               # Byte-identical twin of AGENTS.md (edit either; scripts/sync_agent_instructions.py)
 │
 ├── src/progress/           # ── Python backend (src-layout, spec 01)──
 │   ├── __init__.py         # __version__ + __all__
@@ -62,7 +64,7 @@ progress/
 │   │   ├── http.py         # aiohttp session_factory + tenacity retry_async + HTTP_TIMEOUT
 │   │   ├── templating.py   # Jinja2 engine factory (select_autoescape)
 │   │   ├── markdown.py     # markdown-it-py + nh3 sanitize
-│   │   ├── timezone.py / text.py / i18n.py
+│   │   └── timezone.py / text.py / i18n.py
 │   │
 │   ├── cli/                # CLI entry package (spec 05; symmetric with api/)
 │   │   ├── __init__.py     # empty (package marker only — import-free to avoid circular import)
@@ -82,23 +84,24 @@ progress/
 │       ├── deps.py / middleware.py / errors.py / schemas.py / markdown.py
 │       └── locales/
 │
-├── web/                    # Frontend (top-level Vite SPA, spec 13) + web/e2e/ (Playwright)
-│   └── prek.toml           # web/ workspace project: eslint + prettier (native CWD, no shim)
+├── web/                    # Frontend (top-level Vite SPA, spec 13) + web/e2e/ (Playwright);
+│   │                       # orders in web/AGENTS.md; web/prek.toml (workspace project)
+│   └── e2e/                # Playwright browser e2e (HANDBOOK.md)
 │
 ├── tests/                  # unit/component/e2e test layers (spec 15)
 │   ├── unit/               # pure-function / single-class tests (fakes, no IO)
 │   ├── component/          # mocked external services + real SQLite/git + FastAPI ASGI
 │   ├── e2e/                # real external services, direct core.run() calls
-│   │   ├── feed/ repo/ proposal/ changelog/  # per-integration e2e
-│   │   └── test_all_integrations_*.py
+│   │   └── feed/ repo/ proposal/ changelog/  # per-integration e2e
 │   └── conftest.py
 ├── docker/                 # 2-process (Caddy + uvicorn) container (spec 14)
 │   ├── Dockerfile docker-compose.yml docker-compose.local.yml Caddyfile build.py
 │   └── s6/                 # s6-overlay service definitions
 ├── devops/                 # ansible/ deployment
-├── scripts/                # migration.py + export_openapi.py + check_translations.py + check_drift.py + makemessages.py + compile_messages.py
-├── docs/                   # single docs tree (spec 01)
+├── scripts/                # migration.py + export_openapi.py + doc gates (doc_sync.py) + agent-instruction sync
+├── docs/                   # single docs tree (spec 01) + AGENTS.md (the documentation standard)
 ├── specs/redesign/         # authoritative redesign specs (00-17)
+├── .agents/                # skills/ (source, mirrored to .zcode/skills) + prfcs/ (decision records) + hooks/
 └── data/                   # runtime products (gitignored): progress.db, logs/, repos/, observability/
 ```
 
@@ -136,29 +139,16 @@ uv run deptry .                       # dependency hygiene (unused / undeclared)
 prek run --all-files                  # everything (ruff + ty + eslint + prettier + hygiene)
 ./scripts/check_drift.py              # all 7 drift checks CI runs (deptry / import-linter / OpenAPI / TS types / i18n .pot + catalog / migrations)
 uv run python scripts/check_drift.py  # (equivalent — preferred form in docs)
+uv run python scripts/doc_sync.py     # all documentation gates (pass paths to restrict scope)
 ```
 
-Frontend:
-
-```bash
-cd web && pnpm lint      # ESLint
-cd web && pnpm format    # Prettier
-cd web && pnpm typecheck # tsc --noEmit
-```
+Frontend commands (lint / format / typecheck / test) and Playwright e2e live in [`web/AGENTS.md`](web/AGENTS.md).
 
 Tests:
 
 ```bash
 uv run pytest -v                          # backend (all layers)
-cd web && pnpm test                       # frontend (Vitest)
-```
-
-End-to-end (Playwright, needs Docker):
-
-```bash
-docker compose -f docker/docker-compose.local.yml up -d --build --wait
-cd web/e2e && pnpm install && pnpm exec playwright install chromium && pnpm test
-docker compose -f docker/docker-compose.local.yml down -v
+cd web && pnpm test                       # frontend (Vitest) — see web/AGENTS.md
 ```
 
 Database migrations:
@@ -170,6 +160,8 @@ uv run python scripts/migration.py sql <app> <id> # preview SQL
 uv run python scripts/migration.py down <app>     # rollback
 uv run python scripts/migration.py drift          # drift check (CI gate)
 ```
+
+Ship (commit → build & push → deploy → report): use the `shipping` skill. Deploy defaults to `test` (`fn`); target another environment with `-e target=<env>`.
 
 Generate DB migrations (low-level, prefer the wrapper above):
 
@@ -188,12 +180,7 @@ uv run tortoise -c progress.db.tortoise_config.TORTOISE_ORM makemigrations
 - Async HTTP: aiohttp 3.10.x (pinned <3.11 so the `aioresponses` test mock — used for the gidgethub/GitHub API path in e2e, spec 15 §3.1 — stays compatible)
 - Async SMTP: aiosmtplib 3.0+
 - Async file I/O: aiofiles 24.1+
-- Frontend: React 19 + TypeScript + Vite + Tailwind CSS v4 (top-level SPA, spec 13)
-- Frontend UI: @base-ui/react + class-variance-authority
-- Frontend Data Fetching: @tanstack/react-query v5 + openapi-react-query + openapi-fetch
-- Frontend i18n: i18next + react-i18next (en / zh-hans)
-- Frontend Routing: react-router
-- Frontend Package Manager: pnpm
+- Frontend: React 19 + TypeScript + Vite + Tailwind CSS v4 SPA in `web/` (spec 13) — full stack, tooling, and commands in [`web/AGENTS.md`](web/AGENTS.md)
 - RSS Generation: feedgen
 - Markdown Rendering: markdown-it-py (CommonMark compliant with GitHub style)
 - Containerized development and deployment: Docker
@@ -216,6 +203,7 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 - For adding or modifying configuration items, refer to `docs/config.md`
 - For development server usage, refer to `docs/development.md`
 - For writing test code, refer to `docs/testing.md`
+- For documentation placement, bilingual PRFC pairs, and the Markdown gates, refer to `docs/AGENTS.md`
 - For i18n, refer to the `src/progress/locales/` catalogs and `scripts/makemessages.py` / `scripts/compile_messages.py`
 - For database migrations, refer to `docs/migrations.md`
 - For AI agent hooks, refer to `docs/agent-hooks.md`
@@ -245,46 +233,28 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 
 ## Testing
 
-Tests are layered (spec 15); each layer has a marker and lives in its own directory:
-
-- `tests/unit/` — pure functions / single class, injected fakes, no IO.
-- `tests/component/` — mocked external services + real SQLite/git; includes FastAPI route tests (httpx ASGITransport).
-- `tests/e2e/` — end-to-end against real external services (direct `core.run()` calls); feed e2e needs real Miniflux + Postgres via Docker Compose.
-- `web/e2e/` — Playwright browser e2e against the real production container (separate Node/pnpm suite).
-
-Local and CI use the **identical** command: `uv run pytest` (coverage is always on via `addopts`). Markers are auto-applied by directory in `conftest.py`. The feed e2e suite needs Docker (real Miniflux + Postgres); CI brings the stack up before running. See `docs/testing.md` for conventions and `docs/development.md` for the run commands.
+Tests are layered (spec 15): `tests/unit/` (pure functions, injected fakes, no IO), `tests/component/` (mocked external services + real SQLite/git + FastAPI route tests), `tests/e2e/` (real external services, direct `core.run()` calls), `web/e2e/` (Playwright browser e2e). Local and CI use the **identical** command: `uv run pytest`. See `docs/testing.md` for conventions.
 
 ## Database Migrations
 
-tortoise-orm's built-in CLI (not aerich) manages schema migrations. Use the `scripts/migration.py` wrapper (see Commands). Each app owns its `migrations/` directory; `init_db` applies pending migrations on startup. CI runs `scripts/migration.py drift` to reject a model change without a matching migration. See `docs/migrations.md` for the full workflow.
+tortoise-orm's built-in CLI (not aerich) manages schema migrations; each app owns its `migrations/` directory, `init_db` applies pending migrations on startup, and CI runs `scripts/migration.py drift` to reject a model change without a matching migration. Commands are in the section above; the full workflow lives in `docs/migrations.md`.
 
 ## CI / CD
 
-GitHub Actions workflows under `.github/workflows/`:
+GitHub Actions under `.github/workflows/` — `ci.yml` (lint / type-check / tests / frontend / drift checks / documentation gates / Docker smoke, on every push to `main` and every PR), `codeql.yml` (security analysis), `release.yml` (multi-arch image to GHCR and Docker Hub on `v*` tags + GitHub Release), `e2e.yml` (Playwright browser e2e, path-filtered). The full inventory lives in `docs/ci-cd.md`.
 
-- `ci.yml` — lint (ruff), type-check (ty), tests (unit/component/e2e, feed e2e included via Docker compose), frontend (lint/typecheck/test/build), drift checks (`scripts/check_drift.py` — deptry / import-linter / OpenAPI / TS types / i18n .pot + catalog / migrations), Docker build smoke. Runs on every push to `main` and every PR.
-- `codeql.yml` — security analysis (Python).
-- `release.yml` — multi-arch Docker image to GHCR on `v*` tags + GitHub Release.
-- `e2e.yml` — Playwright browser e2e against the production container; fires only when `src/`, `web/src/`, `docker/`, or `web/e2e/` change (docs-only edits do not trigger it).
+## Users
 
-## User & password management
-
-The auth subsystem is always active (`src/progress/api/auth.py`). On first boot
-with `auth.enabled=true` and an empty users table, an initial superuser is
-created from `cfg.auth.initial_admin_username` / `initial_admin_password`; a
-random password is printed to the logs once.
-
-Manage users from the CLI (`progress users ...`, see `src/progress/cli/users.py`):
-
-    uv run progress users list
-    uv run progress users create <name> [--superuser] [-p <password>]
-    uv run progress users reset-password <name> [-p <password>]   # random if -p omitted
-    uv run progress users deactivate <name>
-
-Self-service password change is in the Web UI (Settings page, top-right user
-menu) and via `POST /api/v1/auth/change-password` (requires current password).
+The auth subsystem is always active; an initial superuser is created from config on first boot. Manage users with `progress users ...` and change passwords from the Web UI — see `docs/users.md`.
 
 ## Proposal Tracking
 
-- Proposal tracking is one of the built-in `integrations` (spec 06). Configure the kinds to track via the `proposal` config section (see `config.example.toml` and spec 02).
-- The `run` command dispatches every registered integration including proposal.
+Proposal tracking is one of the built-in `integrations` (spec 06), configured via the `proposal` config section; the `run` command dispatches every registered integration. See `docs/proposal_tracking.md`.
+
+## PRFCs
+
+Every non-trivial change adds or updates a PRFC in the same PR ([`.agents/prfcs/README.md`](.agents/prfcs/README.md)) — grep `.agents/prfcs/` for the topic first; only mechanical/local edits are exempt.
+
+## Editing these instructions
+
+This file loads in every agent session — keep it to standing orders and link everything else to its home. `CLAUDE.md` is a byte-identical copy with no primary: edit either file; [`scripts/sync_agent_instructions.py`](scripts/sync_agent_instructions.py) copies the newer side over the older and refuses to guess when both changed. Word ceilings live in [`scripts/doc_budgets.manifest.json`](scripts/doc_budgets.manifest.json): relocate or condense before raising one, and justify any raise in the PR.

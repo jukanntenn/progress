@@ -1,21 +1,14 @@
 # Manual Verification Checklist
 
-Human-executable verification of Progress, covering both the **configuration
-refactor** and the **core business logic** (repo tracking, analysis, reporting,
-notifications, proposal/changelog tracking, owner monitoring).
+Human-executable verification of Progress, covering both the **configuration refactor** and the **core business logic** (repo tracking, analysis, reporting, notifications, proposal/changelog tracking, owner monitoring).
 
-Each step lists **Action**, **Expected**, and **Verify**. Steps that need
-network / AI / an external service are marked. Run them in order the first
-time; later sections depend on the config seeded in Section A.
+Each step lists **Action**, **Expected**, and **Verify**. Steps that need network / AI / an external service are marked. Run them in order the first time; later sections depend on the config seeded in Section A.
 
 ## 0. Prerequisites
 
 - `uv` (Python) and `pnpm` (frontend) installed; `uv sync` and
   `cd web && pnpm install` run.
-- For **repo tracking with AI analysis**: the `claude` or `codex` CLI installed
-  and authenticated, **or** set `analysis.provider = "truncate"` for a no-AI
-  smoke test (report content is a truncated diff — still exercises the whole
-  pipeline except the AI call).
+- For **repo tracking with AI analysis**: set `[analysis]` `model` + `api_key` (Pydantic AI over the API, e.g. `anthropic:claude-sonnet-4`), **or** leave `api_key` empty for a no-AI smoke test (report content is a truncated diff — still exercises the whole pipeline except the AI call).
 - For **owner/proposal/changelog tracking**: outbound network to GitHub.
 - Optional external services: Feishu webhook / SMTP server (only for the
   corresponding notification steps; the `console` channel needs nothing).
@@ -30,18 +23,17 @@ cp config.example.toml config.toml
 #     -> set data_dir to an absolute scratch dir, e.g. /tmp/progress-verify
 #     -> set [github] gh_token (any non-empty value works for cloning public repos;
 #        a real PAT is needed for private repos / higher rate limits)
-#     -> set [analysis] provider = "truncate" for the no-AI smoke path
+#     -> leave [analysis] api_key empty for the no-AI smoke path (diff truncation)
 #     -> keep 1 small public repo under [[repos]] (e.g. "octocat/Hello-World")
 
-# 1.2 start backend (port 5000 = the frontend's default proxy target)
-PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev --port 5000
+# 1.2 start backend (port 8000 = the frontend's default proxy target)
+PYTHONPATH=src CONFIG_FILE=config.toml uv run fastapi dev --port 8000
 
 # 1.3 in another shell, start frontend
-cd web && pnpm dev          # http://localhost:3000
+cd web && pnpm dev          # http://localhost:5173
 ```
 
-**Verify:** backend log says `Application startup complete`; opening
-`http://localhost:3000/` loads the reports page without errors.
+**Verify:** backend log says `Application startup complete`; opening `http://localhost:5173/` loads the reports page without errors.
 
 > Tip: to fully reset mid-test, delete the scratch `data_dir` and restart the
 > backend — the first run re-seeds from `config.toml`.
@@ -50,9 +42,7 @@ cd web && pnpm dev          # http://localhost:3000
 
 ## Section A — Configuration
 
-These mirror the automated report
-([`verification-config-refactor.md`](./verification-config-refactor.md)) as
-hands-on steps, and add the **owner-edit fix**.
+These verify the config model hands-on (database is the single source of truth; the TOML file is a one-time seed — the why lives in the [config PRFC](../.agents/prfcs/implemented/2026-06-26-config-database-single-source.md)), and add the **owner-edit fix**.
 
 ### A1. File seeds the DB on first run
 - **Action:** with a fresh scratch DB, start the backend (1.2).
@@ -66,7 +56,7 @@ hands-on steps, and add the **owner-edit fix**.
   sqlite3 <data_dir>/progress.db "SELECT owner_type, name, enabled FROM github_owners;"
   ```
   Values match `config.toml`; `app_config.version = 1`.
-- **Verify (UI):** `http://localhost:3000/config` shows the values and
+- **Verify (UI):** `http://localhost:5173/config` shows the values and
   "Stored in the database (version 1)".
 
 ### A2. Web edit persists and does not touch the file
@@ -89,7 +79,7 @@ hands-on steps, and add the **owner-edit fix**.
 - **Verify:**
   ```bash
   sqlite3 <data_dir>/progress.db "SELECT owner_type, name, enabled FROM github_owners;"
-  curl -s http://127.0.0.1:5000/api/v1/config/owners | python3 -m json.tool
+  curl -s http://127.0.0.1:8000/api/v1/config/owners | python3 -m json.tool
   ```
 - **Also try:** toggle `enabled` off and Save → row kept, `enabled=0` (replace
   preserves disabled owners rather than deleting them). Remove a row and Save →
@@ -118,7 +108,7 @@ hands-on steps, and add the **owner-edit fix**.
 - **Expected:** `GET /api/v1/config` still returns the **DB** value, not 999.
 - **Verify:**
   ```bash
-  curl -s http://127.0.0.1:5000/api/v1/config | python3 -m json.tool
+  curl -s http://127.0.0.1:8000/api/v1/config | python3 -m json.tool
   ```
 - **Restore path:** edit `config.db.toml` and restart the backend; the seed
   file is re-imported on every startup (priority `DB > seed > defaults`,
@@ -142,7 +132,7 @@ hands-on steps, and add the **owner-edit fix**.
     "SELECT id, repo_id, title, commit_count, created_at FROM reports ORDER BY id DESC LIMIT 5;"
   ```
 - **Verify (filesystem):** `ls <workspace_dir>` shows the cloned repo.
-- **Verify (UI):** `http://localhost:3000/` lists the **aggregated** report
+- **Verify (UI):** `http://localhost:5173/` lists the **aggregated** report
   (the list shows reports with no single repo owner); click it →
   `/report/<id>` renders the analysis (AI summary if a real provider was used;
   truncated diff if `truncate`). Per-repo reports have a `repo_id` and are
@@ -207,18 +197,18 @@ hands-on steps, and add the **owner-edit fix**.
   as `********` in `GET /api/v1/config` but work when sending.
 
 ### B8. Reports & RSS
-- **UI:** `http://localhost:3000/` paginated report list; open a report → full
+- **UI:** `http://localhost:5173/` paginated report list; open a report → full
   content at `/report/<id>`.
 - **API:**
   ```bash
-  curl -s "http://127.0.0.1:5000/api/v1/reports?page=1" | python3 -m json.tool
-  curl -s http://127.0.0.1:5000/api/v1/reports/<id> | python3 -m json.tool
+  curl -s "http://127.0.0.1:8000/api/v1/reports?page=1" | python3 -m json.tool
+  curl -s http://127.0.0.1:8000/api/v1/reports/<id> | python3 -m json.tool
   ```
   The list returns aggregated/global reports (`repo_id` null — repo-update
   rollup, proposal, changelog, owner-discovered); page size is server-fixed
   (10). Any report, including per-repo ones, is fetchable by id via the
   detail endpoint.
-- **RSS:** `curl -s http://127.0.0.1:5000/api/v1/rss | head` → valid RSS XML
+- **RSS:** `curl -s http://127.0.0.1:8000/api/v1/rss | head` → valid RSS XML
   listing recent reports. Subscribe in a feed reader to confirm.
 
 ---
@@ -251,8 +241,7 @@ rm -rf <data_dir>          # scratch DB, cloned repos, logs
 rm -f config.toml          # throwaway seed (config.example.toml is untouched)
 ```
 
-Your real `data/progress.db` and any production config are never affected as
-long as `data_dir` pointed at the scratch directory.
+Your real `data/progress.db` and any production config are never affected as long as `data_dir` pointed at the scratch directory.
 
 ---
 
@@ -272,5 +261,4 @@ long as `data_dir` pointed at the scratch directory.
 | Reports & RSS | B8 | UI + API + RSS all return content |
 | Robustness | C1–C6 | errors handled, no crashes, no silent clobbering |
 
-A step **fails** if the observed result diverges from **Expected**; record the
-command output / screenshot and the DB state for triage.
+A step **fails** if the observed result diverges from **Expected**; record the command output / screenshot and the DB state for triage.

@@ -135,7 +135,7 @@ Progress uses [Pydantic AI](https://ai.pydantic.dev/) for diff analysis. Configu
 - `language` — output language for analysis results.
 - `concurrency` — per-integration analysis parallelism.
 
-When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back to truncation. There is no bundled CLI provider (the legacy `claude_code`/`codex` CLI providers were removed in the redesign).
+When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back to truncation. There is no bundled CLI provider — analysis runs through the Pydantic AI API path only.
 
 ## Configuration
 

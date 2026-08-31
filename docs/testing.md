@@ -11,9 +11,7 @@ Progress uses a **three-layer test suite** (spec 15):
   needs a real Miniflux + Postgres stack (brought up via Docker Compose); all
   other e2e integrations use local git + mocked GitHub API / pytest-httpserver.
 
-**Guiding philosophy**: mock only what you cannot control, keep everything else
-real. Match the mock to the boundary, never to convenience. Local and CI run
-the **identical** command — `uv run pytest` — with coverage always on.
+**Guiding philosophy**: mock only what you cannot control, keep everything else real. Match the mock to the boundary, never to convenience. Local and CI run the **identical** command — `uv run pytest` — with coverage always on.
 
 ## 1. Running tests
 
@@ -31,11 +29,7 @@ uv run pytest tests/unit/test_config.py
 uv run pytest tests/unit/test_config.py::test_loads_toml
 ```
 
-`pyproject.toml` sets `testpaths = ["tests"]`. Three markers (`unit` /
-`component` / `e2e`) are auto-applied by the root `conftest.py`'s
-`pytest_collection_modifyitems` hook based on the test file's directory, so
-cases never need a hand-written `@pytest.mark.xxx` (spec 15 §1.3). A fourth
-marker `feed` tags the Docker-dependent feed e2e. Select layers explicitly:
+`pyproject.toml` sets `testpaths = ["tests"]`. Three markers (`unit` / `component` / `e2e`) are auto-applied by the root `conftest.py`'s `pytest_collection_modifyitems` hook based on the test file's directory, so cases never need a hand-written `@pytest.mark.xxx` (spec 15 §1.3). A fourth marker `feed` tags the Docker-dependent feed e2e. Select layers explicitly:
 
 ```bash
 uv run pytest -m unit            # only unit
@@ -46,18 +40,11 @@ uv run pytest -m e2e             # only e2e
 
 ### 1.1 Coverage is always on
 
-`pyproject.toml` injects `--cov=progress --cov-report=term-missing
---cov-report=xml` via `addopts`, so every `uv run pytest` run prints a coverage
-summary to the terminal and writes `coverage.xml` (consumed by the codecov
-action in CI). There is no separate coverage command to remember.
+`pyproject.toml` injects `--cov=progress --cov-report=term-missing --cov-report=xml` via `addopts`, so every `uv run pytest` run prints a coverage summary to the terminal and writes `coverage.xml` (consumed by the codecov action in CI). There is no separate coverage command to remember.
 
 ### 1.2 The feed e2e needs Docker
 
-The `feed` integration's whole value is talking to a real Miniflux, and a mock
-cannot discover "real Miniflux entry JSON drifts from our assumptions". CI
-brings up the Miniflux + Postgres stack via `docker compose` before running the
-suite; local developers must have Docker running too. The command is identical
-everywhere — `uv run pytest`. To skip feed e2e locally (e.g. no Docker):
+The `feed` integration's whole value is talking to a real Miniflux, and a mock cannot discover "real Miniflux entry JSON drifts from our assumptions". CI brings up the Miniflux + Postgres stack via `docker compose` before running the suite; local developers must have Docker running too. The command is identical everywhere — `uv run pytest`. To skip feed e2e locally (e.g. no Docker):
 
 ```bash
 uv run pytest -m "not feed"
@@ -85,26 +72,16 @@ tests/
 web/e2e/                          # Playwright browser e2e (separate Node/pnpm suite)
 ```
 
-Shared fixtures (`tmp_state_home`, `workspace`, `git_helper`,
-`patch_clone_local`, `core_cfg`, `test_cfg`) live in the **root `conftest.py`**
-so they are visible to every layer without duplication. pytest traverses upward
-from a test file to the rootdir collecting conftests, so the root conftest's
-fixtures are in scope everywhere.
+Shared fixtures (`tmp_state_home`, `workspace`, `git_helper`, `patch_clone_local`, `core_cfg`, `test_cfg`) live in the **root `conftest.py`** so they are visible to every layer without duplication. pytest traverses upward from a test file to the rootdir collecting conftests, so the root conftest's fixtures are in scope everywhere.
 
 ### 2.1 Why `component/` instead of `integration/`
 
-`integration` collides with the `integrations/` plugin package (spec 06). The
-community-standard term for "multi-module collaboration under real SQLite but
-mocked external services" is **component testing**, so we use that (spec 15).
-The former `tests/api/` suite is merged here: FastAPI route tests are
-component tests (they mock observability and drive the app in-process via
+`integration` collides with the `integrations/` plugin package (spec 06). The community-standard term for "multi-module collaboration under real SQLite but mocked external services" is **component testing**, so we use that (spec 15). The former `tests/api/` suite is merged here: FastAPI route tests are component tests (they mock observability and drive the app in-process via
 httpx ASGITransport).
 
 ### 2.2 File naming
 
-Test files are named `test_` + the name of the tested module
-(`config.py` → `test_config.py`). Inside each layer, files mirror the source
-package structure where applicable:
+Test files are named `test_` + the name of the tested module (`config.py` → `test_config.py`). Inside each layer, files mirror the source package structure where applicable:
 
 - `src/progress/cli/ai/agent.py` → `tests/unit/test_ai_agent.py`
 - `src/progress/integrations/repo/tracker.py` → `tests/component/test_repo_integration.py`
@@ -113,17 +90,11 @@ package structure where applicable:
 
 ### 2.3 Browser e2e (`web/e2e/`)
 
-Playwright browser e2e is a **separate Node/pnpm suite** living under `web/e2e/`
-with its own `package.json` and `@playwright/test` dependency. It drives the
-real production container (Caddy + FastAPI) through a real browser. It is **not**
-part of the pytest suite — see `web/e2e/HANDBOOK.md` and the `e2e.yml` workflow.
+Playwright browser e2e is a **separate Node/pnpm suite** living under `web/e2e/` with its own `package.json` and `@playwright/test` dependency. It drives the real production container (Caddy + FastAPI) through a real browser. It is **not** part of the pytest suite — see `web/e2e/HANDBOOK.md` and the `e2e.yml` workflow.
 
 ## 3. Async conventions
 
-The whole runtime is async. `pyproject.toml` sets `asyncio_mode = "auto"`, so
-both `async def test_...` functions and `async def` fixtures run without any
-decorator. There is no need for `@pytest.mark.asyncio` or
-`@pytest_asyncio.fixture`.
+The whole runtime is async. `pyproject.toml` sets `asyncio_mode = "auto"`, so both `async def test_...` functions and `async def` fixtures run without any decorator. There is no need for `@pytest.mark.asyncio` or `@pytest_asyncio.fixture`.
 
 ## 4. Mock strategy (spec 15)
 
@@ -140,30 +111,19 @@ decorator. There is no need for `@pytest.mark.asyncio` or
 
 ### 4.1 `aioresponses` covering gidgethub
 
-`aioresponses/core.py` patches `ClientSession._request`, which is the exact
-call site `gidgethub.aiohttp` uses. Best practice: include `x-ratelimit-*`
-headers on mocked responses so gidgethub's `RateLimit.from_http` runs the real
-code path (`sansio.py:270-283`).
+`aioresponses/core.py` patches `ClientSession._request`, which is the exact call site `gidgethub.aiohttp` uses. Best practice: include `x-ratelimit-*` headers on mocked responses so gidgethub's `RateLimit.from_http` runs the real code path (`sansio.py:270-283`).
 
 ### 4.2 Local git fixture pattern
 
-The repo tracker clones via `git` subprocess; e2e/component tests patch
-`progress.integrations.repo.tracker.clone_or_fetch` — the bound name the tracker
-imports — to instead `git clone` a local bare repo fixture into the workspace.
-The `patch_clone_local` fixture lives in the **root `conftest.py`** so it is
-shared across `tests/component/` and `tests/e2e/` without duplication.
+The repo tracker clones via `git` subprocess; e2e/component tests patch `progress.integrations.repo.tracker.clone_or_fetch` — the bound name the tracker imports — to instead `git clone` a local bare repo fixture into the workspace. The `patch_clone_local` fixture lives in the **root `conftest.py`** so it is shared across `tests/component/` and `tests/e2e/` without duplication.
 
-To simulate "new commit since last run", call `GitRepo.add_commit(msg, files=)`
-which commits to the working copy and pushes to the bare remote, advancing HEAD.
-Pass `commit_date=` for a deterministic author date (avoids flaky
-wall-clock-dependent ordering assertions).
+To simulate "new commit since last run", call `GitRepo.add_commit(msg, files=)` which commits to the working copy and pushes to the bare remote, advancing HEAD. Pass `commit_date=` for a deterministic author date (avoids flaky wall-clock-dependent ordering assertions).
 
 ## 5. Shared fixtures
 
 ### 5.1 Root `conftest.py` (shared across all layers)
 
-Shared fixtures are lifted to the root so they apply everywhere; sub-directory
-conftests only add layer-specific fixtures.
+Shared fixtures are lifted to the root so they apply everywhere; sub-directory conftests only add layer-specific fixtures.
 
 | Fixture / hook | Scope | Purpose |
 |---|---|---|
@@ -176,8 +136,7 @@ conftests only add layer-specific fixtures.
 | `_disable_real_model_requests` (autouse) | function | Globally disables real AI calls as a safety switch; cases opt into mocked AI via `agent.override(model=TestModel())`. |
 | `pytest_collection_modifyitems` | — | Auto-tags each test with `unit` / `component` / `e2e` based on its directory (spec 15 §1.3). |
 
-The uvloop event-loop policy is also installed here to work around an aiosqlite
-hang under the default asyncio loop.
+The uvloop event-loop policy is also installed here to work around an aiosqlite hang under the default asyncio loop.
 
 ### 5.2 `tests/component/conftest.py`
 
@@ -203,9 +162,7 @@ hang under the default asyncio loop.
 
 ## 6. e2e tests — direct `core.run()` calls (spec 15)
 
-E2e tests exercise the full pipeline by calling `cli.core.run()` directly — no
-subprocess, no `CliRunner`, no monkeypatching of internal helpers. This is the
-key design fix called out by spec 15.
+E2e tests exercise the full pipeline by calling `cli.core.run()` directly — no subprocess, no `CliRunner`, no monkeypatching of internal helpers. This is the key design fix called out by spec 15.
 
 ```python
 # tests/e2e/repo/test_first_run_baseline_commit.py
@@ -230,11 +187,7 @@ async def test_first_run_baseline_commit(test_cfg, workspace, git_helper, patch_
 
 ### 6.1 Lifespan ownership
 
-`core.run()` owns its own lifespan: it calls `init_db(state_home)` at start and
-`close_db()` at exit. Any post-run DB query (for assertions) must therefore
-re-initialize the DB. The `seed_config` and `db_view` async context managers
-(in `tests/e2e/conftest.py`, spec 15 §2.4.3) wrap the pre-run seeding and
-post-run query boilerplate so cases never write raw `init_db`/`close_db`/`try/finally`.
+`core.run()` owns its own lifespan: it calls `init_db(state_home)` at start and `close_db()` at exit. Any post-run DB query (for assertions) must therefore re-initialize the DB. The `seed_config` and `db_view` async context managers (in `tests/e2e/conftest.py`, spec 15 §2.4.3) wrap the pre-run seeding and post-run query boilerplate so cases never write raw `init_db`/`close_db`/`try/finally`.
 
 ### 6.2 What is mocked vs real (e2e)
 
@@ -251,8 +204,7 @@ post-run query boilerplate so cases never write raw `init_db`/`close_db`/`try/fi
 
 ## 7. Component tests — FastAPI routes via httpx ASGITransport (spec 15)
 
-FastAPI route tests (formerly the `tests/api/` layer, now in `tests/component/`)
-drive the real app in-process:
+FastAPI route tests (formerly the `tests/api/` layer, now in `tests/component/`) drive the real app in-process:
 
 ```python
 async with LifespanManager(app):
@@ -268,11 +220,7 @@ async with LifespanManager(app):
 
 ### 7.1 Error-handler testing caveat
 
-Starlette's `@app.exception_handler(Exception)` routes to
-`ServerErrorMiddleware` (not `ExceptionMiddleware`). `ServerErrorMiddleware`
-always re-raises after handling, and `httpx.ASGITransport` defaults to
-`raise_app_exceptions=True`. To test 500 responses, construct the transport
-with `raise_app_exceptions=False`:
+Starlette's `@app.exception_handler(Exception)` routes to `ServerErrorMiddleware` (not `ExceptionMiddleware`). `ServerErrorMiddleware` always re-raises after handling, and `httpx.ASGITransport` defaults to `raise_app_exceptions=True`. To test 500 responses, construct the transport with `raise_app_exceptions=False`:
 
 ```python
 transport = ASGITransport(app=app, raise_app_exceptions=False)
@@ -280,8 +228,7 @@ transport = ASGITransport(app=app, raise_app_exceptions=False)
 
 ## 8. Config tests — direct `CoreConfig` construction (spec 02)
 
-Tests construct `CoreConfig` directly with only the fields they care about;
-everything else defaults (spec 02 zero-config):
+Tests construct `CoreConfig` directly with only the fields they care about; everything else defaults (spec 02 zero-config):
 
 ```python
 cfg = CoreConfig(
@@ -291,14 +238,11 @@ cfg = CoreConfig(
 )
 ```
 
-`tests/unit/test_config.py` and `tests/component/test_config.py` cover config
-loading, section-level schema validation, secret masking, and DB-backed
-upsert/reload.
+`tests/unit/test_config.py` and `tests/component/test_config.py` cover config loading, section-level schema validation, secret masking, and DB-backed upsert/reload.
 
 ## 9. Unit tests — narrow and pure
 
-Unit tests live in `tests/unit/` and target a single module or class. They
-inject fakes for collaborators and perform no IO. The unit layer covers:
+Unit tests live in `tests/unit/` and target a single module or class. They inject fakes for collaborators and perform no IO. The unit layer covers:
 
 - `cli/core.py` orchestration is covered by e2e (direct `core.run` calls), not
   by unit tests.
@@ -311,17 +255,11 @@ inject fakes for collaborators and perform no IO. The unit layer covers:
 
 ## 10. CI (CI spec)
 
-All Python tests run in a single CI job (`python-tests` in `ci.yml`) using the
-**same command as local**: `uv run pytest`. The job brings up the Miniflux +
-Postgres stack via `docker compose -f tests/e2e/feed/docker-compose.yml` before
-running, and tears it down afterwards. Coverage (injected via `addopts`) flows
-to codecov.
+All Python tests run in a single CI job (`python-tests` in `ci.yml`) using the **same command as local**: `uv run pytest`. The job brings up the Miniflux + Postgres stack via `docker compose -f tests/e2e/feed/docker-compose.yml` before running, and tears it down afterwards. Coverage (injected via `addopts`) flows to codecov.
 
-Browser e2e (`web/e2e/`) runs in a separate workflow (`e2e.yml`) that fires only
-when `src/`, `web/`, `docker/`, or `web/e2e/` change.
+Browser e2e (`web/e2e/`) runs in a separate workflow (`e2e.yml`) that fires only when `src/`, `web/`, `docker/`, or `web/e2e/` change.
 
-Drift checks (OpenAPI / i18n / migrations / TS types) are a separate CI concern
-(`drift-checks` job); see the CI spec for orchestration.
+Drift checks (OpenAPI / i18n / migrations / TS types) are a separate CI concern (`drift-checks` job); see the CI spec for orchestration.
 
 ## 11. Frontend tests (spec 13)
 
