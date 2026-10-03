@@ -9,6 +9,9 @@ Real SQLite tmp file (spec 15). Verifies:
 
 from __future__ import annotations
 
+import asyncio
+from pathlib import Path
+
 import pytest
 from tortoise.exceptions import IntegrityError
 
@@ -16,7 +19,7 @@ from progress.db import close_db, get_all_config, get_config, init_db, set_confi
 from progress.db.models.batch import Batch
 from progress.db.models.config import Config
 from progress.db.models.report import Report
-from progress.errors import ConfigException
+from progress.errors import ConfigException, DBUnavailableException
 from progress.integrations.repo.models import GitHubOwner, Repository
 
 
@@ -41,6 +44,19 @@ class TestInitDb:
         await close_db()
         await init_db(tmp_state_home)
         assert await Report.all().count() == 0
+
+    async def test_init_fails_loud_on_unwritable_state_home(self, tmp_path: Path) -> None:
+        # An unusable DB must abort boot immediately, not hang on the lock
+        # tortoise leaks when opening the file fails (deploy hardening).
+        await close_db()
+        state = tmp_path / "readonly"
+        state.mkdir()
+        state.chmod(0o555)
+        try:
+            with pytest.raises(DBUnavailableException):
+                await asyncio.wait_for(init_db(str(state)), timeout=15)
+        finally:
+            state.chmod(0o755)
 
 
 class TestConfigCrud:

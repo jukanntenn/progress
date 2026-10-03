@@ -22,26 +22,57 @@ from typing import Any
 from pydantic import BaseModel, SecretStr, ValidationError
 from tortoise import Tortoise
 from tortoise.connection import get_connection
+from tortoise.exceptions import OperationalError
 from tortoise.migrations.executor import MigrationExecutor, MigrationTarget
 
 from progress.db.models.config import Config
 from progress.db.tortoise_config import build_db_url, build_tortoise_config
-from progress.errors import ConfigException
+from progress.errors import ConfigException, DBUnavailableException
 from progress.integrations.registry import discover_integrations
 from progress.observability import record_business_event, report_severe
 
 logger = logging.getLogger(__name__)
+
+_ENV_DB_ERROR_MARKERS = (
+    "unable to open database file",
+    "attempt to write a readonly database",
+    "disk i/o error",
+    "database is locked",
+)
+
+
+def _is_environment_db_error(exc: Exception) -> bool:
+    """True when the error means the DB file/directory itself is unusable.
+
+    tortoise's sqlite ConnectionWrapper acquires its lock *before* opening
+    the file and never releases it when the open fails inside ``__aenter__``,
+    so swallowing these errors and continuing would deadlock the next DB
+    call on the leaked lock; they must abort the boot instead.
+    """
+    if not isinstance(exc, OperationalError):
+        return False
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _ENV_DB_ERROR_MARKERS)
 
 
 async def init_db(state_home: str, *, run_migrations: bool = True) -> None:
     """Initialize the DB connection and apply migrations.
 
     The DB file lives at ``<state_home>/progress.db`` (spec 02 derived path).
+    Raises DBUnavailableException when the database cannot be opened at all.
     """
     db_url = build_db_url(state_home)
     Path(state_home).mkdir(parents=True, exist_ok=True)
     config = build_tortoise_config(db_url)
     await Tortoise.init(config=config, _enable_global_fallback=True)
+    try:
+        await get_connection("default").execute_query("SELECT 1")
+    except Exception as e:
+        await Tortoise.close_connections()
+        raise DBUnavailableException(
+            f"database not usable at {db_url}: {e} — ensure the data directory "
+            "is writable by the runtime user (in the container: uid 100)"
+        ) from e
     logger.info("Database initialized: %s", state_home)
     if run_migrations:
         await _apply_migrations(config)
@@ -55,7 +86,9 @@ async def _apply_migrations(config: dict[str, Any]) -> None:
     the migration system), it is fake-applied (marked as applied without
     running) so subsequent migrations can proceed. All other errors are logged
     and recorded as metrics but never raised - the program degrades, never
-    crashes (spec 03 invariant).
+    crashes (spec 03 invariant). The one exception: environment-class DB
+    errors (unwritable/missing file) are re-raised - see
+    ``_is_environment_db_error`` for why continuing is not survivable there.
     """
 
     apps_cfg = config.get("apps", {})
@@ -92,6 +125,8 @@ async def _apply_migrations(config: dict[str, Any]) -> None:
                         attributes={"app": app_label, "name": name},
                     )
                 except Exception as e:
+                    if _is_environment_db_error(e):
+                        raise
                     msg = str(e).lower()
                     if "already exists" in msg or "duplicate column" in msg:
                         logger.info(
@@ -117,6 +152,8 @@ async def _apply_migrations(config: dict[str, Any]) -> None:
                             attributes={"app": app_label, "name": name, "error": str(e)[:200]},
                         )
         except Exception as e:
+            if _is_environment_db_error(e):
+                raise
             logger.warning(
                 "migration setup failed for app %s: %s; continuing",
                 app_label,
