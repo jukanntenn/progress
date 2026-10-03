@@ -58,12 +58,11 @@
         path: "{{ data_path }}"
         state: directory
         mode: a+rwX
-        recurse: true
       # The image runs as uid 100 and SQLite creates the DB/WAL/SHM files as
-      # that uid; the controller user cannot chown to a foreign uid without
-      # root, so the permissive-mode route (docs/deployment.md quick start)
-      # is the deployable one. An unwritable dir hangs boot (see
-      # DBUnavailableException in progress.db).
+      # that uid; the controller user cannot chown/chmod files owned by other
+      # uids (e.g. root-seeded data) without root, so only the playbook-owned
+      # directory is widened. Pre-seeded files are the operator's to fix; a
+      # bad one fails boot loudly (DBUnavailableException in progress.db).
 
     - name: Copy docker-compose.yml
       ansible.builtin.template:
