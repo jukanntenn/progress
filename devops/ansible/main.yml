@@ -53,6 +53,17 @@
         - "{{ app_path }}"
         - "{{ data_path }}"
 
+    - name: Hand the data dir to the container user
+      ansible.builtin.file:
+        path: "{{ data_path }}"
+        state: directory
+        owner: "100"
+        group: "101"
+        recurse: true
+      # 100:101 is the image's non-root `progress` user; SQLite creates the
+      # DB and WAL/SHM files at runtime as that uid, and an unwritable dir
+      # makes the app hang on boot (see DBUnavailableException in progress.db).
+
     - name: Copy docker-compose.yml
       ansible.builtin.template:
         src: docker-compose.yml.j2
