@@ -49,7 +49,8 @@ progress/
 │   │   │   ├── migrations/ templates/ locales/ prompts/
 │   │   ├── changelog/      # changelog integration (same self-contained layout)
 │   │   ├── proposal/       # proposal integration (same self-contained layout)
-│   │   └── feed/           # feed integration (Miniflux RSS; same self-contained layout)
+│   │   ├── feed/           # feed integration (Miniflux RSS; same self-contained layout)
+│   │   └── v2ex/           # v2ex integration (same self-contained layout)
 │   │
 │   ├── observability/      # Shared: OTel + structlog + Bugsink (spec 04)
 │   │   ├── __init__.py     # setup_observability / shutdown_observability
@@ -58,6 +59,27 @@ progress/
 │   │   ├── scrub.py        # unified secret redaction
 │   │   ├── metrics.py      # @observed decorator + record_business_event
 │   │   └── config.py       # BugsinkConfig (Web-class)
+│   │
+│   ├── kernel/             # Shared: cordis-semantics plugin kernel (PRFC 2026-08-31)
+│   │   ├── __init__.py     # public surface (Context/Fiber/boot/Entry/events/errors)
+│   │   ├── context.py      # service registry via __getattr__ + isolate/intercept
+│   │   ├── fiber.py        # fiber lifecycle, epoch, effects, settle engine
+│   │   ├── reflect.py      # service store (per-scope impls, provider-ACTIVE gating)
+│   │   ├── events.py       # 5 dispatch modes + EventSpec catalog (validated)
+│   │   ├── service.py      # Definition (typed key) + Service base
+│   │   ├── compose.py      # Entry rows + boot() with fail-loud activation audit
+│   │   ├── patches.py      # rows/patches as data + deferred _py expressions + dump
+│   │   └── errors.py / utils.py / reflect.py   # pure; kernel depends only on stdlib+pydantic
+│   │
+│   ├── runtime/            # Shared: the app's own plugins + composition (PRFC 2026-08-31)
+│   │   ├── __init__.py     # compose_base/compose_serve/compose_users + frozen entry ids
+│   │   ├── composition.py  # Composer: L0 reload, L1 transactional diff, rows<->entries
+│   │   ├── catalog.py      # 8-event pipeline catalog + payloads
+│   │   ├── db/config/telemetry/http/i18n/git_proxy/auth.py  # service entries (auth owns bootstrap_auth)
+│   │   ├── ai/notifications/scheduler.py  # seams: ai+replay, channel hub, croniter
+│   │   ├── integrations.py runner.py  # @register shim; event-driven runner (streaming)
+│   │   ├── scheduled_run.py plugin_install.py dev_reload.py  # cron, L3 uv install, L2 gen import
+│   │   └── profiles/       # shipped TOML patch layers
 │   │
 │   ├── utils/              # Shared: pure helpers (spec 01)
 │   │   ├── __init__.py
@@ -68,9 +90,8 @@ progress/
 │   │
 │   ├── cli/                # CLI entry package (spec 05; symmetric with api/)
 │   │   ├── __init__.py     # empty (package marker only — import-free to avoid circular import)
-│   │   ├── main.py         # typer app + command definitions (thin, CLI entry module)
-│   │   ├── core.py         # run() business orchestration (thick, e2e-callable)
-│   │   ├── lifespan.py     # @asynccontextmanager CLI process lifespan
+│   │   ├── main.py         # typer app + run/serve/inspect/plugin + --dump-config
+│   │   ├── core.py         # run() thin entry: boot tree + runner.run_once (e2e-callable)
 │   │   ├── outcome.py      # RunOutcome + exit_code (0/1/2)
 │   │   ├── reports/        # report pipeline (spec 09) + templates/reports/ + prompts/
 │   │   ├── notifications/  # Channel/Renderer/Dispatcher (spec 10) + channels/ + templates/report/
@@ -161,7 +182,7 @@ uv run python scripts/migration.py down <app>     # rollback
 uv run python scripts/migration.py drift          # drift check (CI gate)
 ```
 
-Ship (commit → build & push → deploy → report): use the `shipping` skill. Deploy defaults to `test` (`fn`); target another environment with `-e target=<env>`.
+Ship (commit → build & push → deploy → report): use the `shipping` skill. Deploy defaults to `staging` (`oect`); production (`fn`) only on explicit request via `-e target=prod`, after staging passes.
 
 Generate DB migrations (low-level, prefer the wrapper above):
 

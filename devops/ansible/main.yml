@@ -1,18 +1,22 @@
 ---
 # Deploy progress to an environment.
 #
-# Defaults to the test group; target another environment with -e target=prod.
+# Defaults to the staging group (validation); production is a deliberate,
+# explicit step: -e target=prod, only after the change passed acceptance
+# on staging. Staging ships with __FILL_ME__ placeholders the operator
+# must fill (group_vars/staging/env.yml, host_vars/oect.yml) — the playbook
+# refuses to deploy until then.
 # Post-deploy health verification runs scripts/check_deploy.py from the
 # controller machine: waits for /readyz, then compares the deployed git_sha
 # against the local HEAD (skip with -e verify_sha=no).
 #
 # Usage:
-#   ansible-playbook devops/ansible/main.yml
-#   ansible-playbook devops/ansible/main.yml -e target=prod
+#   ansible-playbook devops/ansible/main.yml                # deploy staging (oect)
+#   ansible-playbook devops/ansible/main.yml -e target=prod # deploy production (fn)
 #   ansible-playbook devops/ansible/main.yml -e verify_sha=no
 
 - name: Deploy progress
-  hosts: "{{ target | default('test') }}"
+  hosts: "{{ target | default('staging') }}"
   gather_facts: no
   # Secrets are per-environment !vault variables in group_vars/<group>/vault.yml
   # (auto-loaded); the matching password comes from the avpm keyring via the
@@ -28,6 +32,19 @@
     check_deploy_script: "{{ playbook_dir }}/../../scripts/check_deploy.py"
 
   tasks:
+    - name: Refuse to deploy with unfilled placeholders
+      ansible.builtin.fail:
+        msg: >-
+          {{ inventory_hostname }} has unfilled deployment variables — fill in
+          devops/ansible/host_vars/{{ inventory_hostname }}.yml and
+          devops/ansible/group_vars/{{ target | default('staging') }}/env.yml
+          (all __FILL_ME__ values) before deploying.
+      when: >-
+        (home | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (host_port | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (health_url | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (cron | default('__FILL_ME__')) == '__FILL_ME__'
+
     - name: Ensure paths
       ansible.builtin.file:
         path: "{{ item }}"

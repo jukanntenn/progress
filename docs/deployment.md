@@ -215,30 +215,32 @@ uv run python docker/build.py --no-cache                            # full rebui
 
 An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, starts containers, then verifies health from the controller machine. Works from the project root **and** from `devops/ansible/` — the root `ansible.cfg` plus a directory-local one both point at the same files.
 
-Secrets are encrypted as individual `!vault` variables, split per environment in `devops/ansible/group_vars/<env>/vault.yml` (auto-loaded by group). Each environment has its own vault password in the **avpm keyring** — `progress-test` and `progress-prod` — wired via `vault_identity_list = progress-test@~/.local/bin/avpm-client, progress-prod@~/.local/bin/avpm-client` in `ansible.cfg` (ansible calls the avpm client script as `avpm --vault-id <label>`; the matching password is tried first, then the rest in order). Encrypt a value with:
+Secrets are encrypted as individual `!vault` variables, split per environment in `devops/ansible/group_vars/<env>/vault.yml` (auto-loaded by group). Each environment has its own vault password in the **avpm keyring** — `progress-prod` guards the `prod` group (`fn`), `progress-test` guards the `staging` group (`oect`) — wired via `vault_identity_list = progress-test@~/.local/bin/avpm-client, progress-prod@~/.local/bin/avpm-client` in `ansible.cfg` (ansible calls the avpm client script as `avpm --vault-id <label>`; the matching password is tried first, then the rest in order). Encrypt a value with:
 
 ```bash
 ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
-  --stdin-name <name> >> devops/ansible/group_vars/test/vault.yml
+  --stdin-name <name> >> devops/ansible/group_vars/staging/vault.yml
 ```
 
-Run `avpm unlock` once per session; the agent doing the deploy will tell you if it is missing.
+Run `avpm unlock` once per session; the agent doing the deploy will tell you if it is missing. Manage the per-variable vault blocks with `uv run python scripts/vault.py` (`set` / `get` / `list` / `check` / `remove`); `check` decrypt-validates every variable of every environment under exactly its own vault-id, without printing values.
 
 ```bash
-ansible-playbook devops/ansible/main.yml                             # deploy test (fn) — default
-ansible-playbook devops/ansible/main.yml -e target=prod              # deploy production
+ansible-playbook devops/ansible/main.yml                             # deploy staging (oect) — default
+ansible-playbook devops/ansible/main.yml -e target=prod              # deploy production (fn)
 ansible-playbook devops/ansible/main.yml -e verify_sha=no            # deploy without the git_sha gate
 ```
 
 **Post-deploy verification** (runs `scripts/check_deploy.py` on the controller): waits for `/readyz` (app up + DB reachable), then compares the deployed `git_sha` — reported by `/api/v1/version` — against the local HEAD. A mismatch fails the playbook: a running container is not proof the new image is live.
 
-Internal test (`fn`) pulls the rolling `:main` tag from the in-network registry at `192.168.5.50:5000` (still hosted by the legacy server until it is migrated — update `registry_url` in `devops/ansible/group_vars/` when it moves). Shipping a new build to `fn`:
+Staging (`oect`, arm64) pulls the rolling `:main` tag from the in-network registry at `192.168.5.50:5000` (hosted on the oect machine itself). Its scheduler ships idle (`cron: ""` — trigger runs manually) and the playbook refuses to deploy while any `__FILL_ME__` placeholder remains (`host_port`/`health_url` in `group_vars/staging/env.yml`, `home` in `host_vars/oect.yml`). Shipping a new build for staging validation:
 
 ```bash
-uv run python docker/build.py --push --all-platforms   # 1. build + push :main
-ansible-playbook devops/ansible/main.yml               # 2. deploy + verify
+uv run python docker/build.py --push --all-platforms   # 1. build + push :main (amd64 + arm64)
+ansible-playbook devops/ansible/main.yml               # 2. deploy + verify on oect
 ```
 
-Inventory: `test` group = `fn` (dogfooding); `prod` group = production (host details pending). External users replace `group_vars/` and `host_vars/` (including the per-environment `vault.yml` files) with their own values.
+Production (`fn`) runs the same two commands with `-e target=prod` — a deliberate step taken only after the build has passed acceptance on staging. Publishing a newer `:main` for another staging cycle does not touch the running `fn` container; it changes only on the next explicit prod deploy.
+
+Inventory: `staging` group = `oect` (validation, arm64); `prod` group = `fn` (production). External users replace `group_vars/` and `host_vars/` (including the per-environment `vault.yml` files) with their own values.
 
 After each upgrade, verify the DB auto-migration succeeded — startup migrations never crash on schema errors (they log a `migration_failed` metric and degrade), so check `data/observability/metrics.jsonl` and `data/logs/progress.log` rather than relying on the container being up.

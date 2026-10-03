@@ -43,12 +43,22 @@
 
 ### 2.1 把 DSN 写入 Vault
 
-每个环境的 secret 以**单变量加密**存于 `devops/ansible/group_vars/<env>/vault.yml`（group 自动加载），vault 密码按环境分两个 vault-id（`progress-test` / `progress-prod`），由 avpm keyring 提供（见 `ansible.cfg` 的 `vault_identity_list`）。向某个环境新增变量（与现有 `gh_token`、`feishu_webhook_url` 等并列）：
+每个环境的 secret 以**单变量加密**存于 `devops/ansible/group_vars/<env>/vault.yml`（group 自动加载），vault 密码按环境分两个 vault-id——`progress-prod` 对应 `prod` 组（fn）、`progress-test` 对应 `staging` 组（oect）——由 avpm keyring 提供（见 `ansible.cfg` 的 `vault_identity_list`）。向某个环境新增变量（与现有 `gh_token`、`feishu_webhook_url` 等并列）用 `scripts/vault.py`（单变量块的解析/upsert/严格单身份解密，写盘前自校验）：
+
+```bash
+# 明文从 stdin 读入（剥掉一个尾部换行；--exact 保留字节原样），加密后 upsert
+uv run python scripts/vault.py set staging bugsink_dsn --stdin
+uv run python scripts/vault.py list --all                        # 各环境变量名 + 加密标签（不解密）
+uv run python scripts/vault.py check                             # 全环境全变量解密验证（不输出明文）
+uv run python scripts/vault.py get staging bugsink_dsn --quiet   # 解密到 stdout（唯一的明文输出命令，管道给消费方）
+```
+
+等价的原生命令（工具底层即此二原语；直接手写会绕过写前自校验与结构校验）：
 
 ```bash
 # 单变量加密追加（解密后的明文从 stdin 输入，不落命令行历史）
 ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
-  --stdin-name bugsink_dsn >> devops/ansible/group_vars/test/vault.yml
+  --stdin-name bugsink_dsn >> devops/ansible/group_vars/staging/vault.yml
 ```
 
 值形如 `http://<public-key>@192.168.5.50:8770/<project-id>`。
