@@ -53,16 +53,17 @@
         - "{{ app_path }}"
         - "{{ data_path }}"
 
-    - name: Hand the data dir to the container user
+    - name: Make the data dir writable by the container user
       ansible.builtin.file:
         path: "{{ data_path }}"
         state: directory
-        owner: "100"
-        group: "101"
+        mode: a+rwX
         recurse: true
-      # 100:101 is the image's non-root `progress` user; SQLite creates the
-      # DB and WAL/SHM files at runtime as that uid, and an unwritable dir
-      # makes the app hang on boot (see DBUnavailableException in progress.db).
+      # The image runs as uid 100 and SQLite creates the DB/WAL/SHM files as
+      # that uid; the controller user cannot chown to a foreign uid without
+      # root, so the permissive-mode route (docs/deployment.md quick start)
+      # is the deployable one. An unwritable dir hangs boot (see
+      # DBUnavailableException in progress.db).
 
     - name: Copy docker-compose.yml
       ansible.builtin.template:
