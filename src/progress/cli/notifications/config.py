@@ -9,13 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-import aiohttp
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
-
-from progress.cli.notifications.base import Channel
-from progress.cli.notifications.channels.console import ConsoleChannel
-from progress.cli.notifications.channels.email import EmailChannel
-from progress.cli.notifications.channels.feishu import FeishuChannel
 
 
 class EmailChannelConfig(BaseModel):
@@ -125,36 +119,10 @@ class NotificationConfig(BaseModel):
     )
 
 
-def build_channels(
-    config: NotificationConfig,
-    *,
-    session: aiohttp.ClientSession | None = None,
-) -> list[Channel]:
-    """Instantiate enabled channels from ``config``.
-
-    ``session`` is required if any Feishu channel is enabled (webhook POST).
-    Email uses aiosmtplib's own connection, so it doesn't need a session.
-    """
-    channels: list[Channel] = []
-    for channel_cfg in config.channels:
-        if not channel_cfg.enabled:
-            continue
-        if channel_cfg.type == "console":
-            channels.append(ConsoleChannel())
-        elif channel_cfg.type == "email":
-            channels.append(EmailChannel(channel_cfg))
-        elif channel_cfg.type == "feishu":
-            if session is None:
-                raise ValueError("aiohttp session is required for the feishu channel")
-            channels.append(FeishuChannel(session, channel_cfg))
-    return channels
-
-
 __all__ = [
     "ChannelConfig",
     "ConsoleChannelConfig",
     "EmailChannelConfig",
     "FeishuChannelConfig",
     "NotificationConfig",
-    "build_channels",
 ]

@@ -1,0 +1,2 @@
+# all-in-one profile layer: serve + scheduled runs inside the API process
+# (the schedule.cron consumer; replaces supercronic in containers).

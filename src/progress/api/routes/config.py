@@ -38,10 +38,7 @@ from progress.api.schemas import (
     TestChannelResult,
     TestNotificationResponse,
 )
-from progress.cli.notifications.config import build_channels
-from progress.cli.notifications.dispatcher import Dispatcher
 from progress.cli.notifications.events import TestNotificationEvent
-from progress.cli.notifications.renderer import JinjaRenderer
 from progress.config.loader import merge_db_config
 from progress.config.root import CoreConfig, _normalize_bcp47
 from progress.config.schema import get_config_json_schema
@@ -169,7 +166,14 @@ async def put_section(
     except ConfigException as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    if section == "core":
+    composer = getattr(request.app.state, "composer", None)
+    if composer is not None:
+        try:
+            await composer.reload_config()
+        except Exception as e:
+            logger.warning("live config reload failed; keeping current tree: %s", e)
+            report_severe(e)
+    elif section == "core":
         db_core = await get_config("core")
         if db_core:
             try:
@@ -196,16 +200,26 @@ async def put_section(
 )
 @limiter.limit("30 per minute")
 async def reload_config(request: Request) -> ConfigReloadResponse:
-    """Re-read DB-stored core config and refresh ``app.state.cfg``."""
-    cfg: CoreConfig = request.app.state.cfg
-    db_core = await get_config("core")
-    if db_core:
-        try:
-            request.app.state.cfg = merge_db_config(cfg, db_core)
-        except Exception as e:
-            logger.warning("config reload merge failed; keeping current cfg: %s", e)
-            report_severe(e)
-            return ConfigReloadResponse(status="noop", section="core")
+    """L0 + L1: re-merge layered config, restart affected rows, recompose."""
+    composer = getattr(request.app.state, "composer", None)
+    if composer is None:
+        cfg: CoreConfig = request.app.state.cfg
+        db_core = await get_config("core")
+        if db_core:
+            try:
+                request.app.state.cfg = merge_db_config(cfg, db_core)
+            except Exception as e:
+                logger.warning("config reload merge failed; keeping current cfg: %s", e)
+                report_severe(e)
+                return ConfigReloadResponse(status="noop", section="core")
+        return ConfigReloadResponse(status="ok", section="core")
+    try:
+        await composer.reload_config()
+        await composer.recompose()
+    except Exception as e:
+        logger.warning("config reload recompose failed; tree unchanged: %s", e)
+        report_severe(e)
+        return ConfigReloadResponse(status="noop", section="core")
     return ConfigReloadResponse(status="ok", section="core")
 
 
@@ -223,15 +237,11 @@ async def test_notifications(request: Request) -> TestNotificationResponse:
     ``LocaleMiddleware``) and dispatches via the same ``Dispatcher`` the report
     pipeline uses.
     """
-    cfg: CoreConfig = request.app.state.cfg
-    session = getattr(request.app.state, "session", None)
-    channels = build_channels(cfg.notification, session=session)
-    if not channels:
+    hub = getattr(request.app.state.ctx, "notifications", None) if hasattr(request.app.state, "ctx") else None
+    if hub is None or not hub.channels:
         return TestNotificationResponse(results=[], summary="no_channels")
     event = TestNotificationEvent()
-    renderer = JinjaRenderer(cfg)
-    dispatcher = Dispatcher(channels, renderer)
-    outcome = await dispatcher.dispatch(event)
+    outcome = await hub.dispatch(event)
     for r in outcome.results:
         record_business_event(
             "progress.notifications.test",

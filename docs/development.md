@@ -140,7 +140,7 @@ It runs the seven checks from CI's `drift-checks` job, each with a banner and `[
 6. **i18n catalog lint** — no fuzzy / empty / obsolete `.po` entries.
 7. **Migration drift** — every model change has a matching migration file.
 
-Prerequisites: `uv sync --extra dev` and `pnpm --dir web install` (the latter for the frontend type-drift check). A clean working tree is **not** required — the checks diff against `HEAD`, so uncommitted source changes surface as drift (intentional; commit or stash first if you want to isolate a single check).
+Prerequisites: `uv sync --extra dev` and `cd web && pnpm install` (the latter for the frontend type-drift check). A clean working tree is **not** required — the checks diff against `HEAD`, so uncommitted source changes surface as drift (intentional; commit or stash first if you want to isolate a single check).
 
 The OpenAPI and `.pot` checks leave their freshly regenerated artifacts on disk after running (mirroring CI). Re-commit them if the regeneration is the intended update, otherwise `git checkout -- <path>` to discard.
 

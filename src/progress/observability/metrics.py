@@ -119,13 +119,39 @@ def mark_span_outcome(status: str, *, error_message: str = "") -> None:
         span.set_status(trace.Status(trace.StatusCode.ERROR, error_message or "operation failed"))
 
 
+_active_hub: Any = None
+
+
+def set_active_hub(hub: Any) -> Any:
+    """Install the telemetry hub as the business-event funnel (PRFC phase 3).
+
+    The hub owns scrub policies and sinks; with no hub installed (unit tests,
+    hub-less boots) events go straight to the OTel meter as before. Returns
+    the previous hub so the caller can restore it on dispose.
+    """
+    global _active_hub
+    previous = _active_hub
+    _active_hub = hub
+    return previous
+
+
 def record_business_event(name: str, *, value: float = 1, attributes: dict[str, str] | None = None) -> None:
     """Record a discrete business event as a counter increment.
 
     Uses a dedicated counter registry separate from ``_failure_counters`` so
     failure metrics (``<name>.failures``) and business event metrics never
-    share state — avoiding the double-counting trap spec 04 calls out.
+    share state — avoiding the double-counting trap spec 04 calls out. When a
+    telemetry hub is active the event flows through it (scrub waterfall +
+    sinks) instead of the direct OTel counter.
     """
+    if _active_hub is not None:
+        _active_hub.record("business_event", {"name": name, "value": value, "attributes": dict(attributes or {})})
+        return
+    record_business_event_direct(name, value=value, attributes=attributes)
+
+
+def record_business_event_direct(name: str, *, value: float = 1, attributes: dict[str, str] | None = None) -> None:
+    """The OTel counter write, bypassing the hub (used by the otel sink)."""
     attrs = dict(attributes or {})
     counter = _event_counters.get(name)
     if counter is None:
@@ -137,4 +163,4 @@ def record_business_event(name: str, *, value: float = 1, attributes: dict[str, 
     counter.add(value, attrs)
 
 
-__all__ = ["observe_span", "observed", "record_business_event"]
+__all__ = ["observe_span", "observed", "record_business_event", "record_business_event_direct", "set_active_hub"]

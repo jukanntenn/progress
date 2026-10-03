@@ -53,9 +53,11 @@ async def app_client(tmp_state_home: str, tmp_path: Path, monkeypatch: pytest.Mo
     that a ``POST /config/reload`` (which re-merges the DB core section) does
     not flip ``auth.enabled`` back on.
     """
-    monkeypatch.setattr("progress.api.setup_observability", lambda *a, **kw: None)
-    monkeypatch.setattr("progress.api.shutdown_observability", lambda: None)
-    monkeypatch.setattr("progress.api.instrument_fastapi_app", lambda app: None)
+    monkeypatch.setattr("progress.runtime.telemetry.setup_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.flush_telemetry", lambda: None)
+    monkeypatch.setattr("progress.runtime.telemetry.configure_structlog", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.init_bugsink", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.webserver.instrument_fastapi_app", lambda app: None)
 
     config_path = tmp_path / "config.toml"
     config_path.write_text(f'state_home = "{tmp_state_home}"\n', encoding="utf-8")
@@ -84,9 +86,11 @@ async def auth_client(tmp_state_home: str, tmp_path: Path, monkeypatch: pytest.M
     ``_login(client)`` to get a token, or use the ``authed_client`` fixture
     which is already logged in.
     """
-    monkeypatch.setattr("progress.api.setup_observability", lambda *a, **kw: None)
-    monkeypatch.setattr("progress.api.shutdown_observability", lambda: None)
-    monkeypatch.setattr("progress.api.instrument_fastapi_app", lambda app: None)
+    monkeypatch.setattr("progress.runtime.telemetry.setup_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.flush_telemetry", lambda: None)
+    monkeypatch.setattr("progress.runtime.telemetry.configure_structlog", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.init_bugsink", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.webserver.instrument_fastapi_app", lambda app: None)
 
     config_path = tmp_path / "config.toml"
     config_path.write_text(f'state_home = "{tmp_state_home}"\n', encoding="utf-8")

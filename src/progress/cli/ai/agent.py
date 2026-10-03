@@ -238,6 +238,22 @@ def _resolve_agent_model_name(agent: Agent[Any, Any]) -> str:
     return getattr(agent_model, "model_name", None) or "unknown"
 
 
+_active_ai: Any = None
+
+
+def set_active_ai(handle: Any) -> Any:
+    """Install the active AI handle (the ``ctx.ai`` funnel, PRFC phase 3).
+
+    With a handle installed, ``run_extraction`` routes through it — the seam
+    third-party providers and the deterministic replay provider attach to.
+    Returns the previous handle so the caller restores it on dispose.
+    """
+    global _active_ai
+    previous = _active_ai
+    _active_ai = handle
+    return previous
+
+
 async def run_extraction(
     agent: Agent[Any, Any],
     prompt: str,
@@ -246,18 +262,33 @@ async def run_extraction(
 ) -> Any:
     """Run the extraction agent and return the parsed result.
 
-    Per spec 02, the run is bounded by ``AI_TIMEOUT`` (600s), serialized by
-    ``AI_CONCURRENCY`` (1), and retried ``AI_RETRIES`` (3) times with
-    exponential backoff on transient failures. Pydantic AI's built-in
-    ``ModelRetry`` for validator failures still applies inside each attempt.
+    Routes through the active AI handle when one is installed (the service
+    seam); otherwise takes the direct path below. Per spec 02, the run is
+    bounded by ``AI_TIMEOUT`` (600s), serialized by ``AI_CONCURRENCY`` (1),
+    and retried ``AI_RETRIES`` (3) times with exponential backoff on
+    transient failures. Pydantic AI's built-in ``ModelRetry`` for validator
+    failures still applies inside each attempt.
 
     Raises ``ProgressException`` if the model is not configured or the run
     fails after the retry budget is exhausted.
     """
+    if _active_ai is not None:
+        return await _active_ai.run_extraction(agent, prompt, model=model)
+    return await run_extraction_direct(agent, prompt, model=model)
+
+
+async def run_extraction_direct(
+    agent: Agent[Any, Any],
+    prompt: str,
+    *,
+    model: Any = None,
+    semaphore: asyncio.Semaphore | None = None,
+) -> Any:
+    """The transport: timeout, retry, optional caller-owned semaphore."""
 
     async def _run() -> Any:
-        semaphore = await _acquire_extraction_slot()
-        async with semaphore:
+        slot = semaphore if semaphore is not None else await _acquire_extraction_slot()
+        async with slot:
             return await asyncio.wait_for(agent.run(prompt, model=model), timeout=AI_TIMEOUT)
 
     retrying = AsyncRetrying(

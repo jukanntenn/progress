@@ -6,10 +6,10 @@ from pydantic import SecretStr
 import pytest
 from tortoise.exceptions import IntegrityError
 
-from progress.api.auth_bootstrap import bootstrap_auth
 from progress.config.root import CoreConfig
 from progress.db import close_db, init_db
 from progress.db.models import User
+from progress.runtime.auth import bootstrap_auth
 from progress.utils.security import hash_password, verify_password
 
 

@@ -19,7 +19,7 @@ The seven checks (each prints a banner + [OK]/[FAIL] summary):
 
 Prerequisites (same as CI):
   - ``uv sync --extra dev``          (backend dev deps)
-  - ``pnpm --dir web install``       (frontend deps, for the type-drift check)
+  - ``cd web && pnpm install``       (frontend deps, for the type-drift check)
 
 All checks are **non-destructive**: generated artifacts (openapi.json, .pot,
 schema.ts) are regenerated to temp files and diffed, never written to the
@@ -44,9 +44,10 @@ import sys
 import tempfile
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+WEB_DIR = PROJECT_ROOT / "web"
 LOCALE_POT = PROJECT_ROOT / "src" / "progress" / "locales" / "progress.pot"
-OPENAPI_JSON = PROJECT_ROOT / "web" / "openapi.json"
-SCHEMA_TS = PROJECT_ROOT / "web" / "src" / "api" / "schema.ts"
+OPENAPI_JSON = WEB_DIR / "openapi.json"
+SCHEMA_TS = WEB_DIR / "src" / "api" / "schema.ts"
 
 # ANSI color codes; disabled when stdout is not a tty or NO_COLOR is set.
 _USE_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
@@ -139,7 +140,11 @@ def check_frontend_type_drift() -> int:
     """Generate schema.ts to a temp file (raw) and diff against the committed copy."""
     tmp = _tempfile(".ts")
     try:
-        gen = _run_captured([_pnpm(), "--dir", "web", "exec", "openapi-typescript", "openapi.json", "-o", str(tmp)])
+        # Run with cwd=web, not `--dir web`: a corepack pnpm shim resolves the
+        # pinned packageManager version from the CWD's package.json and never
+        # sees `--dir`, so a root invocation launches the default pnpm and
+        # fails its own version check before openapi-typescript can run.
+        gen = _run_captured([_pnpm(), "exec", "openapi-typescript", "openapi.json", "-o", str(tmp)], cwd=WEB_DIR)
         if gen.returncode != 0:
             print(gen.stderr or gen.stdout)
             return gen.returncode

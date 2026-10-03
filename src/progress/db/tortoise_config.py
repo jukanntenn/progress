@@ -14,12 +14,16 @@ imports would fail.
 
 from __future__ import annotations
 
+import importlib
+import logging
 import pathlib
 from typing import Any
 
 from progress.integrations.registry import discover_integrations
 
 APP_LABEL = "core"
+
+logger = logging.getLogger(__name__)
 
 
 def build_tortoise_config(db_url: str) -> dict[str, Any]:
@@ -43,14 +47,20 @@ def build_tortoise_config(db_url: str) -> dict[str, Any]:
     }
 
     for name, integration_cls in discover_integrations().items():
-        models_path = getattr(integration_cls, "models_module", None)
-        if models_path is None:
-            models_path = f"progress.integrations.{name}.models"
-        migrations_path = f"progress.integrations.{name}.migrations"
+        models_path = getattr(integration_cls, "models_module", None) or f"progress.integrations.{name}.models"
+        try:
+            importlib.import_module(models_path)
+        except ImportError:
+            # DB-less integration (a third-party plugin with no state): no app,
+            # no migrations entry. The spec-06 fallback path can only ever
+            # exist for built-ins — third parties live outside the progress
+            # package, so an absent models_module must be legal.
+            logger.debug("integration %r ships no models module (%r); skipping DB app", name, models_path)
+            continue
         apps[name] = {
             "models": [models_path],
             "default_connection": "default",
-            "migrations": migrations_path,
+            "migrations": f"{models_path.rsplit('.', 1)[0]}.migrations",
         }
 
     return {

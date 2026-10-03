@@ -241,13 +241,17 @@ def _preserve_internal_fields(submitted: dict[str, Any], existing: dict[str, Any
     这些字段不出现在可编辑 JSON Schema 里（前端不可见），所以前端
     提交的 data 里不会包含它们。从 DB 读取原值注入，校验时 model_validate
     会接受它们（因为是合法值），dump 后原样存回 DB。
+
+    仅当 DB 原值非空时才注入：空占位值（如首次启动尚未生成 secret_key
+    时的 ""）不得覆盖提交数据或 bootstrap 刚生成的值——否则每次启动
+    生成的 JWT secret 都会被 DB 里的空串冲掉，secret 永远无法持久化。
     """
     out = dict(submitted)
     for field, path in _CORE_INTERNAL_PATHS.items():
         cursor_existing = existing
         for key in path:
             cursor_existing = cursor_existing.get(key, {}) if isinstance(cursor_existing, dict) else {}
-        if isinstance(cursor_existing, dict) and field in cursor_existing:
+        if isinstance(cursor_existing, dict) and cursor_existing.get(field):
             if path:
                 out.setdefault(path[0], {})
                 if isinstance(out.get(path[0]), dict):

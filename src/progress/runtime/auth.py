@@ -1,14 +1,13 @@
-"""Admin user + JWT secret bootstrap (runs at API/CLI startup).
+"""Auth entry + bootstrap: JWT secret + initial superuser (PRFC phase 1/3).
 
-Two responsibilities:
-
-1. **Secret key**: if ``cfg.auth.secret_key`` is empty, generate a 32-byte
-   random key, persist it into the DB config ``[core]`` section so it survives
-   restarts, and return the updated config.
-2. **Admin user**: if auth is enabled and the ``users`` table is empty, create
-   the initial superuser from ``cfg.auth.initial_admin_*``. When no password is
-   configured, a random one is generated and printed to the log **once**
-   (WARNING level) so the operator can read it on first boot.
+``bootstrap_auth`` moved here from ``progress.api.auth_bootstrap`` — it has
+no FastAPI dependency (db + config + security only), and the runtime layer
+must not import the api layer (import-linter contract 3). It mutates the
+merged config in place (generating and persisting a secret when empty), so
+the webserver entry injects the ``authReady`` marker this module's entry
+provides — the one ordering an in-place mutation cannot express through
+``config`` alone. Sunk into the base tree (cron-only deployments bootstrap
+on first run too).
 """
 
 from __future__ import annotations
@@ -21,9 +20,23 @@ from pydantic import BaseModel, SecretStr
 from progress.config.root import CoreConfig
 from progress.db import _dump_plaintext, get_config, set_config
 from progress.db.models import User
+from progress.kernel import Definition, Entry
 from progress.utils.security import hash_password
 
 logger = logging.getLogger(__name__)
+
+
+class AuthReady(Definition):
+    service_name = "authReady"
+
+
+def make_auth_entry() -> Entry:
+    async def _apply(ctx, config) -> None:
+        cfg = ctx.config
+        await bootstrap_auth(cfg)
+        ctx.provide(AuthReady, True)
+
+    return Entry(id="auth", plugin=_apply, inject=["config"])
 
 
 async def bootstrap_auth(cfg: CoreConfig) -> CoreConfig:

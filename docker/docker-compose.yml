@@ -20,7 +20,9 @@ services:
     environment:
       - TZ=UTC
       - PYTHONUNBUFFERED=1
-      # Cron schedule for automatic pipeline runs (empty = disabled).
+      # Cron schedule for automatic pipeline runs, executed in-process by the
+      # serve tree's scheduled-run row (empty = disabled). Compatibility
+      # fallback for the config-table schedule.cron value.
       # Example: "30 8,22 * * *" runs at 08:30 and 22:30 daily.
       - PROGRESS_SCHEDULE_CRON=
     healthcheck:

@@ -7,7 +7,7 @@ Progress uses a **two-file configuration model** (spec 02) that physically separ
 | Class | Owner | Storage | Mount | Contents |
 |---|---|---|---|---|
 | **Ansible** | Deployer | `config.toml` | read-only file | `state_home` only |
-| **Core Web** | Web UI / user | DB `config` table (`section="core"`) | DB (writable) | language, timezone, github, analysis, markpost, notification, observability, web |
+| **Core Web** | Web UI / user | DB `config` table (`section="core"`) | DB (writable) | language, timezone, github, analysis, markpost, notification, observability, web, schedule |
 | **Plugin** | Web UI / user | DB `config` table (`section=<plugin>`) | DB (writable) | per-integration config (`repo`, `changelog`, `proposal`) |
 
 `state_home` is the single infrastructure key — the root directory for all runtime data (DB, logs, cloned repos, observability exports). Every other path is derived from it.
@@ -111,6 +111,19 @@ When `config.db.toml` exists next to `config.toml`, every startup re-imports it 
 Secrets (`gh_token`, `api_key`, `password`, `webhook_url`, `dsn`, markpost `url`) are `pydantic.SecretStr`: stored as real plaintext values in the DB (trusted internal store) and returned as-is by the API. The browser renders them as password fields (with a reveal toggle); there is no mask sentinel — what you submit is what gets stored.
 
 System-internal fields (`state_home`, `auth.secret_key`, `auth.initial_admin_password`) are excluded from the editable schema and from API responses; writes always preserve their DB values.
+
+## Scheduling
+
+The `schedule` section drives in-process scheduled pipeline runs (PRFC 2026-08-31):
+
+```toml
+[core.schedule]
+cron = "0 6 * * *"   # daily at 06:00 local time; empty disables scheduled runs
+```
+
+- The cron expression is evaluated by the `scheduled-run` row on the serve tree via `ctx.scheduler` (croniter): local time, per-entry mutex (a trigger while the previous run is still active is skipped with a warning), no catch-up of missed fires.
+- Changes are live: writing the section through the API reloads the schedule without a restart (L0).
+- The container's `PROGRESS_SCHEDULE_CRON` environment variable is a compatibility fallback used when `schedule.cron` is empty; scheduling runs in-process.
 
 ## Zero configuration
 

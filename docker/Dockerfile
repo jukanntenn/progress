@@ -63,9 +63,6 @@ ARG GIT_SHA=unknown
 ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG CADDY_VERSION=v2.9.1
 ARG CADDY_SHA512=""
-ARG SUPERCRONIC_VERSION=v0.2.47
-ARG SUPERCRONIC_AMD64_SHA256=dcb1403c188a9438c47d4bba82a9c357fc9351ce91627fb2bae627f0f5becfc4
-ARG SUPERCRONIC_ARM64_SHA256=e1124aa34294e2bb8ab7002f347f4363ba35097f3daf4d3c44e9d813c1fb2bb8
 LABEL org.opencontainers.image.title="progress" \
       org.opencontainers.image.source="https://github.com/jukanntenn/progress" \
       org.opencontainers.image.licenses="MIT"
@@ -118,24 +115,14 @@ RUN S6_ARCH=$(case "${TARGETARCH}" in amd64) echo "x86_64" ;; arm64) echo "aarch
     tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz && \
     rm -f /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-${S6_ARCH}.tar.xz /tmp/s6-overlay-${S6_ARCH}.tar.xz.sha256
 
-# supercronic (spec 14) — crontab-compatible job runner for containers, used by
-# the s6 ``cron`` longrun to schedule periodic ``progress run`` invocations.
-# The release ships bare binaries (no checksums.txt manifest, no cosign sig), so
-# the SHA256 is pinned per-arch via build-arg (verified with sha256sum -c).
-RUN case "${TARGETARCH}" in \
-        amd64) SUPERCRONIC_SHA256="${SUPERCRONIC_AMD64_SHA256}" ;; \
-        arm64) SUPERCRONIC_SHA256="${SUPERCRONIC_ARM64_SHA256}" ;; \
-        *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac && \
-    curl -fsSL \
-        "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH}" \
-        -o /tmp/supercronic && \
-    echo "${SUPERCRONIC_SHA256}  /tmp/supercronic" | sha256sum -c - && \
-    install -m 0755 /tmp/supercronic /usr/local/bin/supercronic && \
-    rm /tmp/supercronic
+# Scheduling (PRFC 2026-08-31 phase 4): periodic pipeline runs execute inside
+# the API process via ctx.scheduler (croniter) — the scheduled-run row on the
+# serve tree reads schedule.cron from config, with PROGRESS_SCHEDULE_CRON as
+# the container compatibility fallback. supercronic and the s6 cron longrun
+# are retired.
 
-# Caddy config + s6 service definitions: caddy + fastapi + cron (supercronic)
-# longruns. No nextjs (Vite produces static output).
+# Caddy config + s6 service definitions: caddy + fastapi longruns. No nextjs
+# (Vite produces static output).
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 COPY docker/s6/cont-init.d /etc/cont-init.d
 COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d

@@ -195,6 +195,25 @@ class AuthConfig(BaseModel):
     )
 
 
+class ScheduleConfig(BaseModel):
+    """In-process scheduled runs (PRFC 2026-08-31 phase 4).
+
+    ``cron`` drives the ``scheduled-run`` consumer on the serve tree via
+    ``ctx.scheduler`` (croniter, local time, per-entry mutex, no catch-up).
+    Empty means no scheduled runs — the container's ``PROGRESS_SCHEDULE_CRON``
+    env var is the compatibility fallback.
+    """
+
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"ui_group": "schedule", "ui_order": 90})
+
+    cron: str = Field(
+        default="",
+        title="Schedule (cron)",
+        description="Cron expression for scheduled pipeline runs inside the serve process (empty disables).",
+        examples=["0 6 * * *", "*/30 * * * *"],
+    )
+
+
 class CoreConfig(BaseSettings):
     """Top-level aggregate root.
 
@@ -233,6 +252,7 @@ class CoreConfig(BaseSettings):
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
+    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
 
     @field_validator("timezone", mode="before")
     @classmethod

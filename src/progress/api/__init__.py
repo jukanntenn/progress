@@ -12,32 +12,25 @@ import time when the config file was missing or invalid.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 import logging
 import os
+from typing import Any
 
-import aiohttp
 from fastapi import FastAPI
 import sentry_sdk
 
 from progress import __version__
-from progress.api.auth_bootstrap import bootstrap_auth
 from progress.api.errors import register_exception_handlers
 from progress.api.middleware import register_middleware
 from progress.api.routes import register_routers
-from progress.cli.git.local import set_git_proxy
-from progress.config.loader import apply_db_and_seed, load_config
-from progress.config.root import CoreConfig
-from progress.db import close_db, init_db
-from progress.db.migrations._config_data import migrate_config_data
-from progress.observability import (
-    instrument_fastapi_app,
-    report_severe,
-    setup_observability,
-    shutdown_observability,
-)
-from progress.utils.http import session_factory
+from progress.config.loader import load_config
+from progress.kernel import root_context
+from progress.runtime import compose_serve
+from progress.runtime.composition import Composer
+from progress.runtime.plugin_install import ensure_plugin_path
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +79,57 @@ def create_app(config_path: str | None = None) -> FastAPI:
     return app
 
 
+def _install_sighup(composer: Any) -> None:
+    """L1 explicit trigger: SIGHUP recomposes the running tree."""
+    import asyncio  # noqa: PLC0415
+    import signal  # noqa: PLC0415
+
+    loop = asyncio.get_running_loop()
+
+    async def _recompose() -> None:
+        try:
+            await composer.recompose()
+        except Exception:
+            logging.getLogger(__name__).exception("SIGHUP recompose failed; tree unchanged")
+
+    def _on_signal() -> None:
+        loop.create_task(_recompose())  # noqa: RUF006
+
+    try:  # noqa: SIM105
+        loop.add_signal_handler(signal.SIGHUP, _on_signal)
+    except NotImplementedError:
+        pass
+
+
+def _maybe_dev_plugin_watch(ctx: Any, cfg: Any) -> Any:
+    """L2 (default off): watch third-party plugin sources and hot-replace.
+
+    Enabled by ``PROGRESS_DEV_PLUGIN_WATCH=1`` (the serve command sets it
+    from ``--dev-plugin-watch``); watches plugin packages under
+    ``<state_home>/plugins``.
+    """
+    if os.environ.get("PROGRESS_DEV_PLUGIN_WATCH", "").strip() not in {"1", "true", "yes"}:
+        return None
+    from progress.runtime.dev_reload import DevPluginWatcher  # noqa: PLC0415
+    from progress.runtime.plugin_install import plugins_dir  # noqa: PLC0415
+
+    watcher = DevPluginWatcher(ctx)
+    for package in sorted(plugins_dir(cfg.state_home).glob("*/__init__.py")):
+        watcher.watch(package)
+    watcher.start()
+    logging.getLogger(__name__).info("dev plugin watch armed over %s", plugins_dir(cfg.state_home))
+    return watcher
+
+
+def _remove_sighup() -> None:
+    import signal  # noqa: PLC0415
+
+    try:  # noqa: SIM105
+        asyncio.get_running_loop().remove_signal_handler(signal.SIGHUP)
+    except (NotImplementedError, RuntimeError):
+        pass
+
+
 def _dev_cors_enabled() -> bool:
     """CORS is dev-only (spec 12). Toggled by ``PROGRESS_DEV_CORS=1``."""
     return os.environ.get(DEV_CORS_ENV, "").strip() in {"1", "true", "yes"}
@@ -97,53 +141,44 @@ def _progress_version() -> str:
 
 
 def _lifespan_factory(config_path: str | None):
-    """Build a lifespan that closes over ``config_path``."""
+    """Build a lifespan that boots the shared composition tree.
+
+    The ASGI protocol requires a lifespan callable; this shim is the only
+    thing left of the old hand-written startup sequence — ordering knowledge
+    lives in ``progress.runtime.compose_serve`` and is expressed as service
+    dependencies.
+    """
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-        cfg: CoreConfig | None = None
-        session: aiohttp.ClientSession | None = None
         try:
             cfg = load_config(config_path)
-            await init_db(cfg.state_home)
-            await migrate_config_data()
-            cfg = await apply_db_and_seed(cfg, config_path)
-
-            cfg = await bootstrap_auth(cfg)
-            setup_observability(
-                cfg.state_home,
-                component="api",
-                bugsink_dsn=cfg.observability.bugsink.dsn.get_secret_value(),
-                bugsink_environment=cfg.observability.bugsink.environment,
-                version=_progress_version(),
+            ensure_plugin_path(cfg.state_home)
+            ctx = root_context()
+            composer = Composer(
+                ctx,
+                profile="serve",
+                cfg=cfg,
+                base_entries_factory=lambda: compose_serve(cfg, config_path=config_path, app=app),
             )
-            instrument_fastapi_app(app)
-            app.state.cfg = cfg
-
-            set_git_proxy(cfg.github.proxy)
-            session_ctx = session_factory(proxy=cfg.github.proxy or None)
-            session = await session_ctx.__aenter__()
-            app.state.session = session
-            app.state.session_ctx = session_ctx
+            composer.set_config_path(config_path)
+            await composer.mount_initial()
+            app.state.ctx = ctx
+            app.state.composer = composer
+            _install_sighup(composer)
+            watcher = _maybe_dev_plugin_watch(ctx, cfg)
+            try:
+                yield
+            finally:
+                if watcher is not None:
+                    await watcher.stop()
+                _remove_sighup()
+                await composer.dispose()
         except Exception as e:
             logger.exception("api lifespan startup failed")
             with suppress(Exception):
                 sentry_sdk.capture_exception(e)
-            if session is not None:
-                await session.close()
-            await close_db()
             raise
-        try:
-            yield
-        finally:
-            if session is not None:
-                try:
-                    await app.state.session_ctx.__aexit__(None, None, None)
-                except Exception as e:
-                    logger.warning("api session close failed: %s", e)
-                    report_severe(e)
-            shutdown_observability()
-            await close_db()
 
     return _lifespan
 

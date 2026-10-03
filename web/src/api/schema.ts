@@ -317,7 +317,7 @@ export interface paths {
         put?: never;
         /**
          * Reload Config
-         * @description Re-read DB-stored core config and refresh ``app.state.cfg``.
+         * @description L0 + L1: re-merge layered config, restart affected rows, recompose.
          */
         post: operations["reload_config_api_v1_config_reload_post"];
         delete?: never;
