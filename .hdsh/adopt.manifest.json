@@ -49,11 +49,7 @@
     "docs/i18n/translation-rules.md": "58c1664159dd1d2c77c3db8718d49f0eb2118e2e794c469debee4f660d822d6d",
     "docs/i18n/translation-rules.zh.md": "17ddc0a570e8348b4539f7988e428c6601725b3b39dbb0c61d7ef5c3b7b2ce9e"
   },
-  "editable": [
-    "docs/architecture.md",
-    "docs/architecture.zh.md",
-    "docs/development.zh.md"
-  ],
+  "editable": [],
   "pendingMerges": [
     "AGENTS.md",
     "docs/AGENTS.md"
