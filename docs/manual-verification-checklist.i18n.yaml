@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record docs/manual-verification-checklist.md
-manual-verification-checklist.md: e675a54cf2ddf35558e8583cb25268b067ccf95a
+manual-verification-checklist.md: e85198f197a1118f6fc1f624e47ebc25495f298e
 manual-verification-checklist.zh.md: 65676c8d8135f3a572f0bf82d3247694ae748667

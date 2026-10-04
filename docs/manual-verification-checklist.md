@@ -35,7 +35,7 @@ cd web && pnpm dev          # http://localhost:5173
 
 **Verify:** backend log says `Application startup complete`; opening `http://localhost:5173/` loads the reports page without errors.
 
-> Tip: to fully reset mid-test, delete the scratch `data_dir` and restart the > backend — the first run re-seeds from `config.toml`.
+> Tip: to fully reset mid-test, delete the scratch `data_dir` and restart the backend — the first run re-seeds from `config.toml`.
 
 ---
 
