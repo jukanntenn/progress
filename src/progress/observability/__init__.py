@@ -20,13 +20,14 @@ package, so we bind stdlib logging eagerly before importing the submodule.
 
 from __future__ import annotations
 
+from contextlib import suppress
 import logging as _stdlib_logging
 from pathlib import Path
 
 import sentry_sdk
 
 from progress.observability.logging import configure_structlog
-from progress.observability.metrics import observe_span, observed, record_business_event
+from progress.observability.metrics import mark_span_outcome, observe_span, observed, record_business_event
 from progress.observability.scrub import scrub_event, scrub_secrets
 from progress.observability.telemetry import (
     instrument_fastapi_app,
@@ -81,6 +82,20 @@ def setup_observability(
     _initialized = True
 
 
+def report_severe(exc: BaseException) -> None:
+    """Best-effort Bugsink capture for a swallowed severe exception.
+
+    Policy (single source of truth): every caught exception is reported unless
+    the catch is provably part of the normal business-logic chain (probe /
+    multi-format try / filter / cleanup) — graceful degradation included.
+    Never raises; no-op when Bugsink is uninitialized (early startup) or
+    unconfigured (empty DSN). Events pass through ``before_send=scrub_event``
+    so secrets stay redacted.
+    """
+    with suppress(Exception):
+        sentry_sdk.capture_exception(exc)
+
+
 def shutdown_observability() -> None:
     """Flush + shutdown all observability subsystems."""
     global _initialized
@@ -96,9 +111,11 @@ def shutdown_observability() -> None:
 
 __all__ = [
     "instrument_fastapi_app",
+    "mark_span_outcome",
     "observe_span",
     "observed",
     "record_business_event",
+    "report_severe",
     "scrub_event",
     "scrub_secrets",
     "setup_observability",

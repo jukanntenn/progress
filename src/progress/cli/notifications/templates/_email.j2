@@ -59,9 +59,11 @@ Light-tint background for a badge foreground color is looked up by name via
 </td>
 {%- endmacro -%}
 
-{# A 3-tile stats row. ``stats`` is a list of {label,value,bg,value_color}. #}
+{# A 3-tile stats row. ``stats`` is a list of {label,value,bg,value_color}.
+   ``table-layout:fixed`` makes the ``width="33%"`` cells exactly equal —
+   auto layout would let a long label widen its tile and squeeze neighbors. #}
 {%- macro stats_row(stats) -%}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:6px;margin:16px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0;">
   <tr>
   {%- for s in stats -%}
   {{ stat_tile(s.label, s.value, s.bg|default("grey"), s.value_color|default("")) }}
@@ -70,21 +72,18 @@ Light-tint background for a badge foreground color is looked up by name via
 </table>
 {%- endmacro -%}
 
-{# A list row: left weighted column (name + optional badge) + right small button.
-   Mirrors the Feishu ``column_set`` row (4:1 weight) with per-row background. #}
+{# A flat list row on a single tinted block: name (+ optional badge) with an
+   inline action link that hugs the name. Single-cell layout (no fixed 80/20
+   column split) so a long name never overflows the right edge in narrow
+   clients and the action never collides with the badge. #}
 {%- macro info_row(name, url="", badge_text="", badge_color="grey", action_url="", action_label="", row_bg="grey", link_color="") -%}
 {%- set rbg = BG_FOR_COLOR.get(row_bg, "#F7F8FA") if row_bg != "grey" else "#F7F8FA" -%}
 {%- set lc = ACCENT.get(link_color, link_color) if link_color else "#3370FF" -%}
 <tr>
-  <td width="80%" valign="middle" style="background-color:{{ rbg }};border-radius:8px;padding:10px 12px;font-size:14px;color:#1D2129;">
-    {%- if url -%}<a href="{{ url }}" style="color:{{ lc }};text-decoration:none;font-weight:600;">{{ name }}</a>{%- else -%}<span style="font-weight:600;">{{ name }}</span>{%- endif -%}
+  <td valign="middle" style="background-color:{{ rbg }};border-radius:8px;padding:10px 12px;font-size:14px;color:#1D2129;">
+    {%- if url -%}<a href="{{ url }}" style="color:{{ lc }};text-decoration:none;font-weight:600;word-break:break-all;">{{ name }}</a>{%- else -%}<span style="font-weight:600;word-break:break-all;">{{ name }}</span>{%- endif -%}
     {%- if badge_text %}　{{ badge(badge_text, badge_color) }}{% endif -%}
-  </td>
-  <td width="6"></td>
-  <td width="20%" valign="middle" align="right" style="background-color:{{ rbg }};border-radius:8px;padding:10px 12px;">
-    {%- if action_url and action_label -%}
-    <a href="{{ action_url }}" style="display:inline-block;padding:4px 12px;border-radius:5px;background-color:#FFFFFF;color:#3370FF;font-size:12px;text-decoration:none;border:1px solid #E5E6EB;">{{ action_label }}</a>
-    {%- endif -%}
+    {%- if action_url and action_label %}　<a href="{{ action_url }}" style="color:{{ lc }};text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;">{{ action_label }} →</a>{%- endif -%}
   </td>
 </tr>
 {%- endmacro -%}
@@ -92,7 +91,7 @@ Light-tint background for a badge foreground color is looked up by name via
 {# The full email document shell. ``caller()`` injects the body content.
    ``accent`` is a theme name (red/green/blue/indigo/wathet/turquoise).
    ``badge_text``/``badge_color`` render a header pill (e.g. FAILED 2, NEW 5). #}
-{%- macro email_shell(title, accent="blue", badge_text="", badge_color="blue", footer=None) -%}
+{%- macro email_shell(title, accent="blue", badge_text="", badge_color="blue", footer=None, generated_at="") -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -104,7 +103,7 @@ Light-tint background for a badge foreground color is looked up by name via
 <body style="margin:0;padding:0;background-color:#F2F3F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F2F3F5;">
   <tr><td align="center" style="padding:24px 12px;">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
       {# Header bar #}
       <tr>
         <td style="background-color:{{ _accent(accent) }};padding:20px 24px;">
@@ -124,7 +123,7 @@ Light-tint background for a badge foreground color is looked up by name via
       </td></tr>
       {# Footer #}
       <tr><td style="padding:14px 24px;border-top:1px solid #F2F3F5;background-color:#FAFBFC;">
-        <div style="font-size:12px;color:#86909C;">{{ footer if footer is not none else "⏱ " ~ _("Generated by Progress") }}</div>
+        <div style="font-size:12px;color:#86909C;text-align:center;line-height:1.5;">{% if footer is none %}{% set _progress_link = '<a href="https://github.com/jukanntenn/progress" style="color:#86909C;text-decoration:none;font-weight:600;">Progress</a>' %}{{ (_("Generated by %(progress)s · %(time)s") % {"progress": _progress_link, "time": generated_at}) | safe }}{% else %}{{ footer }}{% endif %}</div>
       </td></tr>
     </table>
   </td></tr>
@@ -133,11 +132,13 @@ Light-tint background for a badge foreground color is looked up by name via
 </html>
 {%- endmacro -%}
 
-{# A primary filled CTA button, full-width like the Feishu ``primary_filled`` button. #}
+{# A primary filled CTA button, full-width like the Feishu ``primary_filled`` button.
+   Uses ``display:block`` (not ``width:100%``) so padding is contained within the
+   block and the button never overflows the body cell's right edge (#8). #}
 {%- macro cta_button(url, label, accent="blue") -%}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0;">
   <tr><td align="center">
-    <a href="{{ url }}" style="display:block;width:100%;padding:12px 24px;border-radius:6px;background-color:{{ _accent(accent) }};color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;text-align:center;">{{ label }}</a>
+    <a href="{{ url }}" style="display:block;box-sizing:border-box;padding:12px 24px;border-radius:6px;background-color:{{ _accent(accent) }};color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;text-align:center;">{{ label }}</a>
   </td></tr>
 </table>
 {%- endmacro -%}

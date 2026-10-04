@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class Components:
     cfg: CoreConfig | None = None
     session: aiohttp.ClientSession | None = None
+    ai: Any = None
 
 
 @dataclass

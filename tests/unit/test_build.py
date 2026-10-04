@@ -8,18 +8,45 @@ from unittest.mock import patch
 
 from docker.build import (
     ALL_PLATFORMS,
+    DEFAULT_TAG,
     _resolve_owner_from_git,
     _resolve_registry,
     detect_host_platform,
+    resolve_git_sha,
     resolve_platforms,
+    resolve_tags,
 )
 import pytest
 
 
 def _make_args(**kwargs):
-    defaults = {"all_platforms": False, "platform": []}
+    defaults = {"all_platforms": False, "platform": [], "tags": []}
     defaults.update(kwargs)
     return Namespace(**defaults)
+
+
+class TestResolveTags:
+    def test_default_tag_is_main(self):
+        assert resolve_tags(_make_args()) == [DEFAULT_TAG]
+
+    def test_user_tags_appended_after_main(self):
+        assert resolve_tags(_make_args(tags=["v1.0.0"])) == ["main", "v1.0.0"]
+
+    def test_main_always_included_even_if_user_omits(self):
+        assert resolve_tags(_make_args(tags=["20260813"])) == ["main", "20260813"]
+
+    def test_duplicates_removed(self):
+        assert resolve_tags(_make_args(tags=["main", "main", "v1.0.0"])) == ["main", "v1.0.0"]
+
+
+class TestResolveGitSha:
+    def test_returns_head_sha(self):
+        with patch("subprocess.check_output", return_value="abc1234\n"):
+            assert resolve_git_sha() == "abc1234"
+
+    def test_unknown_on_failure(self):
+        with patch("subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "git")):
+            assert resolve_git_sha() == "unknown"
 
 
 class TestResolveRegistry:

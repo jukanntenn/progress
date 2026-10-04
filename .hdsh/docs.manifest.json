@@ -1,0 +1,11 @@
+{
+  "docBudgets": {
+    "AGENTS.md": 2600,
+    "web/AGENTS.md": 300,
+    "docs/AGENTS.md": 1100,
+    "docs/architecture.md": 400,
+    "docs/architecture.zh.md": 250,
+    "docs/development.md": 900,
+    "docs/development.zh.md": 700
+  }
+}

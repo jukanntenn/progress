@@ -49,11 +49,15 @@ async def app_client(tmp_state_home: str, tmp_path: Path, monkeypatch: pytest.Mo
 
     Auth is **disabled** for this fixture so the existing report/config/integration
     tests (which test non-auth concerns) don't each need to log in. Auth-specific
-    tests use the ``auth_client`` fixture instead.
+    tests use the ``auth_client`` fixture instead. The DB row is updated too so
+    that a ``POST /config/reload`` (which re-merges the DB core section) does
+    not flip ``auth.enabled`` back on.
     """
-    monkeypatch.setattr("progress.api.setup_observability", lambda *a, **kw: None)
-    monkeypatch.setattr("progress.api.shutdown_observability", lambda: None)
-    monkeypatch.setattr("progress.api.instrument_fastapi_app", lambda app: None)
+    monkeypatch.setattr("progress.runtime.telemetry.setup_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.flush_telemetry", lambda: None)
+    monkeypatch.setattr("progress.runtime.telemetry.configure_structlog", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.init_bugsink", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.webserver.instrument_fastapi_app", lambda app: None)
 
     config_path = tmp_path / "config.toml"
     config_path.write_text(f'state_home = "{tmp_state_home}"\n', encoding="utf-8")
@@ -62,6 +66,12 @@ async def app_client(tmp_state_home: str, tmp_path: Path, monkeypatch: pytest.Mo
     async with LifespanManager(app):
         # Disable auth post-startup so existing tests don't need login.
         app.state.cfg.auth.enabled = False
+        from progress.db import get_config, set_config  # noqa: PLC0415
+
+        core = await get_config("core")
+        if core:
+            core.setdefault("auth", {})["enabled"] = False
+            await set_config("core", core)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             yield app, client
@@ -76,9 +86,11 @@ async def auth_client(tmp_state_home: str, tmp_path: Path, monkeypatch: pytest.M
     ``_login(client)`` to get a token, or use the ``authed_client`` fixture
     which is already logged in.
     """
-    monkeypatch.setattr("progress.api.setup_observability", lambda *a, **kw: None)
-    monkeypatch.setattr("progress.api.shutdown_observability", lambda: None)
-    monkeypatch.setattr("progress.api.instrument_fastapi_app", lambda app: None)
+    monkeypatch.setattr("progress.runtime.telemetry.setup_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.flush_telemetry", lambda: None)
+    monkeypatch.setattr("progress.runtime.telemetry.configure_structlog", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.init_bugsink", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.webserver.instrument_fastapi_app", lambda app: None)
 
     config_path = tmp_path / "config.toml"
     config_path.write_text(f'state_home = "{tmp_state_home}"\n', encoding="utf-8")

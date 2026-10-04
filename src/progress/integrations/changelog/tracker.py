@@ -47,7 +47,7 @@ from progress.integrations.changelog.parsers import (
     apply_rule,
 )
 from progress.integrations.registry import register
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.http import retry_async
 from progress.utils.timezone import now_utc
 
@@ -135,6 +135,7 @@ class UniversalChangelogParser:
                     )
                 except Exception as e:
                     span.add_event("learned_rule_failed", {"reason": str(e)[:200]})
+                    report_severe(e)
                     record_business_event(
                         "progress.changelog.strategy_failed",
                         attributes={"strategy": "learned_rule", "reason": "error"},
@@ -173,6 +174,7 @@ class UniversalChangelogParser:
                     )
                 except Exception as e:
                     span.add_event("strategy_error", {"strategy": strategy_name, "error": str(e)[:200]})
+                    report_severe(e)
                     record_business_event(
                         "progress.changelog.strategy_failed",
                         attributes={"strategy": strategy_name, "reason": "error"},
@@ -205,6 +207,7 @@ class UniversalChangelogParser:
                         return versions
                 except Exception as e:
                     span.add_event("ai_rule_apply_failed", {"error": str(e)[:200]})
+                    report_severe(e)
             # last resort: use the AI-supplied versions directly
             result = [
                 ChangelogVersion(version=v.get("version", ""), description=v.get("description", ""))
@@ -240,6 +243,7 @@ class UniversalChangelogParser:
             result = await run_extraction(agent, prompt)
         except Exception as e:
             logger.warning("changelog AI structure analysis failed: %s", e)
+            report_severe(e)
             return ChangelogStructureAnalysis()
         if isinstance(result, ChangelogStructureAnalysis):
             return result
@@ -247,6 +251,7 @@ class UniversalChangelogParser:
             return ChangelogStructureAnalysis.model_validate(result)
         except Exception as e:
             logger.warning("changelog AI structure analysis parse failed: %s", e)
+            report_severe(e)
             return ChangelogStructureAnalysis()
 
 
@@ -407,12 +412,14 @@ class ChangelogIntegration:
         try:
             text = await self._fetch_text(session, tracker_row.url)
         except Exception as e:
+            report_severe(e)
             return ChangelogCheckResult(status="failed", error=str(e) or f"{type(e).__name__} (no message)")
 
         try:
             parser = UniversalChangelogParser(self._cfg)
             versions = await parser.parse(text, tracker_row.url, tracker_row)
         except Exception as e:
+            report_severe(e)
             return ChangelogCheckResult(status="failed", error=str(e) or f"{type(e).__name__} (no message)")
 
         if not versions:
@@ -479,6 +486,7 @@ class ChangelogIntegration:
             return ChangelogIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid changelog plugin config; using defaults: %s", e)
+            report_severe(e)
             return ChangelogIntegrationConfig()
 
     async def build_notification(

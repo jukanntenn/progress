@@ -1,0 +1,25 @@
+Your task: For each V2EX topic below, write a one-to-two sentence takeaway that captures what the topic is actually about (the core point a reader needs to decide whether to open it).
+
+Respond in {{ language }}.
+
+Topics to summarize:
+{% for p in posts %}
+- Index: {{ loop.index0 }}
+  Title: {{ p.title }}
+  Body: {{ p.body }}
+{% endfor %}
+CRITICAL FORMAT REQUIREMENTS:
+1. You MUST output ONLY a valid JSON object (no markdown, no code fences, no explanations, no text before or after the JSON).
+2. The JSON MUST contain exactly one key: "posts".
+3. This is a fully autonomous, non-interactive task. You MUST NOT ask questions, request permission, seek clarification, propose to write to files, invoke tools, or wait for user input. Produce the JSON immediately and exit.
+
+Required JSON structure:
+{
+  "posts": [
+    {"post_index": 0, "takeaway": "[one-to-two sentence plain-text takeaway in {{ language }}]"}
+  ]
+}
+
+Content requirements:
+- posts: one object per topic above, keyed by its "Index" (0-based position in the list above).
+- takeaway: one to two plain-text sentences in {{ language }} summarising the substantive content of the topic (e.g. for a job post: role, stack, location/remote, key requirements; for a project post: what it is, what it does, notable details). Do not pad, do not copy the title verbatim.

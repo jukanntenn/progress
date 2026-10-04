@@ -310,12 +310,19 @@ def parse_rst_fieldlist(text: str) -> dict[str, str]:
     Keys lowercased and spaces → underscores (``Last Call`` → ``last_call``).
     Continuation lines (indented) append to the previous field.
     Stops at the first blank line after any field is seen.
+
+    RST section titles are skipped per the docutils spec: a title is a text
+    line adorned by an underline (and optional overline) of repeated punctuation
+    (``=``/``-``/``~`` …). A title that happens to contain a colon (e.g.
+    ``DEP 0020: Annual Release Cycle``) must NOT be mistaken for a bare RFC822
+    field — doing so would set ``seen_any_field`` and the following blank line
+    would terminate parsing before the real ``:Status:`` field is reached.
     """
     lines = text.splitlines()[:_RST_FIELDLIST_MAX_LINES]
     fields: dict[str, str] = {}
     current_key: str | None = None
     seen_any_field = False
-    for line in lines:
+    for idx, line in enumerate(lines):
         if _RST_UNDERSCORE_RE.match(line.strip()):
             continue
         if not line.strip():
@@ -328,6 +335,20 @@ def parse_rst_fieldlist(text: str) -> dict[str, str]:
             continue
         match = _RST_FIELD_RE.match(line)
         if not match:
+            continue
+        # RST section title guard: a field-like line sandwiched between an
+        # overline (above) AND an underline (below) is a section title, not a
+        # field. The overline+underline adornment style is unambiguous per the
+        # docutils spec; an underline-only line after a field-like line may be a
+        # bare RFC822 field followed by an unrelated adornment, so it is not
+        # treated as a title. Skipping a real title here prevents it from
+        # setting seen_any_field and prematurely ending parsing before the real
+        # ``:Status:`` field. This is the docutils rule, not a per-file
+        # special-case: it applies to any RST proposal whose title contains a
+        # colon (e.g. ``DEP 0020: Annual Release Cycle``).
+        prev_line = lines[idx - 1] if idx > 0 else ""
+        next_line = lines[idx + 1] if idx + 1 < len(lines) else ""
+        if _RST_UNDERSCORE_RE.match(prev_line.strip()) and _RST_UNDERSCORE_RE.match(next_line.strip()):
             continue
         key = match.group("key").strip().lower().replace(" ", "_")
         value = match.group("value").strip()

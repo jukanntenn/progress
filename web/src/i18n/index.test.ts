@@ -67,11 +67,11 @@ describe('zh-Hans rendering (regression: the recurring "still English" bug)', ()
     // Allow the async init promise to settle.
     await new Promise((r) => setTimeout(r, 10))
     mod.default.changeLanguage(ZH_HANS)
-    // nav.config is "Configuration" in en.json and "配置" in zh-hans.json.
+    // auth.signIn is "Sign in" in en.json and "登录" in zh-hans.json.
     // If the resource key casing were wrong, this would return the English
     // string (the exact bug that recurred for months).
-    expect(mod.default.t('nav.config')).toBe(zhHans.nav.config)
-    expect(mod.default.t('nav.config')).not.toBe(en.nav.config)
+    expect(mod.default.t('auth.signIn')).toBe(zhHans.auth.signIn)
+    expect(mod.default.t('auth.signIn')).not.toBe(en.auth.signIn)
   })
 })
 

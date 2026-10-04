@@ -126,7 +126,7 @@ jobs:
           fail_ci_if_error: false
 
   drift-checks:
-    name: Drift checks (OpenAPI / types / i18n / migrations)
+    name: Drift + docs checks (OpenAPI / types / i18n / migrations / docs)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -157,6 +157,20 @@ jobs:
       - name: Drift checks (deptry / import-linter / OpenAPI / types / i18n / migrations)
         run: uv run python scripts/check_drift.py
 
+      # hdsh documentation gates over the full corpus (bilingual pairing /
+      # RFC format / wrap / links / word budgets / adoption completion) — the
+      # same commands the prek `hdsh` group runs locally, pinned to the ref
+      # prek.toml carries. Same local/CI parity as check_drift.
+      - name: Documentation gates (hdsh)
+        run: |
+          uv tool install "harness-deepseek-harness @ git+https://github.com/jukanntenn/harness-deepseek-harness@8684da520df25a446a10745063d40d72544d5653"
+          hdsh pairing verify
+          hdsh rfc verify
+          hdsh docs wrap
+          hdsh docs links
+          hdsh docs budgets
+          hdsh adopt verify
+
   docker-build:
     name: Docker image build (smoke)
     runs-on: ubuntu-latest
@@ -164,13 +178,16 @@ jobs:
     needs: [lint, typecheck, python-tests, frontend]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.13"
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
-        with:
-          enable-cache: true
-          cache-dependency-glob: uv.lock
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       # Build the image for the host platform only (no push) to confirm the
-      # Dockerfile is healthy. Push to GHCR happens in release.yml on tags.
-      - run: uv run python docker/build.py
+      # Dockerfile is healthy. Push happens in release.yml on tags, using the
+      # same official build-push-action.
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          tags: progress:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

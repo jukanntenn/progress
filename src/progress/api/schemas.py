@@ -72,6 +72,7 @@ class VersionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = "progress"
     version: str = "0.0.1"
+    git_sha: str = "unknown"
 
 
 class IntegrationSummary(BaseModel):

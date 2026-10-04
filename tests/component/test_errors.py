@@ -24,9 +24,11 @@ from progress.errors import (
 async def error_app_client(tmp_state_home: str, tmp_path, monkeypatch: pytest.MonkeyPatch):
     """App with routes that raise each exception type so we can verify the envelope."""
 
-    monkeypatch.setattr("progress.api.setup_observability", lambda *a, **kw: None)
-    monkeypatch.setattr("progress.api.shutdown_observability", lambda: None)
-    monkeypatch.setattr("progress.api.instrument_fastapi_app", lambda app: None)
+    monkeypatch.setattr("progress.runtime.telemetry.setup_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.flush_telemetry", lambda: None)
+    monkeypatch.setattr("progress.runtime.telemetry.configure_structlog", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.telemetry.init_bugsink", lambda *a, **kw: None)
+    monkeypatch.setattr("progress.runtime.webserver.instrument_fastapi_app", lambda app: None)
 
     config_path = tmp_path / "config.toml"
     config_path.write_text(f'state_home = "{tmp_state_home}"\n', encoding="utf-8")

@@ -117,3 +117,14 @@ trackers = ["eip", "erc", "pep", "rfc", "dep"]
 [feed]
 base_url = ""                         # Miniflux instance URL; empty → disabled
 api_key = ""                          # SecretStr; base_url set but empty → disabled
+
+# -----------------------------------------------------------------------------
+# [v2ex] — v2ex integration plugin config (spec 02/06)
+# -----------------------------------------------------------------------------
+# V2EX tab scraper + AI interest filter. Empty ``interest_profile`` → disabled
+# + warning (zero config). AI provider/model/api_key come from [core.analysis].
+[v2ex]
+base_url = "https://www.v2ex.com"
+interest_profile = ""                 # free-text; empty → disabled
+tabs = ["jobs", "creative"]           # valid: tech/creative/play/apple/jobs/deals/city/qna/hot/all/r2
+max_summaries = 8                     # 1..20, global top-K cap

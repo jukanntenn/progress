@@ -1,0 +1,2 @@
+# run profile layer: the one-shot pipeline tree (base + integrations + runner).
+# Rows mount from cli.core.run; structural overrides land here.

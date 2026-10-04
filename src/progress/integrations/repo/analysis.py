@@ -25,7 +25,7 @@ from progress.cli.ai import (
 from progress.cli.reports.prompts import render_prompt
 from progress.config.root import AnalysisConfig
 from progress.errors import ProgressException
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,7 @@ async def analyze_commit_diff(
         result = await _run_analysis(prompt, cfg, analysis_kind="commit_diff")
     except (ProgressException, Exception) as e:
         logger.warning("commit diff AI analysis failed for %s: %s", repo_name, e)
+        report_severe(e)
         record_business_event(
             "progress.repo.ai_failed",
             attributes={"repo": repo_name, "kind": "commit_diff", "reason": type(e).__name__},
@@ -196,6 +197,7 @@ async def analyze_release(
         result = await _run_analysis(prompt, cfg, analysis_kind="release", empty_marker="No release notes provided.")
     except (ProgressException, Exception) as e:
         logger.warning("release AI analysis failed for %s @ %s: %s", repo_name, tag, e)
+        report_severe(e)
         record_business_event(
             "progress.repo.ai_failed",
             attributes={"repo": repo_name, "kind": "release", "reason": type(e).__name__},
@@ -230,6 +232,7 @@ async def analyze_readme(
         result = await _run_analysis(prompt, cfg, analysis_kind="readme")
     except (ProgressException, Exception) as e:
         logger.warning("README AI analysis failed for %s: %s", repo_name, e)
+        report_severe(e)
         record_business_event(
             "progress.repo.ai_failed",
             attributes={"repo": repo_name, "kind": "readme", "reason": type(e).__name__},

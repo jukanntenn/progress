@@ -11,16 +11,28 @@ returns an empty :class:`~progress.integrations.base.RunResult`.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class FeedIntegrationConfig(BaseModel):
     """Top-level config for the ``feed`` integration (spec feed §3)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"ui_group": "integrations", "ui_order": 120},
+    )
 
-    base_url: str = ""
-    api_key: SecretStr = SecretStr("")
+    base_url: str = Field(
+        default="",
+        title="Miniflux Base URL",
+        description="Base URL of the Miniflux instance. Leave empty to disable the feed integration.",
+        examples=["https://miniflux.example.com"],
+    )
+    api_key: SecretStr = Field(
+        default=SecretStr(""),
+        title="Miniflux API Key",
+        description="API key for accessing the Miniflux API.",
+    )
 
 
 __all__ = ["FeedIntegrationConfig"]

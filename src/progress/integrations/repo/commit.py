@@ -40,7 +40,7 @@ from progress.cli.git import (
     unshallow,
 )
 from progress.errors import GitException, ProgressException
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +101,9 @@ async def clone_or_fetch(
         try:
             await _fetch_and_reset(dest)
             return
-        except CorruptHeadError:
+        except CorruptHeadError as e:
             logger.warning("corrupt HEAD detected for %s; recloning", ref.slug)
+            report_severe(e)
             await _remove_tree(dest)
     last_error: Exception | None = None
     for attempt in range(CLONE_RETRIES):
@@ -170,6 +171,7 @@ async def _fetch_and_reset(dest: Path) -> None:
                     dest.name,
                     e,
                 )
+                report_severe(e)
                 record_business_event(
                     "progress.git.unshallow_failed",
                     attributes={"repo": dest.name, "reason": type(e).__name__},

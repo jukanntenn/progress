@@ -9,6 +9,10 @@ class ConfigException(ProgressException):
     """Raised when configuration loading or validation fails."""
 
 
+class DBUnavailableException(ProgressException):
+    """Raised when the database cannot be opened or written (path, permissions, disk)."""
+
+
 class GitException(ProgressException):
     """Raised when git operations (clone/fetch/diff) fail."""
 

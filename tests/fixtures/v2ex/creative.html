@@ -1,0 +1,2356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta name="Content-Type" content="text/html;charset=utf-8">
+    <meta name="Referrer" content="unsafe-url">
+    <meta content="True" name="HandheldFriendly">
+
+    <meta name="theme-color" content="#ffffff">
+
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="detectify-verification" content="d0264f228155c7a1f72c3d91c17ce8fb" />
+<meta name="p:domain_verify" content="b87e3b55b409494aab88c1610b05a5f0"/>
+<meta name="alexaVerifyID" content="OFc8dmwZo7ttU4UCnDh1rKDtLlY" />
+<meta name="baidu-site-verification" content="D00WizvYyr" />
+<meta name="msvalidate.01" content="D9B08FEA08E3DA402BF07ABAB61D77DE" />
+<meta property="wb:webmaster" content="f2f4cb229bda06a4" />
+<meta name="google-site-verification" content="LM_cJR94XJIqcYJeOCscGVMWdaRUvmyz6cVOqkFplaU" />
+<meta name="wwads-cn-verify" content="c8ffe9a587b126f152ed3d89a146b445" />
+<script type="text/javascript" src="https://cdn.wwads.cn/js/makemoney.js" async></script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5060390720525238"
+     crossorigin="anonymous"></script>
+
+    <title>V2EX</title>
+    <link rel="dns-prefetch" href="https://static.v2ex.com/" />
+<link rel="dns-prefetch" href="about:blank" />
+<link rel="dns-prefetch" href="https://i.v2ex.co/" />
+<link rel="dns-prefetch" href="https://www.google-analytics.com/" />
+    <style>
+        body {
+            min-width: 820px;
+            font-family: "Helvetica Neue", "Luxi Sans", "Segoe UI", "Hiragino Sans GB", "Microsoft Yahei", sans-serif, "Apple Logo";
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" media="screen" href="/assets/eff83bb43f1b5b3b0e04c220ea510bee71884adf-combo.css?t=1786528200">
+
+    <script>
+        const SITE_NIGHT = 0;
+    </script>
+    <link rel="stylesheet" href="/static/css/vendor/tomorrow.css?v=3c006808236080a5d98ba4e64b8f323f" type="text/css">
+
+    <link rel="icon" sizes="192x192" href="/static/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon-180.png?v=91e795b8b5d9e2cbf2d886c3d4b7d63c">
+
+    <link rel="shortcut icon" href="/static/favicon.ico" type="image/png">
+
+
+    <meta property="og:image" content="/static/icon-192.png">
+    <meta name="twitter:image" content="/static/icon-192.png">
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script>
+        const LANG = 'zhcn';
+        const FEATURES = ['search', 'favorite-nodes-sort'];
+    </script>
+    <script src="/assets/30141b4224c26d638178029e4a0c11d896e2980c-combo.js?t=1786528200" defer></script>
+    <meta name="description" content="创意工作者的社区。讨论编程、设计、硬件、游戏等令人激动的话题。">
+
+    <link rel="alternate" type="application/atom+xml" href="/feed/tab/creative.xml">
+
+
+    <link rel="canonical" href="https://www.v2ex.com/">
+
+
+<script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function(event) {
+        protectTraffic();
+
+        const registerServiceWorker = async () => {
+    if ("serviceWorker" in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.register("/sw.js?v=1", {
+                scope: "/",
+            });
+            if (registration.installing) {
+                console.log("Service worker installing");
+            } else if (registration.waiting) {
+                console.log("Service worker installed");
+            } else if (registration.active) {
+                console.log("Service worker active");
+            }
+        } catch (error) {
+            console.error(`Registration failed with ${error}`);
+        }
+    }
+};
+
+// registerServiceWorker();
+
+        // $("#nodes-sidebar").sortable();
+        // $("#nodes-sidebar").disableSelection();
+        $("#nodes-sidebar").sortable({
+            stop: function(event, ui) {
+                let sorted = $("#nodes-sidebar").sortable( "serialize", {key: "n"});
+                $.post('/my/nodes/sorted', {sorted: sorted}, function(data) {});
+            }
+        });
+
+        const topicLinks = document.getElementsByClassName('topic-link');
+const moreLinks = document.getElementsByClassName('count_livid');
+const orangeLinks = document.getElementsByClassName('count_orange');
+// merge non-duplicate arrays
+const links = Array.from(new Set([...topicLinks, ...moreLinks, ...orangeLinks]));
+for (link in links) {
+    let aLink = links[link];
+    if (aLink === undefined) {
+        continue;
+    }
+    if (!aLink.hasAttribute || !aLink.hasAttribute('href')) {
+        continue;
+    }
+    let href = aLink.getAttribute('href');
+    if (href && href.startsWith('/t/')) {
+        // href is something like "/t/1234#reply567"
+        const topicID = href.split('/')[2].split('#')[0];
+        const key = "tp" + topicID;
+        const value = lscache.get(key);
+        if (value) {
+            const anchor = href.split('#')[1];
+            const newHref = "/t/" + topicID + "?p=" + value + "#" + anchor;
+            aLink.setAttribute('href', newHref);
+            console.log("Set p for topic " + topicID + " to " + value + ": " + newHref);
+        }
+    }
+}
+
+
+    });
+</script>
+
+
+</head>
+<body>
+
+
+    <div id="Top">
+        <div class="content">
+            <div class="site-nav">
+                <a href="/" name="top" title="way to explore"><div id="Logo"></div></a>
+                <div id="search-container">
+                    <input id="search" type="text" maxlength="128" autocomplete="off" tabindex="1">
+                    <div id="search-result" class="box"></div>
+                </div>
+                <div class="tools" >
+
+                    <a href="/" class="top">首页</a>
+                    <a href="/signup" class="top">注册</a>
+                    <a href="/signin" class="top">登录</a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="Wrapper">
+        <div class="content">
+
+            <div id="Leftbar"></div>
+            <div id="Rightbar">
+                <div class="sep20"></div>
+
+
+                    <div class="box">
+                        <div class="cell">
+                            <strong>V2EX = way to explore</strong>
+                            <div class="sep5"></div>
+                            <span class="fade">V2EX 是一个关于分享和探索的地方</span>
+                        </div>
+                        <div class="inner">
+                            <div class="sep5"></div>
+                            <div align="center"><a href="/signup" class="super normal button">现在注册</a>
+                            <div class="sep5"></div>
+                            <div class="sep10"></div>
+                            已注册用户请 &nbsp;<a href="/signin">登录</a></div>
+                        </div>
+                    </div>
+
+
+
+
+
+                    <div class="sep20"></div>
+                    <div class="box" id="pro-campaign-container">
+    <!-- Campaign content will be loaded here -->
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function safeHttpsUrl(url) {
+        if (url === null || url === undefined) return '';
+        var value = String(url);
+        if (!/^https:\/\//i.test(value)) return '';
+        try {
+            var parsed = new URL(value);
+            if (parsed.protocol !== 'https:') return '';
+            return parsed.href;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function safeMemberUsername(username) {
+        if (username === null || username === undefined) return '';
+        username = String(username);
+        if (!/^[A-Za-z0-9_-]+$/.test(username)) return '';
+        return username;
+    }
+
+    function bindCampaignLinks(container) {
+        var items = container.querySelectorAll('[data-pro-link]');
+        for (var i = 0; i < items.length; i++) {
+            items[i].addEventListener('click', function() {
+                var link = this.getAttribute('data-pro-link');
+                if (link) {
+                    window.open(link, '_blank', 'noopener');
+                }
+            });
+        }
+    }
+
+    function renderCampaign(campaign) {
+        let html = '';
+        let displayFormat = campaign.display_format || 'text-only';
+        let linkUrl = safeHttpsUrl(campaign.link);
+        if (!linkUrl) return '';
+
+        let title = escapeHtml(campaign.title);
+        let description = escapeHtml(campaign.description);
+        let callToAction = escapeHtml(campaign.call_to_action);
+        let link = escapeHtml(linkUrl);
+        let imgSmallUrl = safeHttpsUrl(campaign.img_small_url);
+        let imgBannerUrl = safeHttpsUrl(campaign.img_banner_url);
+        let imgBigUrl = safeHttpsUrl(campaign.img_big_url);
+        let memberUsername = safeMemberUsername(campaign.member && campaign.member.username);
+        let promotedBy = memberUsername ? `Promoted by <a href="/member/${encodeURIComponent(memberUsername)}" target="_blank" rel="noopener noreferrer">${escapeHtml(memberUsername)}</a>` : 'Promoted by V2EX member';
+
+        if (displayFormat === 'small-with-description' && !imgSmallUrl) {
+            displayFormat = 'text-only';
+        } else if (displayFormat === 'banner-only' && !imgBannerUrl) {
+            displayFormat = 'text-only';
+        } else if ((displayFormat === 'big-only' || displayFormat === 'big-with-description' || displayFormat === 'big-with-title-description-button') && !imgBigUrl) {
+            displayFormat = 'text-only';
+        }
+
+        html = `<div class="pro-unit-title">${title}</div>`;
+        switch(displayFormat) {
+            case 'text-only':
+                html += `
+                    <div class="pro-unit">
+                    <div class="pro-unit-description flex-one-row gap10">
+                        <div data-pro-link="${link}">${description}</div>
+                        <div><a href="${link}" class="pro-unit-go" target="_blank" rel="noopener noreferrer">›</a>
+                        </div>
+                    </div>
+                    </div>
+                `;
+                break;
+
+            case 'small-with-description':
+                html += `<div class="pro-unit flex-one-row">
+                    ${imgSmallUrl ? `<div class="pro-unit-small-image">
+                        <a href="${link}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(imgSmallUrl)}" class="pro-unit-img" style="max-width: 130px; max-height: 100px;" alt="" /></a>
+                    </div>` : ''}
+                    <div data-pro-link="${link}" class="pro-unit-description">${description}</div>
+                </div>`;
+                break;
+
+            case 'banner-only':
+                html += `<div class="cell"><a href="${link}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(imgBannerUrl)}" class="pro-unit-img" style="max-width: 250px; max-height: 60px; display: block; vertical-align: bottom;" alt="" /></a></div>`;
+                break;
+
+            case 'big-only':
+                html += `<div class="cell"><a href="${link}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(imgBigUrl)}" class="pro-unit-img" style="max-width: 500px; max-height: 500px; width: 100%; display: block; vertical-align: bottom;" alt="" /></a></div>`;
+                break;
+
+            case 'big-with-description':
+                html += `<div class="inner" style="padding-bottom: 0px;"><a href="${link}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(imgBigUrl)}" class="pro-unit-img" style="max-width: 500px; max-height: 500px; width: 100%; display: block; vertical-align: bottom;" alt="" /></a></div>`;
+                html += `<div class="pro-unit-description flex-one-row gap10">
+                    <div data-pro-link="${link}">${description}</div>
+                    <div><a href="${link}" class="pro-unit-go" target="_blank" rel="noopener noreferrer">›</a></div></div>`;
+                break;
+
+            case 'big-with-title-description-button':
+                html += `<div class="inner" style="padding-bottom: 0px;"><a href="${link}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(imgBigUrl)}" class="pro-unit-img" style="max-width: 500px; max-height: 500px; width: 100%; display: block; vertical-align: bottom;" alt="" /></a></div>`;
+                html += `<div class="pro-unit-description">
+                    <div style="text-align: center" data-pro-link="${link}">${description}</div>
+                    </div>`;
+                html += `<div class="pro-unit-cta-container"><a href="${link}" target="_blank" rel="noopener noreferrer" class="pro-unit-cta">${callToAction}</a></div>`;
+                break;
+
+            default:
+                html += `
+                    <div class="pro-unit-description flex-one-row gap10">
+                        <div data-pro-link="${link}">${description}</div>
+                        <div><a href="${link}" class="pro-unit-go" target="_blank" rel="noopener noreferrer">›</a></div>
+                    </div>
+                `;
+        }
+
+        html += `<div class="pro-unit-from flex-one-row gap10">
+        <div>${promotedBy}</div>
+        <div><a href="/pro/about" target="_blank" rel="noopener noreferrer" class="fade"><i class="fa fa-question-circle fade"></i> <span style="font-size: 12px; color: var(--color-fade)">PRO</span></a></div>
+        </div>`
+
+        return html;
+    }
+
+    // Load campaign from emitter
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/pro/emitter', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                try {
+                    var campaign = JSON.parse(xhr.responseText);
+                    if (campaign && campaign.id) {
+                        var html = renderCampaign(campaign);
+                        var container = document.getElementById('pro-campaign-container');
+                        if (html) {
+                            container.innerHTML = html;
+                            bindCampaignLinks(container);
+                        } else {
+                            container.style.display = 'none';
+                        }
+                    } else {
+                        document.getElementById('pro-campaign-container').style.display = 'none';
+                    }
+                } catch (e) {
+                    document.getElementById('pro-campaign-container').style.display = 'none';
+                    console.log('Error parsing campaign data: ' + e.message);
+                }
+            } else {
+                document.getElementById('pro-campaign-container').style.display = 'none';
+                console.log('Error loading campaign: HTTP ' + xhr.status);
+            }
+        }
+    };
+
+    xhr.send();
+});
+</script>
+                    <div class="sep20"></div>
+
+
+
+
+
+
+
+
+<div class="box" id="TopicsHot">
+    <div class="cell"><span class="fade">今日热议主题</span></div>
+
+    <div class="cell from_816707 hot_t_1233726">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_001"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233726">底层人为什么完不成原始资本积累？</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_721071 hot_t_1233790">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_002"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233790">父母一直逼我买房怎么办</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_625590 hot_t_1233659">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_003"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233659">其实减肥真的没有那么难，能量守恒是肯定的</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_541648 hot_t_1233735">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_004"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233735">闲聊，感觉 MacbookPro M1Pro 还是很能打，这都过去 5 年了</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_795362 hot_t_1233776">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_005"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233776">除了 V2 你们还去哪里逛啊？</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_608620 hot_t_1233712">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_006"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233712">回首来看，当年学的诗词甚是充满力量与哲理，最爱哪一句？</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_206872 hot_t_1233675">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_007"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233675">吃了 5 6 7 次饭了，还没有牵上手，继续吗</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_578566 hot_t_1233831">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_008"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233831">我家先生快生日了，求建议</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_177214 hot_t_1233787">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_009"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233787">有人懂风水吗？ 领居入户门比我家高</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="cell from_434804 hot_t_1233711">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+            <td width="24" valign="middle" align="center">
+                <a href="/member/user_010"><img src="about:blank" class="avatar" border="0" align="default" width="24" style="width: 24px; max-height: 24px;" alt="avatar" data-uid="0" /></a>
+            </td>
+            <td width="10"></td>
+            <td width="auto" valign="middle">
+                <span class="item_hot_topic_title">
+                <a href="/t/1233711">岚图追光 S 的视频评论区根本没法看，全是米粉攻城掠地</a>
+                </span>
+            </td>
+        </tr>
+    </table>
+    </div>
+
+</div>
+<div class="sep20"></div>
+<div class="box">
+    <div class="cell"><div class="fr"></div><span class="fade">最热节点</span></div>
+    <div class="cell">
+        <a href="/go/qna" class="item_node">问与答</a><a href="/go/programmer" class="item_node">程序员</a><a href="/go/jobs" class="item_node">酷工作</a><a href="/go/share" class="item_node">分享发现</a><a href="/go/create" class="item_node">分享创造</a><a href="/go/apple" class="item_node">Apple</a><a href="/go/career" class="item_node">职场话题</a><a href="/go/macos" class="item_node">macOS</a><a href="/go/bb" class="item_node">宽带症候群</a><a href="/go/python" class="item_node">Python</a><a href="/go/promotions" class="item_node">推广</a><a href="/go/iphone" class="item_node">iPhone</a><a href="/go/android" class="item_node">Android</a><a href="/go/life" class="item_node">生活</a><a href="/go/gts" class="item_node">全球工单系统</a>
+    </div>
+    <div class="inner"><a href="/index.xml" target="_blank"><img src="/static/img/rss@2x.png" align="absmiddle" border="0" style="margin-top:-3px; width: 16px;" /></a>&nbsp; <a href="/index.xml" target="_blank">RSS</a>&nbsp;
+    <a href="https://blog.v2ex.com/rss/" target="_blank"><li class="fa fa-question-circle gray"></li></a>
+    </div>
+</div>
+
+<div class="sep20"></div>
+<div class="box">
+    <div class="cell flex-one-row" style="gap: 10px;">
+        <img src="/static/img/flat_internet.png" width="18" align="absmiddle" alt="avatar" />
+        <strong style="font-family: 'Press Start 2P'; font-size: 10px; font-weight: normal;"><a href="/xna">VXNA</a></strong>
+        <span class="chevron">›</span>
+        <span style="flex: 1;">Site of the Day</span>
+    </div>
+    <div class="cell flex-one-row" style="gap: 5px;">
+        <div style="flex: 1;" class="f16"><a href="https://www.linggandianbo.com/" target="_blank">灵感电波</a></div>
+        <span class="f12 fade">68 篇文章</span>
+        <a href="https://www.linggandianbo.com/tag/newsletter/rss/" target="_blank"><img src="/static/img/rss@2x.png" width="16" style="display: block" alt="feed address" border="0" /></a>
+    </div>
+</div>
+
+<div class="sep20"></div>
+<div class="box">
+    <div class="cell"><div class="fr"></div><span class="fade">最近新增节点</span></div>
+    <div class="cell">
+        <a href="/go/glm" class="item_node">智谱</a><a href="/go/stocktrading" class="item_node">炒股</a><a href="/go/pdd" class="item_node">拼多多</a><a href="/go/usa" class="item_node">美国</a><a href="/go/oldschoolprogramming" class="item_node">古法编程</a><a href="/go/proxyrovider" class="item_node">机场</a><a href="/go/openrouter" class="item_node">中转站</a><a href="/go/grok" class="item_node">grok</a><a href="/go/happy" class="item_node">快乐</a><a href="/go/solmet" class="item_node">solmet</a><a href="/go/ollama" class="item_node">Ollama</a><a href="/go/uschina" class="item_node">中美两栖</a><a href="/go/quant" class="item_node">量化交易</a><a href="/go/malaysia" class="item_node">马来西亚</a><a href="/go/airport" class="item_node">机场</a><a href="/go/prompts" class="item_node">分享提示词</a><a href="/go/ai2you" class="item_node">Ai2You智友社</a><a href="/go/voila" class="item_node">🎙 Voilà 接管你的嘴</a><a href="/go/servercc" class="item_node">ServerCC</a><a href="/go/harness" class="item_node">Harness</a>
+    </div>
+    <div class="inner flex-one-row gap10">
+        <span>✨</span>
+        <a href="/node/create">创建一个新节点</a>
+        <div class="spacer"></div>
+        <div><a href="/help/node-treasury"><i class="fa fa-question-circle"></i></a></div>
+    </div>
+</div>
+
+<div class="sep"></div>
+<div class="box">
+    <div class="cell"><span class="gray">Word of the Day</span></div>
+    <div class="inner">
+        <span style="font-family: serif; font-size: 16px; font-weight: 500;"><a href="/d/camera body">camera body</a></span>
+    </div>
+</div>
+
+<div class="sep20"></div>
+<div class="box">
+    <div class="cell"><span class="fade">社区运行状况</span></div>
+    <div class="cell">
+        <table cellpadding="5" cellspacing="0" border="0" width="100%">
+            <tr>
+                <td width="60" align="right"><span class="gray">注册会员</span></td>
+                <td width="auto" align="left"><strong>837,945</strong></td>
+            </tr>
+            <tr>
+                <td width="60" align="right"><span class="gray">主题</span></td>
+                <td width="auto" align="left"><strong>1,233,906</strong></td>
+            </tr>
+            <tr>
+                <td width="60" align="right"><span class="gray">回复</span></td>
+                <td width="auto" align="left"><strong>17,967,416</strong></td>
+            </tr>
+        </table>
+    </div>
+    <!--
+    <div class="inner">
+        <span class="chevron">›</span> <a href="/top/rich">财富排行榜</a>
+        <div class="sep5"></div>
+        <span class="chevron">›</span> <a href="/top/player">消费排行榜</a>
+    </div>
+    -->
+</div>
+<div class="sep20"></div>
+
+
+            </div>
+            <div id="Main">
+                <div class="sep20"></div>
+
+<div class="box">
+    <div class="inner" id="Tabs"><a href="/?tab=tech" class="tab">技术</a><a href="/?tab=creative" class="tab_current">创意</a><a href="/?tab=play" class="tab">好玩</a><a href="/?tab=apple" class="tab">Apple</a><a href="/?tab=jobs" class="tab">酷工作</a><a href="/?tab=deals" class="tab">交易</a><a href="/?tab=city" class="tab">城市</a><a href="/?tab=qna" class="tab">问与答</a><a href="/?tab=hot" class="tab">最热</a><a href="/?tab=all" class="tab">全部</a><a href="/?tab=r2" class="tab">R2</a><a href="/xna" class="tab">VXNA</a>&nbsp;<a href="/planet"><img src="/static/img/planet/planet128.png?v=129f466d599bcd3bcb3d7a191f11a2be" align="absmiddle" style="height: 20px;" /></a></div>
+    <div class="cell" id="SecondaryTabs"><div class="fr"><a href="/new/create">发布我的新作品</a></div><a href="/go/create">分享创造</a> &nbsp; &nbsp; <a href="/go/design">设计</a> &nbsp; &nbsp; <a href="/go/ideas">奇思妙想</a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_011"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233736#reply14" class="topic-link" id="topic-link-1233736">陪娃做了个「启蒙小超市」小游戏，顺便体验了一下 AI Coding 开发</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_011">user_011</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:54:36 +08:00">4 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_012">user_012</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233736#reply14" class="count_livid">14</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_013"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233842#reply6" class="topic-link" id="topic-link-1233842">写了个桌面应用「懒蚂蚁」， Skill 驱动写作，一键发布多平台</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_013">user_013</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:35:00 +08:00">24 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_013">user_013</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233842#reply6" class="count_livid">6</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_014"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233812#reply15" class="topic-link" id="topic-link-1233812">做了个"说(hu)服(nong)小朋友", 扫描肚子的小页面</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_014">user_014</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:25:19 +08:00">34 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_014">user_014</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233812#reply15" class="count_livid">15</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_015"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233813#reply4" class="topic-link" id="topic-link-1233813">[VibeCode] 2022 年底 3 个月开发了一版本邮件编辑器， Claude Code + Gemini 一周实现完成，效果还更好</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_015">user_015</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:17:23 +08:00">41 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_015">user_015</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233813#reply4" class="count_livid">4</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_016"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233896#reply0" class="topic-link" id="topic-link-1233896">个人开发者做的两个 Chrome 小扩展（基金估值 / 金价），欢迎试用</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_016">user_016</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:12:28 +08:00">46 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div style="border-bottom: 1px solid var(--box-border-color);">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5060390720525238"
+        crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display: block; height: 72px;"
+     data-ad-format="fluid"
+     data-ad-layout-key="-hs-19-p-2z+is"
+     data-ad-client="ca-pub-5060390720525238"
+     data-ad-slot="1009394990"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_017"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233841#reply2" class="topic-link" id="topic-link-1233841">分享一个 Linux 界面下的输入法中英文指示器</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_017">user_017</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:05:40 +08:00">53 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_018">user_018</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233841#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_019"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233890#reply1" class="topic-link" id="topic-link-1233890">网页版 CS 起源，欢迎体验</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"><li class="fa fa-chevron-up"></li> &nbsp;1 &nbsp;&nbsp; </div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_019">user_019</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:04:50 +08:00">54 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_020">user_020</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233890#reply1" class="count_livid">1</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_021"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233889#reply1" class="topic-link" id="topic-link-1233889">开源分享 HollyMusic，家庭适用的在线听歌服务， star 可否？</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_021">user_021</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:10:58 +08:00">48 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_021">user_021</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233889#reply1" class="count_livid">1</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_022"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233876#reply2" class="topic-link" id="topic-link-1233876">ZKE：把 Kubernetes 多集群控制台做成 macOS 风格的 Web Desktop</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_022">user_022</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 16:37:16 +08:00">1 小时 22 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_022">user_022</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233876#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_023"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233885#reply2" class="topic-link" id="topic-link-1233885">写了个解压的刮蜡游戏，欢迎体验！</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_023">user_023</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 16:58:11 +08:00">1 小时 1 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_023">user_023</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233885#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_024"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233864#reply0" class="topic-link" id="topic-link-1233864">[iOS/MacOS 送码] Somio2.1 发布：一款专上下滑动随机浏览照片和视频的回顾管理 App</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_024">user_024</a></strong> &nbsp;<div class="badges"><div class="badge pro">PRO</div></div> &nbsp;•&nbsp; <span title="2026-08-12 15:51:18 +08:00">2 小时 8 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_025"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233850#reply25" class="topic-link" id="topic-link-1233850">[iOS/watchOS 送码] Do? 1.1.0 发布：一款专注隐私与数据可视化的 iOS / watchOS 亲密（性）记录 App</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_025">user_025</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 16:40:41 +08:00">1 小时 18 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_025">user_025</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233850#reply25" class="count_livid">25</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div style="border-bottom: 1px solid var(--box-border-color);">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5060390720525238"
+        crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display: block; height: 72px;"
+     data-ad-format="fluid"
+     data-ad-layout-key="-hs-19-p-2z+is"
+     data-ad-client="ca-pub-5060390720525238"
+     data-ad-slot="1009394990"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_026"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233862#reply0" class="topic-link" id="topic-link-1233862">如果你也需要在手机上快速地从截屏生成笔记，那你可以来看看我写的这个小工具～</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_026">user_026</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 15:49:30 +08:00">2 小时 9 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_027"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233761#reply2" class="topic-link" id="topic-link-1233761">GoAIHop 联合几家 AI 中转站免费发放额度兑换码，注册即可兑换</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_027">user_027</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:35:54 +08:00">6 小时 23 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_028">user_028</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233761#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_029"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233837#reply1" class="topic-link" id="topic-link-1233837">做了一个面向程序员的 AI 简历工具，给 V 友准备了灰度优惠</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_029">user_029</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 14:48:54 +08:00">3 小时 10 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_029">user_029</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233837#reply1" class="count_livid">1</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_030"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233314#reply5" class="topic-link" id="topic-link-1233314">给自己做的一款浏览器标签页管理插件，免费+开源+纯本地（隐私友好），分享给大家</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_030">user_030</a></strong> &nbsp;•&nbsp; <span title="2026-08-11 12:03:28 +08:00">1 天前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_030">user_030</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233314#reply5" class="count_livid">5</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_031"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233762#reply6" class="topic-link" id="topic-link-1233762">一款免费、无广告、免登录的 iOS 专属工具 Timoney - 时间账本</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_031">user_031</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 14:29:14 +08:00">3 小时 30 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_032">user_032</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233762#reply6" class="count_livid">6</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_033"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233249#reply25" class="topic-link" id="topic-link-1233249">告别 TUI，将任意 CLI Agent 进行 Web 可视化访问</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_033">user_033</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 14:35:42 +08:00">3 小时 23 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_033">user_033</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233249#reply25" class="count_livid">25</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_034"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233698#reply14" class="topic-link" id="topic-link-1233698">做了个网站，将手机的照片实时同步到电脑指定的文件夹，不需要复杂的操作！</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_034">user_034</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:11:36 +08:00">47 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_034">user_034</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233698#reply14" class="count_livid">14</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_035"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1213097#reply68" class="topic-link" id="topic-link-1213097">OpenAgent：单文件版龙虾——仅有一个文件，双击就能跑的高性能 Agent</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_035">user_035</a></strong> &nbsp;<div class="badges"><div class="badge pro">PRO</div></div> &nbsp;•&nbsp; <span title="2026-08-12 09:54:38 +08:00">8 小时 4 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_036">user_036</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1213097#reply68" class="count_livid">68</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_037"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233822#reply0" class="topic-link" id="topic-link-1233822">上架了一个极简 chrome 标签页插件</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_037">user_037</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 13:44:05 +08:00">4 小时 15 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_038"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233809#reply2" class="topic-link" id="topic-link-1233809">借助 AI，我让 asyncmy 成为了最快的 Python MySQL/MariaDB 驱动</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_038">user_038</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 15:13:02 +08:00">2 小时 46 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_038">user_038</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233809#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div style="border-bottom: 1px solid var(--box-border-color);">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5060390720525238"
+        crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display: block; height: 72px;"
+     data-ad-format="fluid"
+     data-ad-layout-key="-hs-19-p-2z+is"
+     data-ad-client="ca-pub-5060390720525238"
+     data-ad-slot="1009394990"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_039"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233892#reply0" class="topic-link" id="topic-link-1233892">《积木拼图》，做了一个小游戏大家玩玩看</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_039">user_039</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 17:09:42 +08:00">49 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_040"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233744#reply0" class="topic-link" id="topic-link-1233744">无限空间画布工具</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_040">user_040</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:11:16 +08:00">7 小时 48 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_041"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233797#reply0" class="topic-link" id="topic-link-1233797">分享一个 vibe coding 的自用轻量级本地开发环境，占用内存很小。</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_041">user_041</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:50:26 +08:00">6 小时 8 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_042"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233795#reply0" class="topic-link" id="topic-link-1233795">做了一个让网页端大模型也能使用 Skill 和 MCP 的浏览器扩展</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_042">user_042</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:36:40 +08:00">6 小时 22 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_043"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1231049#reply75" class="topic-link" id="topic-link-1231049">用 AI 重做一遍：一个收集用户反馈的网页挂件</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"><li class="fa fa-chevron-up"></li> &nbsp;2 &nbsp;&nbsp; </div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_043">user_043</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:32:36 +08:00">6 小时 26 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_043">user_043</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1231049#reply75" class="count_livid">75</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_044"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233773#reply3" class="topic-link" id="topic-link-1233773">有没有互刷 github star 来蹭最近 gpt pro 的开源计划的</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_044">user_044</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:38:20 +08:00">6 小时 21 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_045">user_045</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233773#reply3" class="count_livid">3</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_022"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233573#reply3" class="topic-link" id="topic-link-1233573">做了一个不一样的桌面式 K8s 多集群控制台</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_022">user_022</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:17:35 +08:00">6 小时 41 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_046">user_046</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233573#reply3" class="count_livid">3</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_047"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233745#reply4" class="topic-link" id="topic-link-1233745">8.12 日全食，看不到咋办？用 3D 模拟一个！</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_047">user_047</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 14:36:02 +08:00">3 小时 23 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_047">user_047</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233745#reply4" class="count_livid">4</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_048"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233759#reply0" class="topic-link" id="topic-link-1233759">免费简历制作生成器，免费模板</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_048">user_048</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:31:42 +08:00">7 小时 27 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_049"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233757#reply0" class="topic-link" id="topic-link-1233757">做了一个 Claude 文本分析和重写工具，想请大家帮我看看这个思路靠不靠谱</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_049">user_049</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:29:48 +08:00">7 小时 29 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_050"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233738#reply0" class="topic-link" id="topic-link-1233738">去年做的策略 DSL，现在终于能给 Agent 用了</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_050">user_050</a></strong> &nbsp;<div class="badges"><div class="badge pro">PRO</div></div> &nbsp;•&nbsp; <span title="2026-08-12 09:59:21 +08:00">8 小时 0 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_051"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233732#reply0" class="topic-link" id="topic-link-1233732">做了个在线手柄检测网站，支持漂移和 Polling Rate 测试</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_051">user_051</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 09:49:46 +08:00">8 小时 9 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_052"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233796#reply0" class="topic-link" id="topic-link-1233796">🐱益智小游戏上线，欢迎体验游玩！</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_052">user_052</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 11:45:25 +08:00">6 小时 13 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_053"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233730#reply0" class="topic-link" id="topic-link-1233730">做了个插件，给标签页图标换配色</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_053">user_053</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 09:47:00 +08:00">8 小时 12 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_054"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233690#reply6" class="topic-link" id="topic-link-1233690">HowToWhistle：像唱 KTV 一样练习吹口哨</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_054">user_054</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 14:12:49 +08:00">3 小时 46 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_055">user_055</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233690#reply6" class="count_livid">6</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_056"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233346#reply157" class="topic-link" id="topic-link-1233346">重新掌握信息选择权， AI 原生 RSS 阅读器分享，送永久会员</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_056">user_056</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 16:16:39 +08:00">1 小时 42 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_056">user_056</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233346#reply157" class="count_livid">157</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_057"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233649#reply14" class="topic-link" id="topic-link-1233649">分享一个自用的 Mac 截图工具，把「截图后期处理」这件事顺手很多</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_057">user_057</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 09:31:09 +08:00">8 小时 28 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_058">user_058</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233649#reply14" class="count_livid">14</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_045"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233725#reply0" class="topic-link" id="topic-link-1233725">codex-oss/helper</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_045">user_045</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 09:43:02 +08:00">8 小时 16 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_059"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233658#reply8" class="topic-link" id="topic-link-1233658">我写了一个小工具：同一问题让多个 AI 并排回答，数据留在本地，买断制不订阅</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_059">user_059</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:42:55 +08:00">7 小时 16 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_060">user_060</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233658#reply8" class="count_livid">8</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_061"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233686#reply0" class="topic-link" id="topic-link-1233686">Panerelay 0.10：用浏览器登录态做 Fetch，也能 Connect 现有标签页</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_061">user_061</a></strong> &nbsp;•&nbsp; <span title="2026-08-11 23:29:57 +08:00">18 小时 29 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_062"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233678#reply2" class="topic-link" id="topic-link-1233678">推荐一个我做的开源版 WorkBuddy，请大家品鉴一下</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_062">user_062</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 12:40:27 +08:00">5 小时 18 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_062">user_062</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233678#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_063"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233677#reply2" class="topic-link" id="topic-link-1233677">用 Antigravity Vibe 了个免费无限玩的地理猜图站，全球 Street View 随机降落</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_063">user_063</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 12:02:07 +08:00">5 小时 57 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_063">user_063</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233677#reply2" class="count_livid">2</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_064"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233153#reply251" class="topic-link" id="topic-link-1233153">给女儿做了一个 3D 史前动物博物馆，收录 18 种史前动物，免费开源，也分享给 V 友～</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"><li class="fa fa-chevron-up"></li> &nbsp;25 &nbsp;&nbsp; </div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_064">user_064</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 15:46:23 +08:00">2 小时 12 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_011">user_011</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233153#reply251" class="count_livid">251</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_065"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233572#reply7" class="topic-link" id="topic-link-1233572">史前博物馆， vibe 一个汽车小博物馆</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_065">user_065</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:13:46 +08:00">7 小时 45 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_065">user_065</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233572#reply7" class="count_livid">7</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_066"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233648#reply7" class="topic-link" id="topic-link-1233648">部署了一台 H3，做了个免费视频的小工具（无需注册</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_066">user_066</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 10:27:25 +08:00">7 小时 31 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_066">user_066</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233648#reply7" class="count_livid">7</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_067"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233585#reply8" class="topic-link" id="topic-link-1233585">twitter 上看到一网站挺有意思的效果，注视鼠标的小黄狗，复刻了下便于集成到自己网站</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_067">user_067</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 08:07:37 +08:00">9 小时 51 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_067">user_067</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233585#reply8" class="count_livid">8</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_068"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233668#reply0" class="topic-link" id="topic-link-1233668">playlistnameai.org｜一个免费 AI 歌单起名网页工具</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_068">user_068</a></strong> &nbsp;•&nbsp; <span title="2026-08-11 21:00:52 +08:00">20 小时 58 分钟前</span></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="cell item" style="">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+
+            <td width="48" valign="top" align="center"><a href="/member/user_069"><img src="about:blank" class="avatar" border="0" align="default" width="48" style="width: 48px; max-height: 48px;" alt="avatar" data-uid="0" /></a></td>
+            <td width="10"></td>
+
+            <td width="auto" valign="middle"><span class="item_title"><a href="/t/1233645#reply3" class="topic-link" id="topic-link-1233645">做了几年 App，最后还是觉得一个好用的录音器最重要</a></span>
+            <div class="sep5"></div>
+            <span class="topic_info"><div class="votes"></div><a class="node" href="/go/create">分享创造</a> &nbsp;•&nbsp; <strong><a href="/member/user_069">user_069</a></strong> &nbsp;•&nbsp; <span title="2026-08-12 12:25:17 +08:00">5 小时 34 分钟前</span> &nbsp;•&nbsp; 最后回复来自 <strong><a href="/member/user_070">user_070</a></strong></span>
+            </td>
+            <td width="70" align="right" valign="middle">
+
+                <a href="/t/1233645#reply3" class="count_livid">3</a>
+
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div style="border-bottom: 1px solid var(--box-border-color);">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5060390720525238"
+        crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display: block; height: 72px;"
+     data-ad-format="fluid"
+     data-ad-layout-key="-hs-19-p-2z+is"
+     data-ad-client="ca-pub-5060390720525238"
+     data-ad-slot="1009394990"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+
+
+
+    <div class="inner"><div class="fr"><a href="/feed/tab/creative.xml" target="_blank"><img src="/static/img/rss@2x.png" align="absmiddle" style="margin-top:-3px; width: 16px;" border="0" /></a>&nbsp; <a href="/feed/tab/creative.xml" target="_blank">通过 Atom Feed 订阅</a></div>
+        <span class="chevron">&raquo;</span> &nbsp;<a href="/recent">更多新主题</a>
+    </div>
+</div>
+
+<div class="sep20"></div>
+<div style="box-sizing: border-box"><div class="wwads-cn wwads-horizontal" data-id="98" style="max-width: 100%; padding-top: 10px; margin-top: 0px; text-align: left; box-shadow: 0 2px 3px rgb(0 0 0 / 10%); border-bottom: 1px solid var(--box-border-color); background-color: var(--box-background-color); color: var(--box-foreground-color);"></div></div>
+<style type="text/css">.wwads-cn { border-radius: 3px !important; } .wwads-text { color: var(--link-color) !important; }</style>
+
+
+<div class="sep20"></div>
+<div class="box">
+    <div class="cell"><div class="fr flex-one-row gap20">
+        <a href="/node/create">创建新节点</a>
+        <a href="/planes">浏览全部节点</a>
+    </div><span class="fade"><strong>V2EX</strong> / 节点导航</span></div>
+    <div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">分享与探索</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/qna" style="font-size: 14px;">问与答</a>&nbsp; &nbsp; <a href="/go/share" style="font-size: 14px;">分享发现</a>&nbsp; &nbsp; <a href="/go/create" style="font-size: 14px;">分享创造</a>&nbsp; &nbsp; <a href="/go/ideas" style="font-size: 14px;">奇思妙想</a>&nbsp; &nbsp; <a href="/go/in" style="font-size: 14px;">分享邀请码</a>&nbsp; &nbsp; <a href="/go/autistic" style="font-size: 14px;">自言自语</a>&nbsp; &nbsp; <a href="/go/design" style="font-size: 14px;">设计</a>&nbsp; &nbsp; <a href="/go/blog" style="font-size: 14px;">Blog</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">Geek</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/programmer" style="font-size: 14px;">程序员</a>&nbsp; &nbsp; <a href="/go/bb" style="font-size: 14px;">宽带症候群</a>&nbsp; &nbsp; <a href="/go/android" style="font-size: 14px;">Android</a>&nbsp; &nbsp; <a href="/go/linux" style="font-size: 14px;">Linux</a>&nbsp; &nbsp; <a href="/go/outsourcing" style="font-size: 14px;">外包</a>&nbsp; &nbsp; <a href="/go/hardware" style="font-size: 14px;">硬件</a>&nbsp; &nbsp; <a href="/go/windows" style="font-size: 14px;">Windows</a>&nbsp; &nbsp; <a href="/go/car" style="font-size: 14px;">汽车</a>&nbsp; &nbsp; <a href="/go/router" style="font-size: 14px;">路由器</a>&nbsp; &nbsp; <a href="/go/webmaster" style="font-size: 14px;">站长</a>&nbsp; &nbsp; <a href="/go/openwrt" style="font-size: 14px;">OpenWrt</a>&nbsp; &nbsp; <a href="/go/programming" style="font-size: 14px;">编程</a>&nbsp; &nbsp; <a href="/go/github" style="font-size: 14px;">GitHub</a>&nbsp; &nbsp; <a href="/go/vscode" style="font-size: 14px;">Visual Studio Code</a>&nbsp; &nbsp; <a href="/go/blockchain" style="font-size: 14px;">区块链</a>&nbsp; &nbsp; <a href="/go/markdown" style="font-size: 14px;">Markdown</a>&nbsp; &nbsp; <a href="/go/vxna" style="font-size: 14px;">VXNA</a>&nbsp; &nbsp; <a href="/go/designer" style="font-size: 14px;">设计师</a>&nbsp; &nbsp; <a href="/go/kindle" style="font-size: 14px;">Kindle</a>&nbsp; &nbsp; <a href="/go/gamedev" style="font-size: 14px;">游戏开发</a>&nbsp; &nbsp; <a href="/go/business" style="font-size: 14px;">商业模式</a>&nbsp; &nbsp; <a href="/go/ev" style="font-size: 14px;">电动汽车</a>&nbsp; &nbsp; <a href="/go/pi" style="font-size: 14px;">Raspberry Pi</a>&nbsp; &nbsp; <a href="/go/ifix" style="font-size: 14px;">云修电脑</a>&nbsp; &nbsp; <a href="/go/typography" style="font-size: 14px;">字体排印</a>&nbsp; &nbsp; <a href="/go/atom" style="font-size: 14px;">Atom</a>&nbsp; &nbsp; <a href="/go/rss" style="font-size: 14px;">RSS</a>&nbsp; &nbsp; <a href="/go/sony" style="font-size: 14px;">SONY</a>&nbsp; &nbsp; <a href="/go/leetcode" style="font-size: 14px;">LeetCode</a>&nbsp; &nbsp; <a href="/go/sd" style="font-size: 14px;">Stable Diffusion</a>&nbsp; &nbsp; <a href="/go/photoshop" style="font-size: 14px;">Photoshop</a>&nbsp; &nbsp; <a href="/go/thinkpad" style="font-size: 14px;">ThinkPad</a>&nbsp; &nbsp; <a href="/go/amazon" style="font-size: 14px;">Amazon</a>&nbsp; &nbsp; <a href="/go/serverless" style="font-size: 14px;">Serverless</a>&nbsp; &nbsp; <a href="/go/gitlab" style="font-size: 14px;">GitLab</a>&nbsp; &nbsp; <a href="/go/ipfs" style="font-size: 14px;">IPFS</a>&nbsp; &nbsp; <a href="/go/dji" style="font-size: 14px;">DJI</a>&nbsp; &nbsp; <a href="/go/lego" style="font-size: 14px;">LEGO</a>&nbsp; &nbsp; <a href="/go/blender" style="font-size: 14px;">Blender</a>&nbsp; &nbsp; <a href="/go/logseq" style="font-size: 14px;">Logseq</a>&nbsp; &nbsp; <a href="/go/dos" style="font-size: 14px;">DOS</a>&nbsp; &nbsp; <a href="/go/gamedb" style="font-size: 14px;">GameDB</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">AI</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/openai" style="font-size: 14px;">OpenAI</a>&nbsp; &nbsp; <a href="/go/claude" style="font-size: 14px;">Claude</a>&nbsp; &nbsp; <a href="/go/cursor" style="font-size: 14px;">Cursor</a>&nbsp; &nbsp; <a href="/go/copilot" style="font-size: 14px;">GitHub Copilot</a>&nbsp; &nbsp; <a href="/go/localllm" style="font-size: 14px;">Local LLM</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">游戏</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/games" style="font-size: 14px;">游戏</a>&nbsp; &nbsp; <a href="/go/steam" style="font-size: 14px;">Steam</a>&nbsp; &nbsp; <a href="/go/switch" style="font-size: 14px;">Nintendo Switch</a>&nbsp; &nbsp; <a href="/go/minecraft" style="font-size: 14px;">Minecraft</a>&nbsp; &nbsp; <a href="/go/ps4" style="font-size: 14px;">PlayStation 4</a>&nbsp; &nbsp; <a href="/go/igame" style="font-size: 14px;">iGame</a>&nbsp; &nbsp; <a href="/go/sc2" style="font-size: 14px;">StarCraft 2</a>&nbsp; &nbsp; <a href="/go/retro" style="font-size: 14px;">怀旧游戏</a>&nbsp; &nbsp; <a href="/go/bf3" style="font-size: 14px;">Battlefield 3</a>&nbsp; &nbsp; <a href="/go/wow" style="font-size: 14px;">World of Warcraft</a>&nbsp; &nbsp; <a href="/go/ps5" style="font-size: 14px;">PlayStation 5</a>&nbsp; &nbsp; <a href="/go/eve" style="font-size: 14px;">EVE</a>&nbsp; &nbsp; <a href="/go/pokemon" style="font-size: 14px;">精灵宝可梦</a>&nbsp; &nbsp; <a href="/go/3ds" style="font-size: 14px;">3DS</a>&nbsp; &nbsp; <a href="/go/gt" style="font-size: 14px;">Gran Turismo</a>&nbsp; &nbsp; <a href="/go/bf4" style="font-size: 14px;">Battlefield 4</a>&nbsp; &nbsp; <a href="/go/wiiu" style="font-size: 14px;">Wii U</a>&nbsp; &nbsp; <a href="/go/bfv" style="font-size: 14px;">Battlefield V</a>&nbsp; &nbsp; <a href="/go/handheld" style="font-size: 14px;">掌机</a>&nbsp; &nbsp; <a href="/go/arcraiders" style="font-size: 14px;">ARC Raiders</a>&nbsp; &nbsp; <a href="/go/bf6" style="font-size: 14px;">Battlefield 6</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">Internet</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/google" style="font-size: 14px;">Google</a>&nbsp; &nbsp; <a href="/go/youtube" style="font-size: 14px;">YouTube</a>&nbsp; &nbsp; <a href="/go/twitter" style="font-size: 14px;">Twitter</a>&nbsp; &nbsp; <a href="/go/bilibili" style="font-size: 14px;">哔哩哔哩</a>&nbsp; &nbsp; <a href="/go/notion" style="font-size: 14px;">Notion</a>&nbsp; &nbsp; <a href="/go/reddit" style="font-size: 14px;">Reddit</a>&nbsp; &nbsp; <a href="/go/discord" style="font-size: 14px;">Discord</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">Apple</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/apple" style="font-size: 14px;">Apple</a>&nbsp; &nbsp; <a href="/go/macos" style="font-size: 14px;">macOS</a>&nbsp; &nbsp; <a href="/go/iphone" style="font-size: 14px;">iPhone</a>&nbsp; &nbsp; <a href="/go/mbp" style="font-size: 14px;">MacBook Pro</a>&nbsp; &nbsp; <a href="/go/ios" style="font-size: 14px;">iOS</a>&nbsp; &nbsp; <a href="/go/ipad" style="font-size: 14px;">iPad</a>&nbsp; &nbsp; <a href="/go/watch" style="font-size: 14px;"> WATCH</a>&nbsp; &nbsp; <a href="/go/macbook" style="font-size: 14px;">MacBook</a>&nbsp; &nbsp; <a href="/go/accessory" style="font-size: 14px;">配件</a>&nbsp; &nbsp; <a href="/go/mba" style="font-size: 14px;">MacBook Air</a>&nbsp; &nbsp; <a href="/go/macmini" style="font-size: 14px;">Mac mini</a>&nbsp; &nbsp; <a href="/go/imac" style="font-size: 14px;">iMac</a>&nbsp; &nbsp; <a href="/go/xcode" style="font-size: 14px;">Xcode</a>&nbsp; &nbsp; <a href="/go/airpods" style="font-size: 14px;">AirPods</a>&nbsp; &nbsp; <a href="/go/macpro" style="font-size: 14px;">Mac Pro</a>&nbsp; &nbsp; <a href="/go/wwdc" style="font-size: 14px;">WWDC</a>&nbsp; &nbsp; <a href="/go/ipod" style="font-size: 14px;">iPod</a>&nbsp; &nbsp; <a href="/go/homekit" style="font-size: 14px;">HomeKit</a>&nbsp; &nbsp; <a href="/go/macstudio" style="font-size: 14px;">Mac Studio</a>&nbsp; &nbsp; <a href="/go/iwork" style="font-size: 14px;">iWork</a>&nbsp; &nbsp; <a href="/go/mobileme" style="font-size: 14px;">MobileMe</a>&nbsp; &nbsp; <a href="/go/ilife" style="font-size: 14px;">iLife</a>&nbsp; &nbsp; <a href="/go/garageband" style="font-size: 14px;">GarageBand</a>&nbsp; &nbsp; <a href="/go/macos9" style="font-size: 14px;">Mac OS 9</a>&nbsp; &nbsp; <a href="/go/macgaming" style="font-size: 14px;">Mac 游戏</a>&nbsp; &nbsp; <a href="/go/freeform" style="font-size: 14px;">Freeform</a>&nbsp; &nbsp; <a href="/go/imovie" style="font-size: 14px;">iMovie</a>&nbsp; &nbsp; <a href="/go/coreml" style="font-size: 14px;">CoreML</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">Crypto</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/bitcoin" style="font-size: 14px;">Bitcoin</a>&nbsp; &nbsp; <a href="/go/solana" style="font-size: 14px;">Solana</a>&nbsp; &nbsp; <a href="/go/crypto" style="font-size: 14px;">加密货币</a>&nbsp; &nbsp; <a href="/go/faucet" style="font-size: 14px;">Faucet</a>&nbsp; &nbsp; <a href="/go/ripple" style="font-size: 14px;">Ripple</a>&nbsp; &nbsp; <a href="/go/ethereum" style="font-size: 14px;">以太坊</a>&nbsp; &nbsp; <a href="/go/meteora" style="font-size: 14px;">Meteora</a>&nbsp; &nbsp; <a href="/go/solidity" style="font-size: 14px;">Solidity</a>&nbsp; &nbsp; <a href="/go/metamask" style="font-size: 14px;">MetaMask</a>&nbsp; &nbsp; <a href="/go/ton" style="font-size: 14px;">TON</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">生活</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/all4all" style="font-size: 14px;">二手交易</a>&nbsp; &nbsp; <a href="/go/jobs" style="font-size: 14px;">酷工作</a>&nbsp; &nbsp; <a href="/go/career" style="font-size: 14px;">职场话题</a>&nbsp; &nbsp; <a href="/go/cv" style="font-size: 14px;">求职</a>&nbsp; &nbsp; <a href="/go/invest" style="font-size: 14px;">投资</a>&nbsp; &nbsp; <a href="/go/free" style="font-size: 14px;">免费赠送</a>&nbsp; &nbsp; <a href="/go/afterdark" style="font-size: 14px;">天黑以后</a>&nbsp; &nbsp; <a href="/go/music" style="font-size: 14px;">音乐</a>&nbsp; &nbsp; <a href="/go/travel" style="font-size: 14px;">旅行</a>&nbsp; &nbsp; <a href="/go/tuan" style="font-size: 14px;">团购</a>&nbsp; &nbsp; <a href="/go/movie" style="font-size: 14px;">电影</a>&nbsp; &nbsp; <a href="/go/exchange" style="font-size: 14px;">物物交换</a>&nbsp; &nbsp; <a href="/go/creditcard" style="font-size: 14px;">信用卡</a>&nbsp; &nbsp; <a href="/go/tv" style="font-size: 14px;">剧集</a>&nbsp; &nbsp; <a href="/go/taste" style="font-size: 14px;">美酒与美食</a>&nbsp; &nbsp; <a href="/go/photograph" style="font-size: 14px;">摄影</a>&nbsp; &nbsp; <a href="/go/reading" style="font-size: 14px;">阅读</a>&nbsp; &nbsp; <a href="/go/pet" style="font-size: 14px;">宠物</a>&nbsp; &nbsp; <a href="/go/baby" style="font-size: 14px;">Baby</a>&nbsp; &nbsp; <a href="/go/coffee" style="font-size: 14px;">咖啡</a>&nbsp; &nbsp; <a href="/go/soccer" style="font-size: 14px;">绿茵场</a>&nbsp; &nbsp; <a href="/go/bike" style="font-size: 14px;">骑行</a>&nbsp; &nbsp; <a href="/go/diary" style="font-size: 14px;">日记</a>&nbsp; &nbsp; <a href="/go/writing" style="font-size: 14px;">文学</a>&nbsp; &nbsp; <a href="/go/plant" style="font-size: 14px;">植物</a>&nbsp; &nbsp; <a href="/go/mushroom" style="font-size: 14px;">蘑菇</a>&nbsp; &nbsp; <a href="/go/mileage" style="font-size: 14px;">行程控</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">前端开发</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/wechat" style="font-size: 14px;">微信</a>&nbsp; &nbsp; <a href="/go/fe" style="font-size: 14px;">前端开发</a>&nbsp; &nbsp; <a href="/go/chrome" style="font-size: 14px;">Chrome</a>&nbsp; &nbsp; <a href="/go/vue" style="font-size: 14px;">Vue.js</a>&nbsp; &nbsp; <a href="/go/browsers" style="font-size: 14px;">浏览器</a>&nbsp; &nbsp; <a href="/go/react" style="font-size: 14px;">React</a>&nbsp; &nbsp; <a href="/go/css" style="font-size: 14px;">CSS</a>&nbsp; &nbsp; <a href="/go/firefox" style="font-size: 14px;">Firefox</a>&nbsp; &nbsp; <a href="/go/flutter" style="font-size: 14px;">Flutter</a>&nbsp; &nbsp; <a href="/go/edge" style="font-size: 14px;">Edge</a>&nbsp; &nbsp; <a href="/go/angular" style="font-size: 14px;">Angular</a>&nbsp; &nbsp; <a href="/go/electron" style="font-size: 14px;">Electron</a>&nbsp; &nbsp; <a href="/go/webdev" style="font-size: 14px;">Web Dev</a>&nbsp; &nbsp; <a href="/go/nextjs" style="font-size: 14px;">Next.js</a>&nbsp; &nbsp; <a href="/go/vite" style="font-size: 14px;">Vite</a>&nbsp; &nbsp; <a href="/go/nuxtjs" style="font-size: 14px;">Nuxt.js</a>&nbsp; &nbsp; <a href="/go/ionic" style="font-size: 14px;">Ionic</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">编程语言</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/python" style="font-size: 14px;">Python</a>&nbsp; &nbsp; <a href="/go/java" style="font-size: 14px;">Java</a>&nbsp; &nbsp; <a href="/go/php" style="font-size: 14px;">PHP</a>&nbsp; &nbsp; <a href="/go/go" style="font-size: 14px;">Go 编程语言</a>&nbsp; &nbsp; <a href="/go/js" style="font-size: 14px;">JavaScript</a>&nbsp; &nbsp; <a href="/go/nodejs" style="font-size: 14px;">Node.js</a>&nbsp; &nbsp; <a href="/go/cpp" style="font-size: 14px;">C++</a>&nbsp; &nbsp; <a href="/go/rust" style="font-size: 14px;">Rust</a>&nbsp; &nbsp; <a href="/go/swift" style="font-size: 14px;">Swift</a>&nbsp; &nbsp; <a href="/go/html" style="font-size: 14px;">HTML</a>&nbsp; &nbsp; <a href="/go/dotnet" style="font-size: 14px;">.NET</a>&nbsp; &nbsp; <a href="/go/csharp" style="font-size: 14px;">C#</a>&nbsp; &nbsp; <a href="/go/ror" style="font-size: 14px;">Ruby on Rails</a>&nbsp; &nbsp; <a href="/go/typescript" style="font-size: 14px;">TypeScript</a>&nbsp; &nbsp; <a href="/go/ruby" style="font-size: 14px;">Ruby</a>&nbsp; &nbsp; <a href="/go/kotlin" style="font-size: 14px;">Kotlin</a>&nbsp; &nbsp; <a href="/go/lua" style="font-size: 14px;">Lua</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">后端架构</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/cloud" style="font-size: 14px;">云计算</a>&nbsp; &nbsp; <a href="/go/server" style="font-size: 14px;">服务器</a>&nbsp; &nbsp; <a href="/go/dns" style="font-size: 14px;">DNS</a>&nbsp; &nbsp; <a href="/go/mysql" style="font-size: 14px;">MySQL</a>&nbsp; &nbsp; <a href="/go/docker" style="font-size: 14px;">Docker</a>&nbsp; &nbsp; <a href="/go/nginx" style="font-size: 14px;">NGINX</a>&nbsp; &nbsp; <a href="/go/db" style="font-size: 14px;">数据库</a>&nbsp; &nbsp; <a href="/go/k8s" style="font-size: 14px;">Kubernetes</a>&nbsp; &nbsp; <a href="/go/ubuntu" style="font-size: 14px;">Ubuntu</a>&nbsp; &nbsp; <a href="/go/aws" style="font-size: 14px;">Amazon Web Services</a>&nbsp; &nbsp; <a href="/go/django" style="font-size: 14px;">Django</a>&nbsp; &nbsp; <a href="/go/redis" style="font-size: 14px;">Redis</a>&nbsp; &nbsp; <a href="/go/devops" style="font-size: 14px;">DevOps</a>&nbsp; &nbsp; <a href="/go/mongodb" style="font-size: 14px;">MongoDB</a>&nbsp; &nbsp; <a href="/go/cloudflare" style="font-size: 14px;">Cloudflare</a>&nbsp; &nbsp; <a href="/go/elasticsearch" style="font-size: 14px;">Elasticsearch</a>&nbsp; &nbsp; <a href="/go/flask" style="font-size: 14px;">Flask</a>&nbsp; &nbsp; <a href="/go/tornado" style="font-size: 14px;">Tornado</a>&nbsp; &nbsp; <a href="/go/api" style="font-size: 14px;">API</a>&nbsp; &nbsp; <a href="/go/timescale" style="font-size: 14px;">Timescale</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">机器学习</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/ml" style="font-size: 14px;">机器学习</a>&nbsp; &nbsp; <a href="/go/math" style="font-size: 14px;">数学</a>&nbsp; &nbsp; <a href="/go/nlp" style="font-size: 14px;">自然语言处理</a>&nbsp; &nbsp; <a href="/go/tensorflow" style="font-size: 14px;">TensorFlow</a>&nbsp; &nbsp; <a href="/go/cuda" style="font-size: 14px;">CUDA</a>&nbsp; &nbsp; <a href="/go/torch" style="font-size: 14px;">Torch</a>&nbsp; &nbsp; <a href="/go/keras" style="font-size: 14px;">Keras</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">iOS</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/idev" style="font-size: 14px;">iDev</a>&nbsp; &nbsp; <a href="/go/icode" style="font-size: 14px;">iCode</a>&nbsp; &nbsp; <a href="/go/imarketing" style="font-size: 14px;">iMarketing</a>&nbsp; &nbsp; <a href="/go/iad" style="font-size: 14px;">iAd</a>&nbsp; &nbsp; </td></tr></table></div><div class="cell"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">城市</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/beijing" style="font-size: 14px;">北京</a>&nbsp; &nbsp; <a href="/go/shanghai" style="font-size: 14px;">上海</a>&nbsp; &nbsp; <a href="/go/shenzhen" style="font-size: 14px;">深圳</a>&nbsp; &nbsp; <a href="/go/hangzhou" style="font-size: 14px;">杭州</a>&nbsp; &nbsp; <a href="/go/chengdu" style="font-size: 14px;">成都</a>&nbsp; &nbsp; <a href="/go/guangzhou" style="font-size: 14px;">广州</a>&nbsp; &nbsp; <a href="/go/hongkong" style="font-size: 14px;">香港</a>&nbsp; &nbsp; <a href="/go/wuhan" style="font-size: 14px;">武汉</a>&nbsp; &nbsp; <a href="/go/nanjing" style="font-size: 14px;">南京</a>&nbsp; &nbsp; <a href="/go/xian" style="font-size: 14px;">西安</a>&nbsp; &nbsp; <a href="/go/changsha" style="font-size: 14px;">长沙</a>&nbsp; &nbsp; <a href="/go/suzhou" style="font-size: 14px;">苏州</a>&nbsp; &nbsp; <a href="/go/chongqing" style="font-size: 14px;">重庆</a>&nbsp; &nbsp; <a href="/go/kunming" style="font-size: 14px;">昆明</a>&nbsp; &nbsp; <a href="/go/tianjin" style="font-size: 14px;">天津</a>&nbsp; &nbsp; <a href="/go/xiamen" style="font-size: 14px;">厦门</a>&nbsp; &nbsp; <a href="/go/qingdao" style="font-size: 14px;">青岛</a>&nbsp; &nbsp; <a href="/go/sanfrancisco" style="font-size: 14px;">San Francisco</a>&nbsp; &nbsp; <a href="/go/nyc" style="font-size: 14px;">New York</a>&nbsp; &nbsp; <a href="/go/tokyo" style="font-size: 14px;">东京</a>&nbsp; &nbsp; <a href="/go/singapore" style="font-size: 14px;">Singapore</a>&nbsp; &nbsp; <a href="/go/guiyang" style="font-size: 14px;">贵阳</a>&nbsp; &nbsp; <a href="/go/la" style="font-size: 14px;">Los Angeles</a>&nbsp; &nbsp; </td></tr></table></div><div class="inner"><table cellpadding="0" cellspacing="0" border="0"><tr><td align="right" width="80"><span class="fade">V2EX</span></td><td style="line-height: 200%; padding-left: 10px; word-break: keep-all;"><a href="/go/v2ex" style="font-size: 14px;">V2EX</a>&nbsp; &nbsp; <a href="/go/feedback" style="font-size: 14px;">反馈</a>&nbsp; &nbsp; <a href="/go/status" style="font-size: 14px;">站点状态</a>&nbsp; &nbsp; <a href="/go/guide" style="font-size: 14px;">使用指南</a>&nbsp; &nbsp; </td></tr></table></div>
+</div>
+
+
+            </div>
+
+
+        </div>
+        <div class="c"></div>
+        <div class="sep20"></div>
+    </div>
+    <div id="Bottom">
+        <div class="content">
+            <div class="inner">
+                <div class="sep10"></div>
+                    <div class="fr">
+                        <a href="https://www.digitalocean.com/?refcode=1b51f1a7651d" target="_blank"><div id="DigitalOcean"></div></a>
+                    </div>
+                    <strong><a href="/about" class="dark" target="_self">关于</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="https://edge.v2ex.com/help" class="dark" target="_self">帮助文档</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="/pro/about" class="dark" target="_self">自助推广系统</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="https://blog.v2ex.com/" class="dark" target="_blank">博客</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="https://edge.v2ex.com/help/api" class="dark" target="_self">API</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="/faq" class="dark" target="_self">FAQ</a> &nbsp; <span class="snow">·</span> &nbsp; <a href="https://edge.v2ex.com/solana" class="dark" target="_self">Solana</a> &nbsp; <span class="snow">·</span> &nbsp; 4559 人在线</strong> &nbsp; <span class="fade">最高记录 6679</span> &nbsp; <span class="snow">·</span> &nbsp; <a href="/select/language" class="f11"><img src="/static/img/language.png?v=6a5cfa731dc71a3769f6daace6784739" width="16" align="absmiddle" id="ico-select-language" /> &nbsp; Select Language</a>
+                    <div class="sep20"></div>
+                    创意工作者们的社区
+                    <div class="sep5"></div>
+                    World is powered by solitude
+                    <div class="sep20"></div>
+                    <span class="small fade">VERSION: 3.9.8.5 · 8ms · <a href="/worldclock#utc">UTC 09:59</a> · <a href="/worldclock#pvg">PVG 17:59</a> · <a href="/worldclock#lax">LAX 02:59</a> · <a href="/worldclock#jfk">JFK 05:59</a><br />♥ Do have faith in what you're doing.</span>
+                <div class="sep10"></div>
+            </div>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-11940834-2', 'v2ex.com');
+      ga('send', 'pageview');
+
+
+    </script>
+
+
+
+<button class="scroll-top" data-scroll="up" type="button"><span>❯<span></button>
+</body>
+</html>

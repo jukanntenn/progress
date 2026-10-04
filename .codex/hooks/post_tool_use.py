@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
+"""Codex PostToolUse (apply_patch): best-effort format via prek.
+
+Codex edits files through one freeform ``apply_patch`` tool whose patch text
+carries the edited paths (no structured ``file_path`` field). The V4A headers
+``*** Update File:`` / ``*** Add File:`` are parsed — ``*** Move to:`` resolves
+to the destination (the source is removed), ``*** Delete File:`` is skipped.
+prek's ``format`` + ``lint`` groups then run on each path. Never blocks.
+"""
 
 from __future__ import annotations
 
 import json
-from pathlib import PurePath
-import subprocess
+from pathlib import Path
 import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".agents" / "hooks"))
+import _core  # ty:ignore[unresolved-import]
 
 MOVE_TO_PREFIX = "*** Move to: "
 PATCH_FILE_PREFIXES = (
@@ -15,6 +25,7 @@ PATCH_FILE_PREFIXES = (
 
 
 def extract_edited_paths(command: str) -> list[str]:
+    """Return the destination paths edited by a V4A ``apply_patch`` command."""
     paths: list[str] = []
     pending_update: str | None = None
     for raw in command.splitlines():
@@ -37,40 +48,18 @@ def extract_edited_paths(command: str) -> list[str]:
     return paths
 
 
-def commands_for(path: PurePath) -> list[list[str]]:
-    match path.suffix:
-        case ".py" | ".pyi":
-            return [
-                ["uv", "run", "ruff", "check", "--fix", str(path)],
-                ["uv", "run", "ruff", "format", str(path)],
-            ]
-        case _:
-            return []
-
-
 def main() -> None:
     try:
         payload = json.loads(sys.stdin.read())
     except json.JSONDecodeError:
         return
-
     command = (payload.get("tool_input") or {}).get("command")
     if not isinstance(command, str):
         return
-
-    for raw_path in extract_edited_paths(command):
-        for cmd in commands_for(PurePath(raw_path)):
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True)
-            except FileNotFoundError:
-                print(f"[codex-post-tool-use] uv not found on PATH; skipped {cmd[3]}", file=sys.stderr)
-                continue
-            if result.returncode != 0:
-                print(f"[codex-post-tool-use] {cmd[3]} reported issues for {raw_path}:", file=sys.stderr)
-                if result.stdout:
-                    print(result.stdout, file=sys.stderr)
-                if result.stderr:
-                    print(result.stderr, file=sys.stderr)
+    paths = extract_edited_paths(command)
+    if paths:
+        _core.format(paths)
+        _core.lint(*paths)
 
 
 if __name__ == "__main__":

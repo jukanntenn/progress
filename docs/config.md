@@ -1,21 +1,18 @@
 # Configuration
 
-Progress uses a **two-file configuration model** (spec 02) that physically
-separates infrastructure settings (owned by Ansible/deployer) from
-user-facing settings (owned by the Web UI / DB). The two classes never
-overlap, so a deploy cannot clobber a user edit and vice versa.
+English | [中文](config.zh.md)
+
+Progress uses a **two-file configuration model** (spec 02) that physically separates infrastructure settings (owned by Ansible/deployer) from user-facing settings (owned by the Web UI / DB). The two classes never overlap, so a deploy cannot clobber a user edit and vice versa.
 
 ## How configuration is split
 
 | Class | Owner | Storage | Mount | Contents |
 |---|---|---|---|---|
 | **Ansible** | Deployer | `config.toml` | read-only file | `state_home` only |
-| **Core Web** | Web UI / user | DB `config` table (`section="core"`) | DB (writable) | language, timezone, github, analysis, markpost, notification, observability, web |
+| **Core Web** | Web UI / user | DB `config` table (`section="core"`) | DB (writable) | language, timezone, github, analysis, markpost, notification, observability, web, schedule |
 | **Plugin** | Web UI / user | DB `config` table (`section=<plugin>`) | DB (writable) | per-integration config (`repo`, `changelog`, `proposal`) |
 
-`state_home` is the single infrastructure key — the root directory for all
-runtime data (DB, logs, cloned repos, observability exports). Every other
-path is derived from it.
+`state_home` is the single infrastructure key — the root directory for all runtime data (DB, logs, cloned repos, observability exports). Every other path is derived from it.
 
 ## The two files
 
@@ -31,9 +28,7 @@ Environment variable override: `PROGRESS_STATE_HOME`.
 
 ### `config.db.toml` (DB seed, Web class)
 
-A **seed file** that mirrors the `config` table layout: every top-level table
-is one `section` row. Place it next to `config.toml`. On startup it is imported
-into the DB (see [Seed import](#seed-import)).
+A **seed file** that mirrors the `config` table layout: every top-level table is one `section` row. Place it next to `config.toml`. On startup it is imported into the DB (see [Seed import](#seed-import)).
 
 ```toml
 [core]
@@ -89,38 +84,40 @@ Copy `config.example.db.toml` as a starting point.
 
 ## Seed import
 
-When `config.db.toml` exists next to `config.toml`, every startup re-imports it
-into the DB `config` table:
+When `config.db.toml` exists next to `config.toml`, every startup re-imports it into the DB `config` table:
 
-- **Priority**: `DB > seed > code defaults`. The seed only fills keys the DB
-  doesn't already have — Web UI edits survive a restart.
-- **All sections** are imported: `[core]` plus plugin sections (`[repo]`,
-  `[changelog]`, `[proposal]`), so each integration reads its config from the DB.
-- **Validation**: `[core]` passes through; plugin sections are validated against
-  their registered Pydantic schema. A failing section is logged and skipped.
-- **Production**: operators must ensure `config.db.toml` does **not** exist
-  (the DB is the single source of truth; `.gitignore` excludes it). Edit via the
-  Web UI or `PUT /api/v1/config/{section}`.
-- **Testing / first deploy**: place `config.db.toml` to seed initial config
-  without touching the Web UI.
+- **Priority**: `DB > seed > code defaults`. The seed only fills keys the DB doesn't already have — Web UI edits survive a restart.
+- **All sections** are imported: `[core]` plus plugin sections (`[repo]`, `[changelog]`, `[proposal]`), so each integration reads its config from the DB.
+- **Validation**: `[core]` passes through; plugin sections are validated against their registered Pydantic schema. A failing section is logged and skipped.
+- **Production**: operators must ensure `config.db.toml` does **not** exist (the DB is the single source of truth; `.gitignore` excludes it). Edit via the Web UI or `PUT /api/v1/config/{section}`.
+- **Testing / first deploy**: place `config.db.toml` to seed initial config without touching the Web UI.
 
 ## Editing configuration
 
-- **Web UI** — the *Configuration* page renders a form from the JSON Schema
-  (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
-- **API** — `GET /api/v1/config` returns all sections (SecretStr fields masked
-  as `**********`); `PUT /api/v1/config/{section}` validates and writes one.
+- **Web UI** — the *Configuration* page renders an RJSF form from the JSON Schema (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
+- **API** — `GET /api/v1/config` returns all sections in **plaintext** (secret fields carry real values; the Web UI masks them with `type="password"` inputs); `PUT /api/v1/config/{section}` validates the payload with the section's Pydantic model (`extra="forbid"`) and writes a normalized plaintext copy. A failed validation returns 422 and leaves the DB untouched.
 - **Seed file** — edit `config.db.toml` and restart (re-imports into the DB).
 
-Secrets (`gh_token`, `api_key`, `password`, `webhook_url`, `dsn`, markpost
-`url`) are `pydantic.SecretStr`: they are stored as real values in the DB
-(trusted internal store) but serialized to `**********` in every API response.
-Submitting the mask value unchanged preserves the stored value.
+Secrets (`gh_token`, `api_key`, `password`, `webhook_url`, `dsn`, markpost `url`) are `pydantic.SecretStr`: stored as real plaintext values in the DB (trusted internal store) and returned as-is by the API. The browser renders them as password fields (with a reveal toggle); there is no mask sentinel — what you submit is what gets stored.
+
+System-internal fields (`state_home`, `auth.secret_key`, `auth.initial_admin_password`) are excluded from the editable schema and from API responses; writes always preserve their DB values.
+
+## Scheduling
+
+The `schedule` section drives in-process scheduled pipeline runs (PRFC 2026-08-31):
+
+```toml
+[core.schedule]
+cron = "0 6 * * *"   # daily at 06:00 local time; empty disables scheduled runs
+```
+
+- The cron expression is evaluated by the `scheduled-run` row on the serve tree via `ctx.scheduler` (croniter): local time, per-entry mutex (a trigger while the previous run is still active is skipped with a warning), no catch-up of missed fires.
+- Changes are live: writing the section through the API reloads the schedule without a restart (L0).
+- The container's `PROGRESS_SCHEDULE_CRON` environment variable is a compatibility fallback used when `schedule.cron` is empty; scheduling runs in-process.
 
 ## Zero configuration
 
-Every optional feature degrades gracefully when its prerequisite is missing —
-the system never fails to start:
+Every optional feature degrades gracefully when its prerequisite is missing — the system never fails to start:
 
 - No `github.gh_token` → GitHub tracking (release/owner discovery) disabled + warning.
 - No `analysis.provider`/`api_key` → AI analysis disabled; reports use the default title.
@@ -130,8 +127,7 @@ the system never fails to start:
 ## Precedence
 
 - **Ansible** (`state_home`): `PROGRESS_STATE_HOME` env > `config.toml` > default `"data"`.
-- **Web class**: `PROGRESS_*` env vars (prefix `PROGRESS_`, separator `__`) override
-  on top of DB + seed at startup.
+- **Web class**: `PROGRESS_*` env vars (prefix `PROGRESS_`, separator `__`) override on top of DB + seed at startup.
 
 ## Plugin configuration
 
@@ -159,11 +155,7 @@ name = "bytedance"
 enabled = true
 ```
 
-When a repo's `last_check_time` exceeds `reenabled_stale_days`, the next run uses
-`max_reenabled_lookback_commits` / `max_reenabled_lookback_releases` as the
-backfill window instead of the normal incremental diff. Setting `track_commits`
-or `track_releases` to `false` advances the respective checkpoint without
-analysis, eliminating the gap on re-enable.
+When a repo's `last_check_time` exceeds `reenabled_stale_days`, the next run uses `max_reenabled_lookback_commits` / `max_reenabled_lookback_releases` as the backfill window instead of the normal incremental diff. Setting `track_commits` or `track_releases` to `false` advances the respective checkpoint without analysis, eliminating the gap on re-enable.
 
 ### `changelog` (section `"changelog"`)
 
@@ -195,8 +187,7 @@ trackers = ["eip", "erc", "pep", "rfc", "dep"]
 
 ### `feed` (section `"feed"`)
 
-Miniflux RSS reader connection. Empty `base_url` → feed integration disabled
-+ warning (zero config). See `specs/integrations/feed.md`.
+Miniflux RSS reader connection. Empty `base_url` → feed integration disabled + warning (zero config). See `specs/integrations/feed.md`.
 
 ```toml
 [feed]
@@ -204,7 +195,4 @@ base_url = "https://miniflux.example.org"   # empty → disabled
 api_key = "MF-api-key-xxxx"                  # SecretStr; base_url set but empty → disabled
 ```
 
-Which feeds to track is **data-source driven** (decided entirely by what
-Miniflux is subscribed to), so this section carries only the Miniflux
-credentials — no feed list. Per-feed dedup water marks live in the
-`feed_trackers` state table, advanced inside `run`.
+Which feeds to track is **data-source driven** (decided entirely by what Miniflux is subscribed to), so this section carries only the Miniflux credentials — no feed list. Per-feed dedup water marks live in the `feed_trackers` state table, advanced inside `run`.

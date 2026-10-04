@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/implemented/architecture/2026-10-03-two-tier-deployments-staging-oect-production-fn.md
+2026-10-03-two-tier-deployments-staging-oect-production-fn.md: c0abd40c5a201b95f2e89b2078921c4a177123b7
+2026-10-03-two-tier-deployments-staging-oect-production-fn.zh.md: 83fe79ceba49b311bf8df5f542ca89bddc66c7ee

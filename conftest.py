@@ -53,22 +53,23 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 def _stub_observability(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub every observability binding site to a no-op (spec 15 §2.4.1).
 
-    Both entry points (``progress.cli.lifespan`` and ``progress.api``) bind the
-    names via ``from progress.observability import ...`` into their own module
-    namespaces, so each binding site must be patched individually. The canonical
-    ``progress.observability.*`` targets are patched too as belt-and-suspenders
-    for any lazy import.
+    The runtime telemetry entry (``progress.runtime.telemetry``) and the
+    webserver entry (``progress.runtime.webserver``) bind the names via
+    ``from progress.observability import ...`` into their own module
+    namespaces, so each binding site must be patched individually. The
+    canonical ``progress.observability.*`` targets are patched too as
+    belt-and-suspenders for any lazy import.
     """
 
     def _noop(*_args: Any, **_kwargs: Any) -> None:
         return None
 
     targets = [
-        "progress.cli.lifespan.setup_observability",
-        "progress.cli.lifespan.shutdown_observability",
-        "progress.api.setup_observability",
-        "progress.api.shutdown_observability",
-        "progress.api.instrument_fastapi_app",
+        "progress.runtime.telemetry.setup_telemetry",
+        "progress.runtime.telemetry.flush_telemetry",
+        "progress.runtime.telemetry.configure_structlog",
+        "progress.runtime.telemetry.init_bugsink",
+        "progress.runtime.webserver.instrument_fastapi_app",
         "progress.observability.setup_observability",
         "progress.observability.shutdown_observability",
     ]

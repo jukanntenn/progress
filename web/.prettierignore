@@ -1,6 +1,10 @@
 # Prettier reads .gitignore by default, so build/coverage/test artifacts are
-# already excluded via web/.gitignore and web/e2e/.gitignore. This file only
-# holds the orthogonal case: files that MUST stay tracked but should not be
-# reformatted — i.e. machine-generated lock files.
+# already excluded via web/.gitignore and web/e2e/.gitignore. This file holds
+# the orthogonal case: tracked files that MUST stay verbatim because they are
+# machine-generated. Prettier's own docs name "generated files" as the canonical
+# .prettierignore use case — generated output is kept exactly as the generator
+# emits it (no formatter post-processing).
 pnpm-lock.yaml
 e2e/pnpm-lock.yaml
+openapi.json
+src/api/schema.ts

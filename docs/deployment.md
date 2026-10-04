@@ -1,5 +1,7 @@
 # Deployment Guide
 
+English | [中文](deployment.zh.md)
+
 Progress ships as a single hardened container: a static Vite SPA served by Caddy, a FastAPI backend, and a supercronic scheduler, all supervised by s6-overlay. This guide covers the Docker deployment and the one-time migration from the legacy (pre-redesign) build.
 
 ## Docker Quick Start
@@ -135,13 +137,14 @@ Progress uses [Pydantic AI](https://ai.pydantic.dev/) for diff analysis. Configu
 - `language` — output language for analysis results.
 - `concurrency` — per-integration analysis parallelism.
 
-When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back to truncation. There is no bundled CLI provider (the legacy `claude_code`/`codex` CLI providers were removed in the redesign).
+When `provider`/`api_key` are empty, AI analysis is disabled and diffs fall back to truncation. There is no bundled CLI provider — analysis runs through the Pydantic AI API path only.
 
 ## Configuration
 
-Application configuration lives in the **database** `config` table, split into sections (`core`, `repo`, `changelog`, `proposal`). `config.toml` is Ansible-class and carries **only** `state_home`; everything else is edited at runtime:
+Application configuration lives in the **database** `config` table, split into sections (`core`, `repo`, `changelog`, `proposal`, `feed`). `config.toml` is Ansible-class and carries **only** `state_home`; everything else is edited at runtime:
 
-- Edit ongoing settings through the web UI (`/config`) or the API (`PUT /api/v1/config/{section}`).
+- Edit ongoing settings through the web UI (`/config`) or the API (`PUT /api/v1/config/{section}`). The Web UI renders the config form from the server's JSON Schema via RJSF; secret fields are masked with `type="password"` inputs in the browser. Writes are validated with the section's Pydantic model — invalid payloads return 422 and leave the DB untouched.
+- On container startup, after DB migrations, `migrate_config_data()` repairs known-bad structures from the legacy editor (e.g. `core.observability.bugsink` stored as a list, `recipient` containing non-string entries) so the runtime can load the config without falling back to defaults. It is idempotent: healthy data is never touched.
 - For a first deploy or testing, place a `config.db.toml` seed file next to `config.toml`; it is imported into the DB on startup (DB values win over the seed). In production, ensure no `config.db.toml` exists — the DB is the single source of truth.
 
 Environment-variable overrides (`PROGRESS_` prefix, `__` for nested keys) still apply, but only for keys the DB does not already set. For a production deploy, prefer editing via the Web UI over env vars. Note: `core.observability.otel.*` is not a config field (OTel export paths derive from `state_home`) — do **not** set `PROGRESS_OBSERVABILITY__OTEL__*` env vars, they will fail `CoreConfig` validation and prevent startup.
@@ -195,25 +198,51 @@ If you serve Progress under a public URL, set `core.web.base_url` (via the Web U
 ## Building the Image
 
 ```bash
-uv run python docker/build.py                                      # build for the local platform (load)
-uv run python docker/build.py --push --registry ghcr               # build + push multi-platform (alias)
-uv run python docker/build.py --push --registry ghcr.io/youruser   # build + push with explicit host
-uv run python docker/build.py --platform amd64                     # build a specific platform
-uv run python docker/build.py --tags v1.0.0                        # additional tags (replaces default "latest")
-uv run python docker/build.py --no-cache                           # disable the build cache
+uv run python docker/build.py                                        # build for the local platform (load), tag :main
+uv run python docker/build.py --push --all-platforms                # build + push multi-platform (default registry)
+uv run python docker/build.py --push --registry ghcr                # build + push (alias)
+uv run python docker/build.py --platform amd64                      # build a specific platform
+uv run python docker/build.py --tags v1.0.0 20260813                # additional tags (main always included, deduplicated)
+uv run python docker/build.py --no-cache                            # full rebuild, no layer reuse
 ```
 
-Registry targets: aliases `ghcr` → `ghcr.io`, `dockerhub`/`docker` → `docker.io`;
-or any host like `registry.local:5000` (owner auto-derived from git config when possible).
-Run `uv run python docker/build.py --help` for the full list of options. The build uses Docker buildx and requires QEMU binfmt registered for cross-platform builds. Third-party binaries (Caddy, s6-overlay, supercronic) are downloaded with mandatory SHA checksum verification.
+- **Tags**: `main` is always included (the rolling internal tag); `--tags` appends more, duplicates removed.
+- **git_sha injection**: every build passes the current `git rev-parse HEAD` as the `GIT_SHA` build arg; the runtime exposes it via `/api/v1/version`, which the deploy automation compares against the shipped commit to confirm the deployed image is actually live.
+- Registry targets: aliases `ghcr` → `ghcr.io`, `dockerhub`/`docker` → `docker.io`; or any host like `registry.local:5000` (owner auto-derived from git remote for aliases).
+- CI does **not** use this script — GitHub Actions builds with the official `docker/login-action` + `docker/metadata-action` + `docker/build-push-action` (see `release.yml`). This script is the local build tool: buildx with QEMU binfmt registered for cross-platform builds.
+- Third-party binaries (Caddy, s6-overlay, supercronic) are downloaded with mandatory SHA checksum verification.
+- Run `uv run python docker/build.py --help` for the full list of options.
 
 ## Ansible Automation
 
-An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, and (re)starts the container. Variables are encrypted with `ansible-vault` for internal use — external users should replace `devops/ansible/vars/` and `host_vars/` with their own values.
+An automated deployment playbook lives in `devops/ansible/`. It renders `config.toml` and `docker-compose.yml` from templates, pulls the image, starts containers, then verifies health from the controller machine. Works from the project root **and** from `devops/ansible/` — the root `ansible.cfg` plus a directory-local one both point at the same files.
+
+Secrets are encrypted as individual `!vault` variables, split per environment in `devops/ansible/group_vars/<env>/vault.yml` (auto-loaded by group). Each environment has its own vault password in the **avpm keyring** — `progress-prod` guards the `prod` group (`fn`), `progress-test` guards the `staging` group (`oect`) — wired via `vault_identity_list = progress-test@~/.local/bin/avpm-client, progress-prod@~/.local/bin/avpm-client` in `ansible.cfg` (ansible calls the avpm client script as `avpm --vault-id <label>`; the matching password is tried first, then the rest in order). Encrypt a value with:
 
 ```bash
-ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
-  --vault-password-file ~/.ansible-vault/progress.pwd
+ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
+  --stdin-name <name> >> devops/ansible/group_vars/staging/vault.yml
 ```
 
-The inventory (`hosts.yml`) targets the new server (`fn`); the legacy server (`oect`) is retained until the new build is verified and the old one decommissioned.
+Run `avpm unlock` once per session; the agent doing the deploy will tell you if it is missing. Manage the per-variable vault blocks with `uv run python scripts/vault.py` (`set` / `get` / `list` / `check` / `remove`); `check` decrypt-validates every variable of every environment under exactly its own vault-id, without printing values.
+
+```bash
+ansible-playbook devops/ansible/main.yml                             # deploy staging (oect) — default
+ansible-playbook devops/ansible/main.yml -e target=prod              # deploy production (fn)
+ansible-playbook devops/ansible/main.yml -e verify_sha=no            # deploy without the git_sha gate
+```
+
+**Post-deploy verification** (runs `scripts/check_deploy.py` on the controller): waits for `/readyz` (app up + DB reachable), then compares the deployed `git_sha` — reported by `/api/v1/version` — against the local HEAD. A mismatch fails the playbook: a running container is not proof the new image is live.
+
+Staging (`oect`, arm64) pulls the rolling `:main` tag from the in-network registry at `192.168.5.50:5000` (hosted on the oect machine itself). Its scheduler ships idle (`cron: ""` — trigger runs manually) and the playbook refuses to deploy while any `__FILL_ME__` placeholder remains (`host_port`/`health_url` in `group_vars/staging/env.yml`, `home` in `host_vars/oect.yml`). Shipping a new build for staging validation:
+
+```bash
+uv run python docker/build.py --push --all-platforms   # 1. build + push :main (amd64 + arm64)
+ansible-playbook devops/ansible/main.yml               # 2. deploy + verify on oect
+```
+
+Production (`fn`) runs the same two commands with `-e target=prod` — a deliberate step taken only after the build has passed acceptance on staging. Publishing a newer `:main` for another staging cycle does not touch the running `fn` container; it changes only on the next explicit prod deploy.
+
+Inventory: `staging` group = `oect` (validation, arm64); `prod` group = `fn` (production). External users replace `group_vars/` and `host_vars/` (including the per-environment `vault.yml` files) with their own values.
+
+After each upgrade, verify the DB auto-migration succeeded — startup migrations never crash on schema errors (they log a `migration_failed` metric and degrade), so check `data/observability/metrics.jsonl` and `data/logs/progress.log` rather than relying on the container being up.

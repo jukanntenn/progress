@@ -10,6 +10,7 @@ The exporter mode is also a code constant (``"file"`` JSONL by default); if
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 from pathlib import Path
@@ -72,6 +73,12 @@ def setup_telemetry(observability_dir: Path, *, environment: str = ENVIRONMENT) 
     called before any ``aiohttp.ClientSession`` is constructed, otherwise that
     session has no TraceConfig and its calls won't be traced. We instrument
     aiohttp here, before the CLI / API build their sessions.
+
+    The providers are process-global singletons, so setup is idempotent and
+    shutdown is deferred to process exit (``atexit``): the OTel global APIs
+    refuse a second ``set_tracer_provider``, so a hot-reloaded row (L0) must
+    re-enter this as a no-op instead of tearing the globals down and trying
+    to re-create them.
     """
     global _tracer_provider, _meter_provider
     if _tracer_provider is not None:
@@ -97,13 +104,36 @@ def setup_telemetry(observability_dir: Path, *, environment: str = ENVIRONMENT) 
     AioHttpClientInstrumentor().instrument()
     SQLite3Instrumentor().instrument()
     LoggingInstrumentor(inject_trace_context=True).instrument()
+    atexit.register(shutdown_telemetry)
 
 
 def instrument_fastapi_app(app: Any) -> None:
     """Instrument a FastAPI app. Call AFTER ``setup_telemetry`` and AFTER the
     app is created, so spans cover request handling (spec 04 fixes prior
-    ordering bug where ``instrument_app`` ran before telemetry was enabled)."""
+    ordering bug where ``instrument_app`` ran before telemetry was enabled).
+    Idempotent: a restart of the webserver row (L0) must not re-instrument."""
+    if getattr(app.state, "otel_instrumented", False):
+        return
     FastAPIInstrumentor.instrument_app(app)
+    app.state.otel_instrumented = True
+
+
+def flush_telemetry() -> None:
+    """Force-export buffered spans/metrics without tearing the globals down.
+
+    The restart-safe counterpart of :func:`shutdown_telemetry`: a fiber
+    disposer can run while the process keeps serving, so it may only flush.
+    """
+    if _tracer_provider is not None:
+        try:
+            _tracer_provider.force_flush()
+        except Exception as e:
+            _logger.debug("tracer provider flush failed: %s", e)
+    if _meter_provider is not None:
+        try:
+            _meter_provider.force_flush()
+        except Exception as e:
+            _logger.debug("meter provider flush failed: %s", e)
 
 
 def shutdown_telemetry() -> None:
@@ -128,6 +158,7 @@ __all__ = [
     "PROGRESS_VERSION",
     "SAMPLING_RATE",
     "SERVICE_NAME",
+    "flush_telemetry",
     "instrument_fastapi_app",
     "setup_telemetry",
     "shutdown_telemetry",

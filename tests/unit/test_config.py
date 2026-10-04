@@ -12,7 +12,6 @@ from pydantic import SecretStr, ValidationError
 import pytest
 import tomlkit
 
-from progress.cli.notifications.config import FeishuChannelConfig, NotificationConfig
 from progress.config.loader import (
     find_seed_file,
     load_config,
@@ -147,24 +146,32 @@ class TestMergeDbConfig:
         assert merged.state_home == "/tmp/ansible"
         assert merged.language == "zh-Hans"
 
-    def test_partial_merge_preserves_real_secrets(self) -> None:
-        """A partial db_core (e.g. {"language": ...}) must not mask existing
-        SecretStr fields. Regression for the bug where switching language
-        corrupted every runtime secret to ``**********`` until a restart."""
+    def test_partial_merge_uses_model_defaults(self) -> None:
+        """A partial db_core (e.g. {"language": ...}) fills missing fields with
+        model defaults (spec 3.7.1: DB dict is the whole input; no cfg-dump
+        merge). Production DB rows are always full normalized dumps, so a
+        partial row only occurs transiently (seed bootstrap)."""
         cfg = CoreConfig(
             state_home="/tmp/x",
             github=GitHubConfig(gh_token=SecretStr("ghp_REAL_TOKEN")),
         )
         merged = merge_db_config(cfg, {"language": "zh-Hans"})
-        assert merged.github.gh_token.get_secret_value() == "ghp_REAL_TOKEN"
+        assert merged.language == "zh-Hans"
+        assert merged.github.gh_token.get_secret_value() == ""
 
-    def test_partial_merge_preserves_webhook_url(self) -> None:
-        cfg = CoreConfig(
-            notification=NotificationConfig(
-                channels=[FeishuChannelConfig(webhook_url=SecretStr("https://open.feishu.cn/REAL"))]
-            )
+    def test_db_plaintext_secret_round_trips(self) -> None:
+        """DB stores plaintext (no mask sentinel); the merged config keeps the
+        real secret value."""
+        cfg = CoreConfig(state_home="/tmp/x")
+        merged = merge_db_config(
+            cfg,
+            {
+                "language": "zh-Hans",
+                "github": {"gh_token": "ghp_REAL_TOKEN"},
+                "notification": {"channels": [{"type": "feishu", "webhook_url": "https://open.feishu.cn/REAL"}]},
+            },
         )
-        merged = merge_db_config(cfg, {"language": "zh-Hans"})
+        assert merged.github.gh_token.get_secret_value() == "ghp_REAL_TOKEN"
         feishu = next(c for c in merged.notification.channels if c.type == "feishu")
         assert feishu.webhook_url.get_secret_value() == "https://open.feishu.cn/REAL"
 

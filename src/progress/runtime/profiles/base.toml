@@ -1,0 +1,3 @@
+# Shipped base profile (PRFC 2026-08-31): rows are generated from
+# compose_base code; this layer adjusts structure only (disabled/inject).
+# Patches target rows by id; ids are contract.

@@ -74,7 +74,7 @@ from progress.integrations.proposal.statuses import (
 )
 from progress.integrations.registry import register
 from progress.integrations.repo.analysis import truncate_diff
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.markdown import downgrade_headings
 from progress.utils.timezone import now_utc
 
@@ -146,6 +146,29 @@ CLONE_RETRIES: int = 3
 CLONE_BACKOFF_BASE_SECONDS: float = 3.0
 
 
+def _normalize_status(raw_status: str, kind: str, file_path: str) -> str:
+    """Normalize a raw status with observability on the ``unknown`` sink.
+
+    Wraps :func:`normalize` so a fall-through to ``unknown`` (empty/misspelled
+    raw status, or a parser bug) is never silent: it emits a warning log and a
+    ``progress.proposal.status_unknown`` business event carrying ``kind``,
+    ``raw_status`` and ``file_name`` for triage.
+    """
+    normalized = normalize(raw_status, kind)
+    if normalized == ProposalStatus.UNKNOWN.value:
+        logger.warning(
+            "proposal status normalized to unknown: kind=%s raw_status=%r file=%s",
+            kind,
+            raw_status,
+            file_path,
+        )
+        record_business_event(
+            "progress.proposal.status_unknown",
+            attributes={"kind": kind, "raw_status": raw_status, "file_name": file_path},
+        )
+    return normalized
+
+
 @dataclass
 class ProposalReport:
     """In-memory intermediate result produced by ``check`` (spec proposal §14.1)."""
@@ -191,6 +214,7 @@ class ProposalIntegration:
                 )
             except ProgressException as e:
                 logger.warning("GitHub client unavailable; RFC PR title resolution will be skipped: %s", e)
+                report_severe(e)
                 self._gh = None
         else:
             self._gh = None
@@ -230,6 +254,7 @@ class ProposalIntegration:
                 await task
             except ProgressException as e:
                 logger.warning("proposal kind tracking failed: %s", e)
+                report_severe(e)
                 result.errors.append(e)
                 result.status = "partial"
             except Exception as e:
@@ -323,6 +348,7 @@ class ProposalIntegration:
                 logger.warning("corrupt HEAD detected for %s; recloning", kind_cfg.repo_url)
             except ProgressException as e:
                 logger.warning("fetch+reset failed for %s; recloning: %s", kind_cfg.repo_url, e)
+                report_severe(e)
             await _rmtree_async(dest)
 
         token = self._cfg.github.gh_token.get_secret_value() if self._cfg else ""
@@ -382,6 +408,7 @@ class ProposalIntegration:
                 text = file_path.read_text(encoding="utf-8")
             except OSError as e:
                 logger.debug("failed to read %s: %s", file_path, e)
+                report_severe(e)
                 continue
             try:
                 parsed = parser(text, _relative_path(file_path, repo_path))
@@ -391,12 +418,13 @@ class ProposalIntegration:
                     attributes={"kind": kind},
                 )
                 logger.debug("parse failed for %s: %s", file_path, e)
+                report_severe(e)
                 continue
             record_business_event(
                 "progress.proposal.parsed",
                 attributes={"kind": kind},
             )
-            normalized_status = normalize(parsed.raw_status, kind)
+            normalized_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
             await self._upsert_proposal(
                 kind=kind,
                 parsed=parsed,
@@ -419,13 +447,14 @@ class ProposalIntegration:
                 attributes={"kind": kind},
             )
             logger.debug("re-parse failed for newest %s: %s", newest_file, e)
+            report_severe(e)
             return []
         record_business_event(
             "progress.proposal.parsed",
             attributes={"kind": kind},
         )
         parsed = await self._resolve_rfc_title(kind, parsed)
-        normalized_status = normalize(parsed.raw_status, kind)
+        normalized_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
         await self._upsert_proposal(
             kind=kind,
             parsed=parsed,
@@ -526,6 +555,7 @@ class ProposalIntegration:
             text = file_full.read_text(encoding="utf-8")
         except OSError as e:
             logger.warning("failed to read %s: %s", path, e)
+            report_severe(e)
             return None
         try:
             parsed = parser(text, path)
@@ -535,6 +565,7 @@ class ProposalIntegration:
                 attributes={"kind": kind},
             )
             logger.warning("parse failed for %s: %s", path, e)
+            report_severe(e)
             return None
         record_business_event(
             "progress.proposal.parsed",
@@ -542,7 +573,7 @@ class ProposalIntegration:
         )
 
         parsed = await self._resolve_rfc_title(kind, parsed)
-        new_status = normalize(parsed.raw_status, kind)
+        new_status = _normalize_status(parsed.raw_status, kind, parsed.file_path)
         old_status = await self._lookup_old_status(kind, parsed.number)
 
         analysis = await self._analyze_proposal(
@@ -633,6 +664,7 @@ class ProposalIntegration:
                 parsed.title = title
         except ProgressException as e:
             logger.warning("RFC PR title lookup failed for #%d: %s", pr_number, e)
+            report_severe(e)
         return parsed
 
     async def _analyze_proposal(
@@ -658,6 +690,7 @@ class ProposalIntegration:
                 content_source = truncate_diff(raw_diff, source=f"proposal {file_path}").text
             except ProgressException as e:
                 logger.warning("file diff failed for %s: %s", file_path, e)
+                report_severe(e)
                 content_source = parsed.full_text
 
         prompt = render_prompt(
@@ -674,6 +707,7 @@ class ProposalIntegration:
             return await _invoke_agent(prompt, cfg)
         except (ProgressException, Exception) as e:
             logger.warning("proposal AI analysis failed for %s/%s: %s", kind, parsed.number, e)
+            report_severe(e)
             return AnalysisResult(summary="", detail="")
 
     async def _upsert_proposal(
@@ -711,7 +745,8 @@ class ProposalIntegration:
         try:
             head = await get_head_commit(repo_path)
             return head or None
-        except ProgressException:
+        except ProgressException as e:
+            report_severe(e)
             return None
 
     def _build_kind_section(self, kind: str, reports: list[ProposalReport]) -> ReportSection:
@@ -762,6 +797,7 @@ class ProposalIntegration:
             return ProposalIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid proposal plugin config; using defaults: %s", e)
+            report_severe(e)
             return ProposalIntegrationConfig()
 
     async def build_notification(

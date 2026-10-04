@@ -1,0 +1,31 @@
+{# v2ex Feishu interactive-card v2 (spec v2ex §10).
+
+High-density digest: AI summary + per-tab count badges + top posts as bare
+linked titles (score/replies are internal selection signals users don't
+care about). Takeaways live in the report — the card never duplicates them.
+Visual language reuses the shared ``card`` / ``footer_content`` macros.
+#}
+{% from "_feishu_v2.j2" import card, footer_content %}
+{% set tabs = tabs or [] %}
+{% set top_posts = top_posts or [] %}
+{% set ns = namespace(elements=[]) %}
+{% if summary %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": summary}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% endif %}
+{%- set counts = namespace(parts=[]) -%}
+{% for t in tabs %}
+{%- set counts.parts = counts.parts + [t.icon ~ " **" ~ t.tab_title ~ "** <text_tag color='turquoise'>" ~ t.count ~ "</text_tag>"] -%}
+{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": counts.parts | join("　")}] -%}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% for p in top_posts %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": "[" ~ p.title ~ "](" ~ p.url ~ ")"}] -%}
+{% endfor %}
+{%- set ns.elements = ns.elements + [{"tag": "hr"}] -%}
+{% if markpost_url %}
+{%- set ns.elements = ns.elements + [{"tag": "button", "text": {"tag": "plain_text", "content": " " ~ _("View Report") ~ " "}, "type": "primary_filled", "width": "fill", "size": "medium", "behaviors": [{"type": "open_url", "default_url": markpost_url}]}] -%}
+{% endif %}
+{%- set ns.elements = ns.elements + [{"tag": "markdown", "content": footer_content(generated_at), "text_align": "center", "text_size": "notation"}] -%}
+{% set text_tags = [{"tag": "text_tag", "text": {"tag": "plain_text", "content": selected_count ~ " " ~ _("picks")}, "color": "wathet"}] %}
+{{ card(title, ns.elements, markpost_url, "wathet", header_icon_token="news-outlined", header_icon_color="wathet", text_tags=text_tags) }}

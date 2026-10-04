@@ -29,11 +29,8 @@ PLAYWRIGHT_HTML_OPEN=never npx playwright test --debug=cli
 playwright-cli attach tw-abcdef
 ```
 
-Keep the test running in the background while you explore and look for a fix.
-The test is paused at the start, so you should step over or pause at a particular location
-where the problem is most likely to be.
+Keep the test running in the background while you explore and look for a fix. The test is paused at the start, so you should step over or pause at a particular location where the problem is most likely to be.
 
-Every action you perform with `playwright-cli` generates corresponding Playwright TypeScript code.
-This code appears in the output and can be copied directly into the test. Most of the time, a specific locator or an expectation should be updated, but it could also be a bug in the app. Use your judgement.
+Every action you perform with `playwright-cli` generates corresponding Playwright TypeScript code. This code appears in the output and can be copied directly into the test. Most of the time, a specific locator or an expectation should be updated, but it could also be a bug in the app. Use your judgement.
 
 After fixing the test, stop the background test run. Rerun to check that test passes.

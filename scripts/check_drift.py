@@ -19,15 +19,13 @@ The seven checks (each prints a banner + [OK]/[FAIL] summary):
 
 Prerequisites (same as CI):
   - ``uv sync --extra dev``          (backend dev deps)
-  - ``pnpm --dir web install``       (frontend deps, for the type-drift check)
+  - ``cd web && pnpm install``       (frontend deps, for the type-drift check)
 
-A clean working tree is **not** required — checks diff against HEAD, so
-uncommitted source changes surface as drift (intentional; commit or stash first
-to isolate a single check).
-
-Side effects: the OpenAPI and .pot checks leave their freshly regenerated
-artifacts on disk (mirroring CI). Re-commit them if the regeneration is the
-intended update, otherwise ``git checkout -- <path>`` to discard.
+All checks are **non-destructive**: generated artifacts (openapi.json, .pot,
+schema.ts) are regenerated to temp files and diffed, never written to the
+committed path. A clean run leaves the working tree untouched. Generated files
+are also exempt from prek's mutating hooks (see prek.toml ``exclude`` and
+``web/.prettierignore``), so a generator's raw output is the canonical form.
 
 Usage::
 
@@ -40,13 +38,16 @@ from collections.abc import Callable
 import difflib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-LOCALE_POT = PROJECT_ROOT / "src/progress/locales/progress.pot"
-OPENAPI_JSON = PROJECT_ROOT / "web/openapi.json"
-SCHEMA_TS = PROJECT_ROOT / "web/src/api/schema.ts"
+WEB_DIR = PROJECT_ROOT / "web"
+LOCALE_POT = PROJECT_ROOT / "src" / "progress" / "locales" / "progress.pot"
+OPENAPI_JSON = WEB_DIR / "openapi.json"
+SCHEMA_TS = WEB_DIR / "src" / "api" / "schema.ts"
 
 # ANSI color codes; disabled when stdout is not a tty or NO_COLOR is set.
 _USE_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
@@ -70,10 +71,39 @@ def _run_captured(cmd: list[str], *, cwd: Path = PROJECT_ROOT) -> subprocess.Com
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
 
 
-def _git_show_head_blob(path: str) -> str:
-    """Return the content of `path` at HEAD, or empty string if untracked at HEAD."""
-    result = _run_captured(["git", "show", f"HEAD:{path}"])
-    return result.stdout if result.returncode == 0 else ""
+def _tempfile(suffix: str) -> Path:
+    """Return a fresh closed temp file path (caller unlinks it)."""
+    fd, name = tempfile.mkstemp(prefix="drift-", suffix=suffix)
+    os.close(fd)
+    return Path(name)
+
+
+def _pnpm() -> str:
+    """Locate pnpm; falls back to nvm-installed binaries for shells whose PATH
+    lacks them (e.g. prek's hook environment) — CI always has pnpm on PATH.
+    Prepends the node bin dir to PATH so node is reachable for the spawned
+    subprocesses too."""
+    found = shutil.which("pnpm")
+    if found:
+        return "pnpm"
+    candidates = sorted(Path.home().glob(".nvm/versions/node/*/bin"))
+    if candidates:
+        node_bin = candidates[-1]
+        os.environ["PATH"] = str(node_bin) + os.pathsep + os.environ.get("PATH", "")
+        return str(node_bin / "pnpm")
+    return "pnpm"
+
+
+def _strip_pot_creation_date(text: str) -> str:
+    """Drop the non-deterministic ``POT-Creation-Date`` line and trailing EOL.
+
+    Babel stamps ``POT-Creation-Date`` with ``datetime.now()``; it carries no
+    information for drift detection, so it is removed before comparing. Trailing
+    newlines are normalized too so Babel's raw double-newline compares equal
+    regardless of any historical end-of-file processing.
+    """
+    kept = "\n".join(line for line in text.splitlines() if not line.startswith('"POT-Creation-Date:'))
+    return kept.rstrip()
 
 
 # ---------------------------------------------------------------------------
@@ -91,94 +121,79 @@ def check_import_linter() -> int:
 
 
 def check_openapi_drift() -> int:
-    """Regenerate openapi.json, fail if it differs from the committed copy."""
-    gen = _run(["uv", "run", "python", "scripts/export_openapi.py"])
-    if gen.returncode != 0:
-        return gen.returncode
-    diff = _run_captured(["git", "diff", "--exit-code", "--", "web/openapi.json"])
-    if diff.returncode != 0:
-        print(diff.stdout)
+    """Regenerate openapi.json to a temp file; fail if it differs from committed."""
+    tmp = _tempfile(".json")
+    try:
+        gen = _run_captured(["uv", "run", "python", "scripts/export_openapi.py", "--output", str(tmp)])
+        if gen.returncode != 0:
+            print(gen.stderr or gen.stdout)
+            return gen.returncode
+        diff = subprocess.run(["diff", "-u", str(OPENAPI_JSON), str(tmp)], capture_output=True, text=True, check=False)
+        if diff.returncode != 0:
+            print(diff.stdout)
         return diff.returncode
-    return 0
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def check_frontend_type_drift() -> int:
-    """Generate schema.ts.check from openapi.json, diff against committed schema.ts."""
-    check_file = SCHEMA_TS.with_suffix(".ts.check")
-    gen = _run_captured(["pnpm", "--dir", "web", "exec", "openapi-typescript", "openapi.json", "-o", str(check_file)])
-    if gen.returncode != 0:
-        print(gen.stderr or gen.stdout)
-        return gen.returncode
-    # The committed schema.ts is formatted by Prettier (singleQuote, no semicolons,
-    # tabWidth 2 per web/.prettierrc.json). Reformat the freshly generated file
-    # so the diff compares apples-to-apples.
-    fmt = _run_captured(
-        ["pnpm", "--dir", "web", "exec", "prettier", "--write", "--parser", "typescript", str(check_file)]
-    )
-    if fmt.returncode != 0:
-        print(fmt.stderr or fmt.stdout)
-        check_file.unlink(missing_ok=True)
-        return fmt.returncode
-    diff = subprocess.run(
-        ["diff", "-u", str(SCHEMA_TS), str(check_file)],
-        cwd=str(PROJECT_ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if diff.returncode != 0:
-        print(diff.stdout)
-    check_file.unlink(missing_ok=True)
-    return diff.returncode
+    """Generate schema.ts to a temp file (raw) and diff against the committed copy."""
+    tmp = _tempfile(".ts")
+    try:
+        # Run with cwd=web, not `--dir web`: a corepack pnpm shim resolves the
+        # pinned packageManager version from the CWD's package.json and never
+        # sees `--dir`, so a root invocation launches the default pnpm and
+        # fails its own version check before openapi-typescript can run.
+        gen = _run_captured([_pnpm(), "exec", "openapi-typescript", "openapi.json", "-o", str(tmp)], cwd=WEB_DIR)
+        if gen.returncode != 0:
+            print(gen.stderr or gen.stdout)
+            return gen.returncode
+        diff = subprocess.run(["diff", "-u", str(SCHEMA_TS), str(tmp)], capture_output=True, text=True, check=False)
+        if diff.returncode != 0:
+            print(diff.stdout)
+        return diff.returncode
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def check_pot_drift() -> int:
-    """Extract .pot fresh, diff against HEAD (POT-Creation-Date line stripped)."""
-    extract = _run_captured(
-        [
-            "uv",
-            "run",
-            "pybabel",
-            "extract",
-            "-F",
-            "babel.cfg",
-            "-o",
-            "src/progress/locales/progress.pot",
-            "--project=Progress",
-            "--version=0.0.1",
-            ".",
-        ]
-    )
-    if extract.returncode != 0:
-        print(extract.stderr or extract.stdout)
-        return extract.returncode
-    # Normalize trailing newlines to match the committed copy (prek's
-    # end-of-file-fixer rewrites Babel's double trailing newline to a single
-    # one on commit). Without this the freshly extracted .pot would always
-    # differ from HEAD and the check would never go green. Mirrors
-    # scripts/makemessages.py's _normalize_eol.
-    text = LOCALE_POT.read_text(encoding="utf-8")
-    LOCALE_POT.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
-    committed = "\n".join(
-        line
-        for line in _git_show_head_blob("src/progress/locales/progress.pot").splitlines()
-        if not line.startswith('"POT-Creation-Date:')
-    )
-    current_text = LOCALE_POT.read_text(encoding="utf-8")
-    current = "\n".join(line for line in current_text.splitlines() if not line.startswith('"POT-Creation-Date:'))
-    if committed == current:
-        return 0
-    # Show a compact diff so the failure is actionable.
-    print("--- committed (HEAD)        vs    freshly extracted (working tree) ---")
-    for line in difflib.unified_diff(
-        committed.splitlines(),
-        current.splitlines(),
-        fromfile="HEAD:progress.pot (POT-Creation-Date stripped)",
-        tofile="working-tree progress.pot (POT-Creation-Date stripped)",
-        lineterm="",
-    ):
-        print(line)
-    return 1
+    """Extract .pot to a temp file; diff against HEAD (POT-Creation-Date stripped)."""
+    tmp = _tempfile(".pot")
+    try:
+        extract = _run_captured(
+            [
+                "uv",
+                "run",
+                "pybabel",
+                "extract",
+                "-F",
+                "babel.cfg",
+                "-o",
+                str(tmp),
+                "--project=Progress",
+                "--version=0.0.1",
+                ".",
+            ]
+        )
+        if extract.returncode != 0:
+            print(extract.stderr or extract.stdout)
+            return extract.returncode
+        committed = _strip_pot_creation_date(LOCALE_POT.read_text(encoding="utf-8"))
+        current = _strip_pot_creation_date(tmp.read_text(encoding="utf-8"))
+        if committed == current:
+            return 0
+        print("--- committed (HEAD)        vs    freshly extracted (working tree) ---")
+        for line in difflib.unified_diff(
+            committed.splitlines(),
+            current.splitlines(),
+            fromfile="HEAD:progress.pot (POT-Creation-Date stripped)",
+            tofile="fresh extract (POT-Creation-Date stripped)",
+            lineterm="",
+        ):
+            print(line)
+        return 1
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def check_i18n_catalog_lint() -> int:

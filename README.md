@@ -1,16 +1,12 @@
-English | [简体中文](README_zh.md)
-
 <div align="center">
 
 # Progress
 
+English | [简体中文](README.zh.md)
+
 **Trace multi-repo code changes, run AI analysis, and deliver progress reports for the open-source projects you follow.**
 
-[![CI](https://github.com/jukanntenn/progress/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jukanntenn/progress/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Vite](https://img.shields.io/badge/Vite-React%2019-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![CI](https://github.com/jukanntenn/progress/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jukanntenn/progress/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](https://fastapi.tiangolo.com/) [![Vite](https://img.shields.io/badge/Vite-React%2019-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 
 </div>
 

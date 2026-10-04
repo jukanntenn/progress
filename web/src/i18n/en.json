@@ -1,12 +1,11 @@
 {
   "app": {
-    "title": "Progress Reports",
+    "title": "Progress",
     "description": "Track open-source project progress with AI-powered reports"
   },
   "nav": {
     "reports": "Reports",
-    "integrations": "Integrations",
-    "config": "Config",
+    "settings": "Settings",
     "language": "Language",
     "rss": "RSS feed",
     "themeSystem": "System theme",
@@ -40,22 +39,74 @@
     "commitCount_one": "Commit",
     "commitCount_other": "Commits"
   },
-  "integrations": {
-    "title": "Integrations",
-    "description": "Registered tracking integrations and their configuration schemas.",
-    "notFound": "Integration not found",
-    "backToList": "Back to integrations",
-    "configSchema": "Config schema"
+  "settings": {
+    "title": "Settings",
+    "group": {
+      "core": "Core",
+      "preferences": "Preferences",
+      "integrations": "Integrations",
+      "notifications": "Notifications",
+      "system": "System",
+      "account": "Account"
+    },
+    "nav": {
+      "core": "Core",
+      "preferences": "Preferences",
+      "github": "GitHub",
+      "analysis": "AI Analysis",
+      "notification": "Notifications",
+      "markpost": "Markpost",
+      "web": "Web",
+      "auth": "Authentication",
+      "observability": "Observability",
+      "repo": "Repositories",
+      "changelog": "Changelog",
+      "proposal": "Proposals",
+      "feed": "Feed",
+      "account": "Change Password",
+      "schemas": "Raw schemas"
+    },
+    "field": {
+      "modified": "Modified",
+      "defaultValue": "Default: {{value}}",
+      "range": "Range: {{min}}–{{max}}",
+      "examples": "Examples: {{values}}",
+      "showDetails": "Show details",
+      "hideDetails": "Hide details",
+      "required": "Required",
+      "selectPlaceholder": "Select…",
+      "recipientPlaceholder": "Type an email, press Enter to add…",
+      "invalidNumber": "Must be a number",
+      "invalidEmail": "Please enter a valid email address",
+      "invalidUrl": "Please enter a valid URL",
+      "valid": "Valid"
+    },
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "confirmPassword": "Confirm New Password",
+    "submit": "Change Password",
+    "changing": "Changing…",
+    "passwordChanged": "Password changed successfully.",
+    "passwordMismatch": "Passwords do not match.",
+    "passwordSameAsCurrent": "New password must differ from current password.",
+    "incorrectPassword": "Current password is incorrect.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "userLabel": "User: {{username}}",
+    "sections": "Sections"
   },
   "config": {
     "title": "Configuration",
-    "description": "View and edit runtime configuration. Secrets are masked.",
+    "description": "View and edit runtime configuration. Secrets are masked on the client.",
     "coreSection": "Core",
     "pluginsSection": "Plugins",
-    "sections": "Sections",
     "save": "Save",
     "saved": "Saved",
     "saveFailed": "Save failed",
+    "saving": "Saving…",
+    "saveFailedFields": "Save failed — {{count}} field(s) need attention",
     "reload": "Reload from DB",
     "reloaded": "Reloaded",
     "reloadFailed": "Reload failed",
@@ -79,7 +130,12 @@
     "schemaDriven": "Schema-driven form",
     "editSection": "Edit",
     "addItem": "Add {{item}}",
-    "removeItem": "Remove"
+    "removeItem": "Remove",
+    "integrations": {
+      "title": "Integrations",
+      "description": "Registered tracking integrations and their configuration schemas.",
+      "configSchema": "Config schema"
+    }
   },
   "common": {
     "loading": "Loading...",
@@ -98,29 +154,24 @@
   },
   "auth": {
     "title": "Sign in",
+    "welcomeHeading": "Welcome back",
+    "welcomeSubtitle": "Sign in to your Progress account",
     "username": "Username",
+    "usernamePlaceholder": "Enter your username",
     "password": "Password",
+    "passwordPlaceholder": "Enter your password",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
-    "loginFailed": "Login failed",
+    "invalidCredentials": "Incorrect username or password",
+    "accountDisabled": "This account has been disabled. Please contact your administrator.",
+    "loginFailed": "Unable to sign in. Please try again.",
+    "usernameRequired": "Please enter your username",
+    "usernameTooShort": "Username must be at least 3 characters",
+    "passwordRequired": "Please enter your password",
+    "passwordTooShort": "Password must be at least 8 characters",
     "logout": "Sign out",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
-  },
-  "settings": {
-    "title": "Settings",
-    "changePassword": "Change Password",
-    "currentPassword": "Current Password",
-    "newPassword": "New Password",
-    "newPasswordPlaceholder": "At least 8 characters",
-    "confirmPassword": "Confirm New Password",
-    "submit": "Change Password",
-    "changing": "Changing…",
-    "passwordChanged": "Password changed successfully.",
-    "passwordMismatch": "Passwords do not match.",
-    "passwordSameAsCurrent": "New password must differ from current password.",
-    "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "userLabel": "User: {{username}}"
+    "loadingApp": "Loading…"
   }
 }

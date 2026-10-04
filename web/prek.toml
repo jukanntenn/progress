@@ -1,0 +1,59 @@
+# prek configuration for the web/ project — a nested workspace subproject of
+# the root prek.toml (https://github.com/j178/prek, "Workspace Mode").
+#
+# In workspace mode prek runs these hooks with CWD = web/ and passes
+# web-relative paths (src/foo.ts, not web/src/foo.ts), so eslint's flat config
+# and prettier's plugins resolve natively — no run-hook.sh path-stripping shim.
+# Run `prek run` from the repo root to hit every project, or `prek run web/` /
+# `cd web && prek run` for frontend only.
+#
+# The group names (`format`, `lint`) mirror the root config 1:1, so the agent
+# hooks in .agents/hooks/_core.py (`prek run --group {format,lint} --files …`)
+# route web/ files here automatically with no shell-side extension→tool mapping.
+
+# Generated artifacts that must stay verbatim. These are ALSO excluded globally
+# by the root prek.toml (the workspace-root exclude is applied before files are
+# distributed to projects); they are repeated here so `cd web && prek run` or
+# `-c web/prek.toml` — which skip the root exclude — still leave them untouched.
+exclude = '''(?x)^(
+    openapi\.json$
+  | src/api/schema\.ts$
+)'''
+
+# ---- frontend (eslint + prettier) ----------------------------------------
+# Calls the locally installed binaries directly (no pnpm/corepack version
+# negotiation per commit). CWD is web/, so ./node_modules/.bin/<tool> resolves
+# against web/node_modules.
+#
+# `shell = "bash"`: prek otherwise execs the first token as a script, and the
+# eslint/prettier node shebangs resolve `node` via PATH — which misses nvm
+# installs in non-interactive shells (agent hooks, CI-like envs). Sourcing nvm
+# first is machine-agnostic ($HOME) and a no-op when node is already on PATH.
+#
+# prek writes `entry` to a scratch script and runs `bash <script> <files…>`, so
+# the selected files arrive as `"$@"` — the tool MUST be invoked with `"$@"` or
+# it silently receives no files (prettier errors; eslint exits 0 unchecked).
+# `exec` hands the tool the script's own slot so its exit code becomes the
+# hook's, unchanged.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "eslint"
+name = "eslint --fix"
+language = "system"
+shell = "bash"
+entry = 'source "$HOME/.nvm/nvm.sh" 2>/dev/null || true; ./node_modules/.bin/eslint --fix --max-warnings 0 "$@"'
+files = "\\.(ts|tsx|js|jsx)$"
+pass_filenames = true
+groups = ["lint"]
+
+[[repos.hooks]]
+id = "prettier"
+name = "prettier --write"
+language = "system"
+shell = "bash"
+entry = 'source "$HOME/.nvm/nvm.sh" 2>/dev/null || true; ./node_modules/.bin/prettier --write "$@"'
+files = "\\.(ts|tsx|js|jsx|json|css|md)$"
+pass_filenames = true
+groups = ["format"]

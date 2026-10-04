@@ -1,12 +1,26 @@
 ---
+# Deploy progress to an environment.
+#
+# Defaults to the staging group (validation); production is a deliberate,
+# explicit step: -e target=prod, only after the change passed acceptance
+# on staging. Staging ships with __FILL_ME__ placeholders the operator
+# must fill (group_vars/staging/env.yml, host_vars/oect.yml) — the playbook
+# refuses to deploy until then.
+# Post-deploy health verification runs scripts/check_deploy.py from the
+# controller machine: waits for /readyz, then compares the deployed git_sha
+# against the local HEAD (skip with -e verify_sha=no).
+#
 # Usage:
-# ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml --vault-password-file ~/.ansible-vault/progress.pwd
+#   ansible-playbook devops/ansible/main.yml                # deploy staging (oect)
+#   ansible-playbook devops/ansible/main.yml -e target=prod # deploy production (fn)
+#   ansible-playbook devops/ansible/main.yml -e verify_sha=no
 
 - name: Deploy progress
-  hosts: fn
+  hosts: "{{ target | default('staging') }}"
   gather_facts: no
-  vars_files:
-    - vars/vault_main.yml
+  # Secrets are per-environment !vault variables in group_vars/<group>/vault.yml
+  # (auto-loaded); the matching password comes from the avpm keyring via the
+  # vault_identity_list in ansible.cfg.
 
   vars:
     app_name: progress
@@ -15,8 +29,22 @@
     compose_file: "{{ app_path }}/docker-compose.yml"
     config_file: "{{ app_path }}/config.toml"
     data_path: "{{ app_path }}/data"
+    check_deploy_script: "{{ playbook_dir }}/../../scripts/check_deploy.py"
 
   tasks:
+    - name: Refuse to deploy with unfilled placeholders
+      ansible.builtin.fail:
+        msg: >-
+          {{ inventory_hostname }} has unfilled deployment variables — fill in
+          devops/ansible/host_vars/{{ inventory_hostname }}.yml and
+          devops/ansible/group_vars/{{ target | default('staging') }}/env.yml
+          (all __FILL_ME__ values) before deploying.
+      when: >-
+        (home | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (host_port | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (health_url | default('__FILL_ME__')) in ('', '__FILL_ME__')
+        or (cron | default('__FILL_ME__')) == '__FILL_ME__'
+
     - name: Ensure paths
       ansible.builtin.file:
         path: "{{ item }}"
@@ -25,30 +53,55 @@
         - "{{ app_path }}"
         - "{{ data_path }}"
 
+    - name: Make the data dir writable by the container user
+      ansible.builtin.file:
+        path: "{{ data_path }}"
+        state: directory
+        mode: a+rwX
+      # The image runs as uid 100 and SQLite creates the DB/WAL/SHM files as
+      # that uid; the controller user cannot chown/chmod files owned by other
+      # uids (e.g. root-seeded data) without root, so only the playbook-owned
+      # directory is widened. Pre-seeded files are the operator's to fix; a
+      # bad one fails boot loudly (DBUnavailableException in progress.db).
+
     - name: Copy docker-compose.yml
-      template:
+      ansible.builtin.template:
         src: docker-compose.yml.j2
         dest: "{{ compose_file }}"
         mode: "0644"
 
     - name: Copy config.toml
-      template:
+      ansible.builtin.template:
         src: config.toml.j2
         dest: "{{ config_file }}"
         mode: "0644"
 
-    - name: Pull images
+    - name: Pull images and start containers
       community.docker.docker_compose_v2:
         project_src: "{{ app_path }}"
         pull: always
         state: present
 
-    - name: Stop containers
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_path }}"
-        state: absent
+    - name: Record expected git sha from local HEAD
+      ansible.builtin.command: git rev-parse HEAD
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      register: local_head
+      when: verify_sha | default(true) | bool
 
-    - name: Start containers
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_path }}"
-        state: present
+    - name: Verify deployment health and image
+      ansible.builtin.command:
+        cmd: "python3 {{ check_deploy_script }} --url {{ health_url }} --sha {{ local_head.stdout }}"
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      when: verify_sha | default(true) | bool
+
+    - name: Verify deployment health
+      ansible.builtin.command:
+        cmd: "python3 {{ check_deploy_script }} --url {{ health_url }}"
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      when: not (verify_sha | default(true) | bool)

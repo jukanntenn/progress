@@ -31,8 +31,8 @@ services:
       # Drive state_home via the BaseSettings env var (PROGRESS_ prefix). No
       # config.toml is mounted — the app runs off defaults + env overrides.
       - PROGRESS_STATE_HOME=/app/data
-      # Empty => the supercronic s6 longrun idles (sleep infinity). Acceptance
-      # and e2e are driven via the Web UI / API, not scheduled pipeline runs.
+      # Empty => the in-process scheduled-run row stays idle. Acceptance and
+      # e2e are driven via the Web UI / API, not scheduled pipeline runs.
       - PROGRESS_SCHEDULE_CRON=
       # Deterministic admin credentials so the Playwright e2e suite can log in
       # without scraping the random password the empty-config bootstrap prints.

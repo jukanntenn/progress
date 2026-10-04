@@ -18,6 +18,8 @@ import importlib.metadata
 import logging
 from typing import Any
 
+from progress.observability import report_severe
+
 logger = logging.getLogger(__name__)
 
 _REGISTRY: dict[str, Any] = {}
@@ -27,6 +29,7 @@ _BUILTIN_INTEGRATIONS: tuple[str, ...] = (
     "progress.integrations.changelog",
     "progress.integrations.proposal",
     "progress.integrations.feed",
+    "progress.integrations.v2ex",
 )
 
 _discovered: bool = False
@@ -69,7 +72,8 @@ def discover_integrations() -> dict[str, Any]:
     result = dict(_REGISTRY)
     try:
         eps = importlib.metadata.entry_points(group="progress.integrations")
-    except Exception:
+    except Exception as e:
+        report_severe(e)
         eps = []
     for ep in eps:
         if ep.name in result:
@@ -78,6 +82,7 @@ def discover_integrations() -> dict[str, Any]:
             result[ep.name] = ep.load()
         except Exception as e:
             logger.warning("failed to load integration entry-point %s: %s", ep.name, e)
+            report_severe(e)
     return result
 
 

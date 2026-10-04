@@ -233,6 +233,50 @@ class TestRepoBuildNotification:
         assert len(events) == 1
         assert events[0].kind == "repo_update"
 
+    async def test_repos_with_updates_counts_commit_or_release(self) -> None:
+        # repos_with_updates = repos with commit_count>0 OR a non-empty releases
+        # list. A repo with neither (success but no new data) is not counted.
+        integration = RepoIntegration()
+        result = RunResult(name="repo")
+        result.reports = [
+            ReportSection(
+                title="a/with-commits",
+                payload={
+                    "repo_name": "a/with-commits",
+                    "commit_count": 5,
+                    "releases": [],
+                    "report_type": "repo_update",
+                    "status": "success",
+                },
+            ),
+            ReportSection(
+                title="b/with-release",
+                payload={
+                    "repo_name": "b/with-release",
+                    "commit_count": 0,
+                    "releases": [{"tag": "v2"}],
+                    "report_type": "repo_update",
+                    "status": "success",
+                },
+            ),
+            ReportSection(
+                title="c/nothing-new",
+                payload={
+                    "repo_name": "c/nothing-new",
+                    "commit_count": 0,
+                    "releases": [],
+                    "report_type": "repo_update",
+                    "status": "success",
+                },
+            ),
+        ]
+        events = await integration.build_notification(
+            result=result,
+            reports=[_report(integration="repo", report_type="repo_update")],
+        )
+        update = next(e for e in events if e.kind == "repo_update")
+        assert update.data["repos_with_updates"] == 2
+
     async def test_no_notification_when_no_reports(self) -> None:
         integration = RepoIntegration()
         events = await integration.build_notification(result=RunResult(name="repo"), reports=[])

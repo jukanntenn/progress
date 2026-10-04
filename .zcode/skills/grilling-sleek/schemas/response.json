@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "Response",
+  "type": "object",
+  "properties": {
+    "round": { "type": "integer", "minimum": 1 },
+    "answers": {
+      "type": "object",
+      "description": "key 为 question id；value 为该题作答",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "selected": {
+            "description": "single/text 题型为 string；multi 题型为 string[]",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "custom_text": {
+            "type": "string",
+            "description": "补充说明，allow_custom_text=true 时携带，否则空串"
+          }
+        },
+        "required": ["selected"]
+      }
+    },
+    "additional_notes": { "type": ["string", "null"], "description": "全局补充说明" },
+    "submitted_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["round", "answers", "submitted_at"]
+}

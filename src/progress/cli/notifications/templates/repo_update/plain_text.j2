@@ -6,7 +6,7 @@
 {% set success_count = repos.values() | select("equalto", "success") | list | length %}
 {% set failed_count = repos.values() | select("equalto", "failed") | list | length %}
 {% set skipped_count = repos.values() | reject("equalto", "success") | reject("equalto", "failed") | list | length %}
-{{ _("Total Repositories") }}: {{ repos | length }}  ✅ {{ success_count }}  ❌ {{ failed_count }}{% if skipped_count > 0 %}  ➖ {{ skipped_count }}{% endif %}
+{{ _("Total Repositories") }}: {{ repos | length }}  {{ status_icon("repo_status", "success") }} {{ success_count }}  {{ status_icon("repo_status", "failed") }} {{ failed_count }}{% if skipped_count > 0 %}  {{ status_icon("repo_status", "skipped") }} {{ skipped_count }}{% endif %}
 
 {% for name in (repos.keys() | list)[:5] %}
 - {{ name }}

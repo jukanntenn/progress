@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next'
-import { PageContainer } from '@/components/PageContainer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { $api } from '@/api/client'
@@ -10,9 +9,11 @@ export default function IntegrationsPage() {
   const { data, error, isPending } = $api.useQuery('get', '/api/v1/integrations')
 
   return (
-    <PageContainer>
-      <h1 className="mb-2 text-2xl font-bold">{t('integrations.title')}</h1>
-      <p className="text-muted-foreground mb-6 text-sm">{t('integrations.description')}</p>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-foreground text-lg font-bold">{t('config.integrations.title')}</h2>
+        <p className="text-muted-foreground mt-1 text-sm">{t('config.integrations.description')}</p>
+      </div>
 
       {isPending ? (
         <div className="space-y-4">
@@ -32,7 +33,7 @@ export default function IntegrationsPage() {
             <Card key={integration.name}>
               <CardHeader>
                 <CardTitle className="font-mono">{integration.name}</CardTitle>
-                <CardDescription>{t('integrations.configSchema')}</CardDescription>
+                <CardDescription>{t('config.integrations.configSchema')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <pre className="bg-muted max-h-96 overflow-auto rounded-md p-4 text-xs">
@@ -43,6 +44,6 @@ export default function IntegrationsPage() {
           ))}
         </div>
       )}
-    </PageContainer>
+    </div>
   )
 }

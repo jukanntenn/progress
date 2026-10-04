@@ -339,6 +339,29 @@
     border: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.7));
   }
 
+  .glass-chip {
+    background: rgb(var(--glass-bg-primary) / 0.5);
+    backdrop-filter: blur(var(--glass-blur-1)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur-1)) saturate(var(--glass-saturate));
+    border: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.6));
+    box-shadow: inset 1px 1px 0
+      rgb(var(--glass-specular) / calc(var(--glass-opacity-specular) * 0.7));
+    transition: background-color 150ms ease;
+  }
+  .glass-chip:hover {
+    background: rgb(var(--glass-bg-primary) / 0.7);
+  }
+
+  .glass-popover {
+    background: rgb(var(--glass-bg-primary) / 0.92);
+    backdrop-filter: blur(var(--glass-blur-3)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur-3)) saturate(var(--glass-saturate));
+    border: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.8));
+    box-shadow:
+      var(--shadow-glass-elevated),
+      inset 1px 1px 0 rgb(var(--glass-specular) / var(--glass-opacity-specular));
+  }
+
   .skeleton {
     position: relative;
     overflow: hidden;
@@ -480,31 +503,51 @@
   }
 
   .prose-progress details {
-    margin-bottom: 1.5rem;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: rgb(var(--glass-bg-tertiary) / 0.3);
-    border: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.5));
+    margin-bottom: 0.5rem;
+    border-radius: var(--radius-md);
   }
 
   .prose-progress summary {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
     cursor: pointer;
-    padding: 0.75rem 1.25rem;
+    padding: 0.375rem 0.75rem;
+    margin: 0;
     font-weight: 500;
     user-select: none;
+    border-radius: var(--radius-md);
     transition: background-color 150ms ease;
+    list-style: none;
+  }
+  .prose-progress summary::-webkit-details-marker {
+    display: none;
+  }
+  .prose-progress summary::before {
+    content: '';
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 150ms ease;
+    opacity: 0.6;
+  }
+  .prose-progress details[open] > summary::before {
+    transform: rotate(45deg);
   }
 
   .prose-progress summary:hover {
-    background: rgb(var(--accent) / 0.3);
+    background: rgb(var(--accent) / 0.15);
   }
 
   .prose-progress details[open] summary {
-    border-bottom: 1px solid rgb(var(--glass-border) / calc(var(--glass-opacity-border) * 0.4));
+    margin-bottom: 0.25rem;
   }
 
   .prose-progress details > *:not(summary) {
-    padding: 1rem 1.25rem;
+    padding: 0.25rem 0 0.5rem 1.25rem;
   }
 }
 
@@ -551,6 +594,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -614,6 +668,10 @@
 
   .animate-scale-in {
     animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .animate-toast-in {

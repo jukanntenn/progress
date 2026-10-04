@@ -6,7 +6,8 @@ is **independent** from the commit checkpoint (spec repo §2): a check may
 advance either one without affecting the other.
 
 Algorithm (spec repo §6.2):
-1. Query all releases (GitHub API already filters draft/prerelease).
+1. Query all published releases (the client filters drafts; prereleases
+   are included).
 2. Empty list → ``None``.
 3. Normalize the checkpoint timestamp (string / naive datetime → aware UTC).
 4. First run → candidate = the latest single release by ``published_at``.
@@ -24,7 +25,7 @@ from typing import TYPE_CHECKING
 from progress.cli.git.local import get_diff
 from progress.errors import ProgressException
 from progress.integrations.repo.analysis import TruncatedDiff, truncate_diff
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -210,6 +211,7 @@ async def _collect_releases(ref: RepoRef, gh: GitHubClient) -> list[ReleaseRecor
             )
     except (ProgressException, Exception) as e:
         logger.warning("release listing failed for %s: %s", ref.slug, e)
+        report_severe(e)
         record_business_event(
             "progress.git.release_listing_failed",
             attributes={"repo": ref.slug, "owner": ref.owner, "reason": type(e).__name__},
@@ -235,6 +237,7 @@ async def _hydrate_candidate(
         candidate.commit_hash = await gh.get_release_commit_sha(ref, candidate.tag)
     except ProgressException as e:
         logger.warning("release commit SHA lookup failed for %s@%s: %s", ref.slug, candidate.tag, e)
+        report_severe(e)
         candidate.commit_hash = None
 
     if last_release_commit_hash and candidate.commit_hash and dest.is_dir():
@@ -259,6 +262,7 @@ async def _hydrate_candidate(
                     "new_hash": candidate.commit_hash,
                 },
             )
+            report_severe(e)
             record_business_event(
                 "progress.git.diff_failed",
                 attributes={

@@ -27,6 +27,7 @@ from asgiref.sync import sync_to_async
 import miniflux
 
 from progress.errors import ExternalServiceException
+from progress.observability import report_severe
 from progress.utils.http import retry_async
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,7 @@ class MinifluxClient:
                 out.append(_parse_entry(item))
             except ExternalServiceException as e:
                 logger.warning("skipping malformed miniflux entry: %s", e)
+                report_severe(e)
         return out
 
     async def get_feeds(self) -> list[dict[str, Any]]:

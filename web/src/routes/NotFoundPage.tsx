@@ -9,7 +9,7 @@ export default function NotFoundPage() {
   const { t } = useTranslation()
 
   return (
-    <PageContainer>
+    <PageContainer size="wide">
       <Card>
         <CardContent className="py-16 text-center">
           <div className="mb-4 text-3xl font-bold">{t('common.notFound')}</div>

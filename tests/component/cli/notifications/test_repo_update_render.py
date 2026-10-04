@@ -16,6 +16,7 @@ import json
 
 import pytest
 
+from progress.cli.notifications.status import status_color, status_icon, status_label
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.templating import create_environment
 
@@ -35,6 +36,10 @@ _SKIPPED_REPOS = ["r_s1"]
 def env():
     env = create_environment(_TEMPLATE_DIRS, autoescape=False)
     env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # type: ignore
+    # Mirror JinjaRenderer._get_env: templates resolve status color/icon/label
+    # from the single source (spec 10).
+
+    env.globals.update({"status_color": status_color, "status_icon": status_icon, "status_label": status_label})  # type: ignore
     return env
 
 
@@ -82,8 +87,9 @@ def test_html_renders_failed_repos(env, repo_statuses: dict[str, str]) -> None:
     # failure state → red header + FAILED badge in the header
     assert "background-color:#F53F3F" in html
     assert "FAILED" in html
-    # failed count appears in the stat tile (red-tinted) and the section heading
-    assert f"Failed Repositories ({len(_FAILED_REPOS)})" in html
+    # failed count appears in the stat tile (red-tinted); the section heading
+    # carries no redundant count (the header badge already shows it)
+    assert "Failed Repositories" in html
 
 
 def test_card_json_renders_failed_count(env, repo_statuses: dict[str, str]) -> None:

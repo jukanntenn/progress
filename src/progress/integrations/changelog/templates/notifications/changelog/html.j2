@@ -1,32 +1,20 @@
 {% from "_email.j2" import email_shell, badge, cta_button, section_heading %}
 {% set entries = entries or [] %}
-{% set visible = entries[:5] %}
-{% set rest = entries[5:] %}
-{% set level_color = {"MAJOR": "red", "MINOR": "blue", "PATCH": "grey"} %}
-{% call email_shell(title, "indigo", "RELEASE " ~ (entries | length), "indigo") %}
-{{ section_heading("📦 " ~ _("Version List")) }}
+{% call email_shell(title, "indigo", "RELEASE " ~ (entries | length), "indigo", generated_at=generated_at) %}
+{{ section_heading("📦 " ~ _("Version List") ~ " (" ~ (entries | length) ~ ")") }}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0 6px;margin:0 0 4px 0;">
-  {% for e in visible %}
-  {% set lc = level_color.get(e.level, "") %}
+  {% for e in entries %}
+  {% set lc = status_color("changelog_level", e.level) if e.level else "" %}
   <tr>
-    <td width="80%" valign="middle" style="background-color:#F7F8FA;border-radius:8px;padding:10px 12px;font-size:14px;color:#1D2129;">
+    <td valign="middle" style="background-color:#F7F8FA;border-radius:8px;padding:10px 12px;font-size:14px;color:#1D2129;word-break:break-word;">
       <strong>{{ e.name }}</strong>　<code style="background-color:#F2F3F5;padding:1px 6px;border-radius:3px;font-size:12px;color:#4E5969;">{{ e.version }}</code>
       {%- if e.level %}　{{ badge(e.level ~ " ⬆", lc) }}{% endif -%}
-    </td>
-    <td width="6"></td>
-    <td width="20%" valign="middle" align="right" style="background-color:#F7F8FA;border-radius:8px;padding:10px 12px;">
-      <a href="{{ e.url }}" style="display:inline-block;padding:4px 12px;border-radius:5px;background-color:#FFFFFF;color:#3370FF;font-size:12px;text-decoration:none;border:1px solid #E5E6EB;">{{ _("Release Note") }}</a>
+      {%- if e.url %}　<a href="{{ e.url }}" style="color:#3370FF;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;">{{ _("Release Note") }} →</a>{%- endif -%}
     </td>
   </tr>
   {% endfor %}
 </table>
-{% if rest %}
-<div style="background-color:#F7F8FA;border:1px solid #E5E6EB;border-radius:6px;padding:10px 12px;font-size:13px;color:#4E5969;margin-top:8px;">
-  <div style="font-weight:600;color:#86909C;margin-bottom:4px;">▸ {{ _("Expand remaining") }} {{ rest | length }} {{ _("versions") }}</div>
-  {% for e in rest %}<div style="margin:2px 0;"><strong>{{ e.name }}</strong>　<code style="background-color:#F2F3F5;padding:1px 6px;border-radius:3px;font-size:12px;">{{ e.version }}</code></div>{% endfor %}
-</div>
-{% endif %}
 {% if markpost_url %}
-{{ cta_button(markpost_url, _("View Full Changelog") ~ "（Markpost）", "indigo") }}
+{{ cta_button(markpost_url, _("View Report"), "indigo") }}
 {% endif %}
 {% endcall %}

@@ -113,36 +113,36 @@ pydantic-settings 的 `settings_customise_sources` 返回元组,**先返回的�
 
 - **一行一分区**:`section="core"` 存核心配置;`section="repo"` 存 repo 插件配置。
 - **`data` 永远是 JSON 对象**(无论核心还是插件),统一格式。
-- **校验用 JSON Schema,schema 在代码层定义**(Pydantic 模型 `model_json_schema()`):核心定义 core schema,每个插件定义自己 schema,注册到注册表。写入前用对应 schema + `jsonschema.Draft202012Validator` 校验。
+- **校验用 Pydantic 模型**(`model_validate`):核心定义 core 模型,每个插件定义自己模型,注册到注册表。写入前用对应模型校验(`lax` 模式 + `extra="forbid"`),校验失败抛 `ConfigException`(API 层转 422),**DB 不变**。不用 jsonschema validator——jsonschema 不支持 discriminated union 的 `discriminator` 关键字(OpenAPI 扩展),Pydantic 原生支持且全栈已统一。
 - **框架提供统一 API**:`get_config(section)` / `set_config(section, data)` 管理这些配置。
 - **前端通过一个接口获取全部配置**(见 12):`GET /api/v1/config` 返回 `{core: {...}, repo: {...}, ...}`;`GET /api/v1/config/schema` 返回合并的 schema。
 
-## 密钥处理:SecretStr(强制)
+## 密钥处理:明文往返 + 前端遮蔽(强制)
 
-所有密钥字段**必须**用 Pydantic `SecretStr`,不用裸 `str` + `json_schema_extra` 注解。
+所有密钥字段**必须**用 Pydantic `SecretStr`,不用裸 `str` + `json_schema_extra` 注解。SecretStr 保证:DB 序列化可控、JSON Schema 自动生成 `format: password`(前端自动密码框)、`model_dump(mode="json")` 自动输出 `**********`(日志/调试安全)。
 
-### SecretStr 流转链
+### 明文往返链(2026-08-10 重构定稿)
 
 | 阶段 | 行为 |
 |---|---|
 | 配置文件/种子(明文 TOML) | 写真值(如 `gh_token = "ghp_xxx"`) |
-| 导入 DB | `SecretStr` 序列化存真值(DB 是可信内部存储) |
-| `GET /api/v1/config` | `model_dump_json()` 自动输出 `**********`(脱敏免费,真值不出库) |
-| `PUT /api/v1/config` | 提交值若为 `**********` 则保留 DB 原值;否则更新 |
-| JSON Schema | `SecretStr` 自动生成 `format: password, writeOnly: true`(前端表单自动密码框) |
+| 写入 DB(`set_config`) | Pydantic `model_validate` 校验 → `model_dump(mode="python")` + SecretStr 手动解包 → 存**规范化明文**(coercion 后,如 `"3"` → `3`)。**校验失败绝不落库** |
+| `GET /api/v1/config` | 明文返回(secret 为真实值),前端用 `type="password"` 浏览器原生遮蔽 |
+| `PUT /api/v1/config` | 前端提交整个表单(formData 明文)→ 后端校验 + dump 明文。提交什么存什么,无 sentinel、无按位置合并 |
+| JSON Schema | `SecretStr` 自动生成 `format: password, writeOnly: true`(前端表单自动密码框 + eye 切换显示) |
 
 ### 决策理由
 
-- `SecretStr` 在 `model_dump_json()` 默认输出 `**********`(基于 `pydantic/types.py:1742` `_secret_display`),真实密钥永不到达浏览器。
-- 删除当前 `config_store.py` 的 ~200 行手写 schema-walker 脱敏(`_resolve_ref`/`_mask_secrets`/`_merge_secret_placeholders`)——它们存在正是为弥补"明文 str"的缺陷,SecretStr 让其彻底消失。
-- `model_json_schema()` 对 SecretStr 自动生成 `format: password, writeOnly: true`,前端表单自动渲染密码框。
+- 内网受信环境:明文往返从根本上消除"mask sentinel 字符串巧合匹配"的脆弱性(sentinel 机制曾在 `SecretStr` 接受 `**********` 作为真值时静默损坏配置)。
+- 消除整个 sentinel 脱敏补偿层(按数组下标合并 secret、mask 还原、mask 保留),列表删改/重排天然正确——每个 secret 值随其对象整体移动。
+- 系统/Ansible 内部字段(`state_home`、`auth.secret_key`、`auth.initial_admin_password`)从可编辑 schema 剥离、GET 返回剥离、写入时始终保留 DB 原值,前端不可见也不可覆盖。
+- `SecretStr` 在 `model_dump_json()` 默认输出 `**********`(基于 `pydantic/types.py:1742` `_secret_display`),日志/异常上报天然脱敏;scrub 层(见 04)按字段名 redact 兜底。
 
-### 否掉的方案
+### 写入失败契约
 
-| 方案 | 否掉理由 |
-|---|---|
-| 保持现状 str + schema-driven masking(`mask_secrets` walker) | 违背"最优设计"原则:那套是为弥补明文缺陷的补偿代码,SecretStr 是更优解;且与"全新重构不优雅实现"目标冲突 |
-| 手写脱敏 filter | 每个序列化点都要记得调用,易漏;SecretStr 自动覆盖所有路径 |
+- 写入校验失败 → `ConfigException` → API 422 + 结构化错误(`loc: msg` 行,前端可映射到字段)→ **DB 保持原值**(写入未发生)。
+- 运行时加载失败(启动 merge / reload)→ 保持 Ansible 默认配置 + 告警,不崩溃。
+- `GET /config` 发现 DB 数据损坏 → 422(不部分降级、不返回损坏数据)。
 
 ## 配置组织(模块划分)
 

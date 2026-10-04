@@ -1,62 +1,72 @@
-# 可观测性上线手册（OpenTelemetry + Bugsink）
+# Observability rollout runbook (OpenTelemetry + Bugsink)
 
-本手册指导如何在生产环境上线本次可观测性功能：OpenTelemetry traces/metrics 输出到容器内 `/app/data/observability/*.jsonl`（映射到宿主机 `./data/observability/`），错误/崩溃通过 `sentry-sdk` 上报到 Bugsink（`http://192.168.5.50:8770/`）。
+English | [中文](observability-deploy.zh.md)
 
-- **回滚成本：低**。OTel traces/metrics 始终开启（代码常量，无开关）；Bugsink 由 DSN 控制，清空即下线。
-- **影响面**：仅新增 2 个遥测文件与到 Bugsink 的出站错误上报；不改变任何业务逻辑。
-- 设计与实现记录见 [`observability.md`](./observability.md)。
+This runbook covers bringing the observability feature to production: OpenTelemetry traces/metrics are written to `/app/data/observability/*.jsonl` inside the container (mapped to `./data/observability/` on the host), and errors/crashes are reported to Bugsink (`http://192.168.5.50:8770/`) via `sentry-sdk`.
+
+- **Rollback cost: low.** OTel traces/metrics are always on (a code constant, no switch); Bugsink is driven by its DSN — clear it and reporting stops.
+- **Blast radius**: two new telemetry files plus outbound error reporting to Bugsink; no business logic changes.
+- Design and implementation notes live in [`observability.md`](./observability.md).
 
 ---
 
-## 0. 前置条件（Pre-flight）
+## 0. Pre-flight
 
-| 项 | 要求 | 验证方式 |
+| Item | Requirement | How to verify |
 |---|---|---|
-| Bugsink 服务 | 已运行于 `http://192.168.5.50:8770/` | `curl -sS -o /dev/null -w '%{http_code}' http://192.168.5.50:8770/` → 期望 `302`（登录重定向） |
-| Bugsink 项目 + DSN | 已在 Bugsink 创建项目并取得 DSN | 见 §1 |
-| 生产主机 → Bugsink 网络 | 容器可直连 `192.168.5.50:8770`（同局域网，无需走 `192.168.5.101:7890` 代理） | 在**生产主机**上执行上面那条 curl |
-| 镜像依赖 | 新镜像已包含 OTel/sentry-sdk 依赖 | 见 §3 构建步骤（Dockerfile 在构建时从 `uv.lock` 重新生成 requirements） |
-| Ansible Vault | 持有 `~/.ansible-vault/progress.pwd` | 见 §2 |
+| Bugsink service | Running at `http://192.168.5.50:8770/` | `curl -sS -o /dev/null -w '%{http_code}' http://192.168.5.50:8770/` → expect `302` (login redirect) |
+| Bugsink project + DSN | Project created in Bugsink, DSN in hand | See §1 |
+| Production host → Bugsink network | The container can reach `192.168.5.50:8770` directly (same LAN; the `192.168.5.101:7890` proxy is not involved) | Run the curl above **on the production host** |
+| Image dependencies | The new image ships the OTel/sentry-sdk dependencies | See the build steps in §3 (the Dockerfile regenerates requirements from `uv.lock` at build time) |
+| Ansible Vault | Holds `~/.ansible-vault/progress.pwd` | See §2 |
 
-> 提示：验收阶段已用 DSN `http://98f360b91ad9474d9144c44327913cf0@192.168.5.50:8770/2`（project_id=2）验证过端到端投递（HTTP 200）。生产可直接复用该项目，或新建独立项目。
+> Tip: acceptance already verified end-to-end delivery (HTTP 200) with the DSN `http://98f360b91ad9474d9144c44327913cf0@192.168.5.50:8770/2` (project_id=2). Production can reuse that project as-is or create a dedicated one.
 
 ---
 
-## 1. 准备 Bugsink 项目与 DSN
+## 1. Prepare the Bugsink project and DSN
 
-1. 浏览器打开 `http://192.168.5.50:8770/`，登录。
-2. 进入（或新建）目标项目 → Project Settings，复制 **DSN**，形如：
+1. Open `http://192.168.5.50:8770/` in a browser and log in.
+2. Open (or create) the target project → Project Settings, copy the **DSN**, which looks like:
    ```
    http://<public-key>@192.168.5.50:8770/<project-id>
    ```
-   记下完整 DSN（含公钥与 project-id），后续作为 secret 注入。
-3. （可选）清理验收期间遗留的测试事件：在 project 2 中 resolve/delete 以下 event_id：
-   `58210c809fdf426d8b28f5d262e2cb0d`、`98db4309a3b34feab782f3081fe1084b`、`db107e65b17546d9873aa0e825e90e43`、`c9fd1ee92ea3451d948954fd94756ce0`、`e5e9f9ba69a14d8eb9eee53ab729ae22`、`3fd42583bdd242b2a347946ac4b4e03c`。
+   Note down the full DSN (public key and project-id included); it is injected as a secret later.
+3. (Optional) Clean up the test events left over from acceptance: in project 2, resolve/delete the following event_ids: `58210c809fdf426d8b28f5d262e2cb0d`, `98db4309a3b34feab782f3081fe1084b`, `db107e65b17546d9873aa0e825e90e43`, `c9fd1ee92ea3451d948954fd94756ce0`, `e5e9f9ba69a14d8eb9eee53ab729ae22`, `3fd42583bdd242b2a347946ac4b4e03c`.
 
 ---
 
-## 2. 注入配置（Ansible 管理）
+## 2. Inject the configuration (Ansible-managed)
 
-生产配置由 Ansible 渲染。DSN 是 secret，按本项目惯例放入 vault，并在 compose 模板中以环境变量引用。
+Production configuration is rendered by Ansible. The DSN is a secret; by this project's convention it goes into the vault and is referenced as an environment variable in the compose template.
 
-> 推荐用**环境变量**启用（DSN 不落配置文件、由 vault 管理、Ansible 全权托管）。`[observability]` 是**基础设施**配置，每次启动都会重新读取，因此通过环境变量即可生效，无需编辑种子文件或重启服务。
+> Enabling through **environment variables** is recommended (the DSN never lands in a config file, stays vault-managed, and is fully owned by Ansible). `[observability]` is **infrastructure** configuration that is re-read on every start, so the environment variable takes effect on its own — no seed-file edit or service restart needed.
 
-### 2.1 把 DSN 写入 Vault
+### 2.1 Write the DSN into the vault
+
+Each environment's secrets live in `devops/ansible/group_vars/<env>/vault.yml` as **individually encrypted single variables** (auto-loaded by group). The vault passwords are split per environment into two vault-ids — `progress-prod` for the `prod` group (`fn`), `progress-test` for the `staging` group (`oect`) — provided by the avpm keyring (see `vault_identity_list` in `ansible.cfg`). Add a variable to an environment (alongside the existing `gh_token`, `feishu_webhook_url`, and friends) with `scripts/vault.py` (parse/upsert of single-variable blocks, strict single-identity decryption, self-check before writing to disk):
 
 ```bash
-ansible-vault edit devops/ansible/vars/vault_main.yml \
-  --vault-password-file ~/.ansible-vault/progress.pwd
+# 明文从 stdin 读入（剥掉一个尾部换行；--exact 保留字节原样），加密后 upsert
+uv run python scripts/vault.py set staging bugsink_dsn --stdin
+uv run python scripts/vault.py list --all                        # 各环境变量名 + 加密标签（不解密）
+uv run python scripts/vault.py check                             # 全环境全变量解密验证（不输出明文）
+uv run python scripts/vault.py get staging bugsink_dsn --quiet   # 解密到 stdout（唯一的明文输出命令，管道给消费方）
 ```
 
-新增一行（与现有 `gh_token`、`feishu_webhook_url` 等 secret 并列）：
+The equivalent native command (the tool is built on exactly these two primitives; writing it by hand bypasses the pre-write self-check and the structural validation):
 
-```yaml
-bugsink_dsn: "http://<public-key>@192.168.5.50:8770/<project-id>"
+```bash
+# 单变量加密追加（解密后的明文从 stdin 输入，不落命令行历史）
+ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
+  --stdin-name bugsink_dsn >> devops/ansible/group_vars/staging/vault.yml
 ```
 
-### 2.2 在 compose 模板中启用
+The value looks like `http://<public-key>@192.168.5.50:8770/<project-id>`.
 
-编辑 `devops/ansible/templates/docker-compose.yml.j2`，在 `environment:` 下追加：
+### 2.2 Enable it in the compose template
+
+Edit `devops/ansible/templates/docker-compose.yml.j2` and append under `environment:`:
 
 ```jinja
     environment:
@@ -66,11 +76,11 @@ bugsink_dsn: "http://<public-key>@192.168.5.50:8770/<project-id>"
       - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
 ```
 
-OTel traces/metrics 始终开启（写 `/app/data/observability/`，无需配置）。如需改走 OTLP collector，追加 `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector>:4318`。
+OTel traces/metrics are always on (writing to `/app/data/observability/`, no configuration needed). To route through an OTLP collector instead, append `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector>:4318`.
 
-### 2.3（可选）改走 Web UI / DB config
+### 2.3 (Optional) Go through the Web UI / DB config instead
 
-也可在 Web UI 的 Settings 页面或通过 API 设置 `core.observability.bugsink.dsn`（Web-class config，存 DB `config` 表）：
+You can also set `core.observability.bugsink.dsn` from the Web UI's Settings page or via the API (Web-class config, stored in the DB `config` table):
 
 ```toml
 [core.observability.bugsink]
@@ -78,85 +88,85 @@ dsn = "http://<public-key>@192.168.5.50:8770/<project-id>"
 environment = "production"
 ```
 
-> 建议优先用 §2.1/2.2 的 env+vault 方式（DSN 不进文件）。本节仅作备选。
+> Prefer the env+vault route of §2.1/2.2 (the DSN stays out of files). This section is only the fallback.
 
-提交代码与模板改动后进入构建。
+Commit the code and template changes, then move on to the build.
 
 ---
 
-## 3. 构建并推送镜像
+## 3. Build and push the image
 
 ```bash
-# 多架构构建并推送到 192.168.5.50:5000
-python docker/build.py --push
+# 多架构构建并推送到 192.168.5.50:5000（生产 tag 为 :main）
+uv run python docker/build.py --push --tags main
 ```
 
-确认推送成功（镜像 `192.168.5.50:5000/progress:latest` 已更新）。Dockerfile 会在构建阶段执行 `uv export …`，新依赖（opentelemetry-*、sentry-sdk）随之固化进镜像。
+Confirm the push succeeded (the `192.168.5.50:5000/progress:main` image is updated). The Dockerfile runs `uv export …` during the build stage, so the new dependencies (opentelemetry-*, sentry-sdk) are baked into the image.
 
 ---
 
-## 4. 部署到生产
+## 4. Deploy to production
 
 ```bash
 ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
   --vault-password-file ~/.ansible-vault/progress.pwd
 ```
 
-playbook 会：渲染 compose → `pull: always` 拉取新镜像 → 重建容器。容器内 s6-overlay 自动拉起 fastapi（长驻）、cron（supercronic，按 `30 8,22 * * *` 运行 `progress check`）等服务。
+The playbook renders the compose file → pulls the new image with `pull: always` → recreates the container. Inside the container, s6-overlay automatically brings up fastapi (long-running), cron (supercronic, running `progress check` on `30 8,22 * * *`), and the other services.
 
 ---
 
-## 5. 上线后验证（Post-deploy）
+## 5. Post-deploy verification
 
-> 容器名 `progress`；下文 `docker compose` 在生产机的 `~/docker/progress/`（即 `app_path`）下执行。
+> The container is named `progress`; the `docker compose` commands below run on the production host under `~/docker/progress/` (that is, `app_path`).
 
-### 5.1 启动日志确认初始化成功
+### 5.1 Startup logs confirm initialization
 ```bash
 docker compose logs app 2>&1 | grep -iE "Bugsink error reporting enabled|telemetry"
 ```
-期望看到 `Bugsink error reporting enabled (environment=prod)`。无报错即 `sentry-sdk` 初始化成功。
+Expect to see `Bugsink error reporting enabled (environment=prod)`. No errors means `sentry-sdk` initialized successfully.
 
-### 5.2 遥测文件已生成
+### 5.2 Telemetry files exist
 ```bash
 # API 服务（长驻）会持续写 traces（HTTP/DB span）
 docker exec progress ls -la /app/data/observability/
 ```
-期望出现 `traces.jsonl`、`metrics.jsonl`。也可在宿主机查看 `./data/observability/`。
+Expect `traces.jsonl` and `metrics.jsonl` to appear. You can also inspect `./data/observability/` on the host.
 
-### 5.3 触发一次 run，验证业务链路 span
+### 5.3 Trigger one run and verify the business-pipeline spans
 ```bash
 # 手动跑一次 run（与 cron 同路径），随后检查 traces
 docker exec progress progress run -c /app/config.toml
 docker exec progress sh -c "tail -n 3 /app/data/observability/traces.jsonl"
 ```
-期望看到 `progress.run`、`progress.integration.repo`、`progress.git.op`、`progress.ai.call` 等 span，且子 span 的 `parentSpanId` 指向 `progress.run`。
+Expect spans such as `progress.run`, `progress.integration.repo`, `progress.git.op`, and `progress.ai.call`, with child spans' `parentSpanId` pointing at `progress.run`.
 
-### 5.4 指标文件
+### 5.4 The metrics file
 ```bash
 docker exec progress tail -n 1 /app/data/observability/metrics.jsonl | python3 -m json.tool
 ```
-期望包含 `progress.repos.checked`、`progress.git.op.duration` 等指标。
+Expect metrics such as `progress.repos.checked` and `progress.git.op.duration`.
 
-### 5.5 日志 trace 关联
+### 5.5 Log-trace correlation
 ```bash
 docker exec progress tail -n 20 /app/data/logs/progress.log
 ```
-期望 JSON 日志行带 `"trace_id": "…", "span_id": "…"` 字段。
+Expect JSON log lines carrying `"trace_id": "…", "span_id": "…"` fields.
 
-### 5.6 Bugsink 收到事件
-- 等待一次真实的 check 报错（若有），或临时制造一个：在容器内 `python -c "import sentry_sdk; ..."` 仅限排障；
-- 更稳妥：到 Bugsink 项目页查看是否出现新 issue；本次验收已用独立 envelope 与 sentry-sdk 两条路径确认 HTTP 200。
+### 5.6 Bugsink receives events
+- Wait for a real check error (if any), or fabricate one temporarily: `python -c "import sentry_sdk; ..."` inside the container is for troubleshooting only;
+- Safer: check the Bugsink project page for a new issue; this acceptance pass already confirmed HTTP 200 through both an independent envelope and the sentry-sdk path.
 
 ---
 
-## 6. 运维注意事项
+## 6. Operations notes
 
-### 6.1 ⚠️ 文件保留（生产必读）
-当前遥测文件为**追加写、无内置轮转**，100% 采样下会**无限增长**。生产上线**必须**配置轮转，否则磁盘会被写满。
+### 6.1 ⚠️ File retention (read before production)
+The telemetry files are **append-only with no built-in rotation** and grow **without bound** at 100% sampling. A production rollout **must** configure rotation, or the disk fills up.
 
-推荐在生产机上用 `logrotate` 的 `copytruncate`（导出器持有文件句柄追加写，`copytruncate` 可在不重启进程的前提下切割）：
+On the production host, prefer `logrotate` with `copytruncate` (the exporters hold the file handles and append; `copytruncate` rotates without restarting the process):
 
-新增 `/etc/logrotate.d/progress-observability`：
+Create `/etc/logrotate.d/progress-observability`:
 ```
 /path/to/data/observability/*.jsonl {
     daily
@@ -168,52 +178,52 @@ docker exec progress tail -n 20 /app/data/logs/progress.log
     size 100M
 }
 ```
-（把路径替换为生产机上的实际 `data/observability` 绝对路径。）日常按 100M 或每日切割，保留 14 份压缩归档。
+(Replace the path with the actual absolute `data/observability` path on the production host.) Rotate at 100M or daily, keeping 14 compressed archives.
 
-### 6.2 文件位置
-- 容器内：`/app/data/observability/{traces,metrics}.jsonl`
-- 宿主机：`<app_path>/data/observability/`（即 `./data/observability/`）
-- 人工/AI 检索：见 [`observability.md`](./observability.md) 的 jq 示例。
+### 6.2 File locations
+- Inside the container: `/app/data/observability/{traces,metrics}.jsonl`
+- On the host: `<app_path>/data/observability/` (that is, `./data/observability/`)
+- Human/AI inspection: see the jq examples in [`observability.md`](./observability.md).
 
-### 6.3 性能与配额
-- 100% 采样，内部低流量工具，开销可忽略；CLI（短驻）用同步 processor，API（长驻）批量导出。
-- Bugsink 配额：每项目默认保留 10000 事件、5 分钟/小时/月有上限，超限返回 HTTP 429（客户端自动退避）。本项目错误量低，一般不会触达。
-
----
-
-## 7. 回滚 / 关闭
-
-清空 DSN 即可关闭 Bugsink 上报，**无需回滚镜像**：
-
-**A. 仅关闭 Bugsink（保留镜像）**：编辑 `docker-compose.yml.j2`，删除（或留空）`PROGRESS_OBSERVABILITY__BUGSINK__DSN`，重跑 §4 部署。重启后不再联网上报（OTel 文件仍写本地）。
-**B. 完全回滚**：部署上一版镜像并移除上述 env。
-
-回滚后已写入的 `*.jsonl` 与 Bugsink 中已入库的事件保留，不影响业务。
+### 6.3 Performance and quotas
+- 100% sampling on an internal low-traffic tool: negligible overhead; the CLI (short-lived) uses a synchronous processor, the API (long-running) exports in batches.
+- Bugsink quotas: each project keeps 10000 events by default with per-5-minute/hour/month caps; exceeding them returns HTTP 429 (the client backs off automatically). This project's error volume is low and rarely reaches them.
 
 ---
 
-## 8. 故障排查
+## 7. Rollback / turning it off
 
-| 现象 | 排查 |
+Clearing the DSN turns Bugsink reporting off — **no image rollback needed**:
+
+- **A. Turn off Bugsink only (keep the image)**: edit `docker-compose.yml.j2`, remove (or empty) `PROGRESS_OBSERVABILITY__BUGSINK__DSN`, and re-run the §4 deploy. After the restart, outbound reporting stops (OTel files still write locally).
+- **B. Full rollback**: deploy the previous image and drop the env above.
+
+After a rollback, the already-written `*.jsonl` files and the events already stored in Bugsink stay put; business is unaffected.
+
+---
+
+## 8. Troubleshooting
+
+| Symptom | Investigation |
 |---|---|
-| `data/observability/` 无文件 | OTel 始终开启，文件应自动生成；`docker compose logs app` 查看是否有 instrumentation 警告；确认 `/app/data/` 卷已挂载 |
-| traces.jsonl 为空 / span 缺失 | API 路径：发一个 HTTP 请求即可生成；CLI 路径：需等 cron 或手动 `progress run`（短驻进程在退出时 force_flush） |
-| Bugsink 收不到事件 | 确认 DSN 非空（`docker exec progress python3 -c "..."` 查 DB config）；在生产机 `curl` 验证连通；确认 DSN 公钥与 project-id 正确；查 Bugsink 是否返回 429（配额）；查 `progress.log` 是否有 `bugsink dsn empty` 警告 |
-| 日志里 `trace_id` 为空 | 正常——表示当前不在 span 上下文中；在 `progress run` 运行期间的业务日志应有值 |
-| 磁盘占用增长快 | 见 §6.1，配置 logrotate |
+| No files under `data/observability/` | OTel is always on; the files should appear on their own. Check `docker compose logs app` for instrumentation warnings and confirm the `/app/data/` volume is mounted |
+| traces.jsonl empty / spans missing | API path: a single HTTP request generates them; CLI path: wait for cron or run `progress run` manually (the short-lived process force-flushes on exit) |
+| Bugsink receives no events | Confirm the DSN is non-empty (`docker exec progress python3 -c "..."` to read the DB config); `curl` connectivity from the production host; confirm the DSN public key and project-id are correct; check whether Bugsink returns 429 (quota); check `progress.log` for a `bugsink dsn empty` warning |
+| `trace_id` empty in the logs | Normal: it means the code is not inside a span context; business logs during a `progress run` should carry a value |
+| Disk usage grows fast | See §6.1: configure logrotate |
 
 ---
 
-## 9. 上线签字清单（Sign-off）
+## 9. Launch sign-off checklist
 
-- [ ] §0 前置条件全部满足（Bugsink 可达、vault 就绪）
-- [ ] §1 DSN 已取得并记入 vault（`bugsink_dsn`）
-- [ ] §2 compose 模板已加 env，代码/模板改动已提交
-- [ ] §3 镜像已 `--push` 成功
-- [ ] §4 Ansible 部署完成、容器已重建
-- [ ] §5.1 启动日志出现 `Bugsink error reporting enabled`
-- [ ] §5.2 遥测文件已生成
-- [ ] §5.3 一次 check 后 traces 含完整 span 树
-- [ ] §5.6 Bugsink 收到事件
-- [ ] §6.1 logrotate（或等效轮转）已配置
-- [ ] §7 已知悉回滚步骤
+- [ ] §0 pre-flight fully satisfied (Bugsink reachable, vault ready)
+- [ ] §1 DSN obtained and written into the vault (`bugsink_dsn`)
+- [ ] §2 compose template carries the env; code/template changes committed
+- [ ] §3 image pushed successfully via `--push`
+- [ ] §4 Ansible deploy finished, container recreated
+- [ ] §5.1 startup logs show `Bugsink error reporting enabled`
+- [ ] §5.2 telemetry files exist
+- [ ] §5.3 after one check, traces carry the full span tree
+- [ ] §5.6 Bugsink receives events
+- [ ] §6.1 logrotate (or equivalent rotation) configured
+- [ ] §7 rollback steps reviewed

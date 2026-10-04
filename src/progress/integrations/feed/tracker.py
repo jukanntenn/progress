@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
@@ -51,7 +50,7 @@ from progress.integrations.feed.fetcher import (
 )
 from progress.integrations.feed.models import FeedTracker
 from progress.integrations.registry import register
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.i18n import gettext as _
 from progress.utils.markdown import downgrade_headings
 from progress.utils.timezone import now_utc
@@ -120,6 +119,7 @@ class FeedIntegration:
             raw_entries = await self._client.get_unread_entries()
         except ExternalServiceException as e:
             logger.warning("feed integration: miniflux fetch failed: %s", e)
+            report_severe(e)
             result.errors.append(e)
             result.status = "failed"
             return result
@@ -210,6 +210,7 @@ class FeedIntegration:
             result = await run_extraction(agent, prompt)
         except (ProgressException, Exception) as e:
             logger.warning("feed AI analysis failed for %s: %s", feed.title, e)
+            report_severe(e)
             return _degraded_analysis(feed, reason=_("AI analysis unavailable"))
         if isinstance(result, FeedAnalysis):
             return result
@@ -217,6 +218,7 @@ class FeedIntegration:
             return FeedAnalysis.model_validate(result)
         except Exception as e:
             logger.warning("feed AI analysis parse failed for %s: %s", feed.title, e)
+            report_severe(e)
             return _degraded_analysis(feed, reason=_("AI analysis unavailable"))
 
     async def _maintain_trackers(self, grouped: dict[int, list[RawEntry]]) -> None:
@@ -313,6 +315,7 @@ class FeedIntegration:
             return FeedIntegrationConfig.model_validate(raw)
         except Exception as e:
             logger.warning("invalid feed plugin config; using defaults: %s", e)
+            report_severe(e)
             return FeedIntegrationConfig()
 
     async def build_notification(
@@ -352,7 +355,6 @@ class FeedIntegration:
                     "feed_count": len(feeds_payload),
                     "entry_count": entry_count,
                     "feeds": feeds_payload,
-                    "run_at": _format_local_run_at(self._cfg),
                 },
             )
         ]
@@ -378,22 +380,6 @@ def _entry_analysis(analysis: FeedAnalysis, entry: RawEntry, index: int) -> str:
         attributes={"entry_index": str(index), "entry_id": str(entry.id)},
     )
     return ""
-
-
-def _format_local_run_at(cfg: CoreConfig | None) -> str:
-    """Format ``now`` in the core timezone for the notification footer (§8.3.1).
-
-    Mirrors feeber's ``to_local(run_at, config.timezone)`` then
-    ``strftime("%Y-%m-%d %H:%M:%S %Z")``. Returns an empty string when the core
-    timezone cannot be resolved (defensive — should not happen in practice).
-    """
-    if cfg is None:
-        return ""
-    try:
-        local_now = now_utc().astimezone(ZoneInfo(cfg.timezone))
-    except Exception:  # pragma: no cover - defensive
-        return ""
-    return local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def _degraded_analysis(feed: Feed, *, reason: str) -> FeedAnalysis:

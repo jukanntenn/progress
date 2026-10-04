@@ -9,41 +9,40 @@ web UI. Registered as a sub-command group on the main Typer app in
     progress users list
     progress users deactivate alice
 
-Each command boots a minimal lifespan (init_db + load config) so it can run
-standalone outside the API server. All heavy imports are deferred into the
-command bodies to avoid a module-load-time circular import through
+Each command boots the minimal composition tree (``compose_users``: the db
+entry, which also runs config-data repairs — previously absent here) so it
+can run standalone outside the API server. All heavy imports are deferred
+into the command bodies to avoid a module-load-time circular import through
 ``progress.config.root`` (which imports ``progress.cli.notifications``).
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
+from collections.abc import Callable, Coroutine
 import secrets
+from typing import Any
 
 import typer
 
 from progress.config.loader import load_config
-from progress.db import close_db, init_db
 from progress.db.models import User
+from progress.kernel import boot as kernel_boot
+from progress.runtime import compose_users
 from progress.utils.security import hash_password
-
-logger = logging.getLogger(__name__)
 
 users_app = typer.Typer(help="User management commands (create, reset-password, list, deactivate).")
 
 
-def _run(coro):
-    """Run ``coro`` with proper cleanup."""
-    try:
-        return asyncio.run(coro)
-    finally:
-        asyncio.run(_close())
+def _run(body: Callable[[], Coroutine[Any, Any, None]], config: str):
+    """Run ``body`` inside the minimal users tree (db up, disposed after)."""
 
+    async def _main() -> None:
+        cfg = load_config(config)
+        async with kernel_boot(compose_users(cfg)) as _ctx:
+            await body()
 
-async def _close() -> None:
-
-    await close_db()
+    asyncio.run(_main())
 
 
 def _hash_password(plain: str) -> str:
@@ -62,9 +61,6 @@ def create_user(
     """Create a new user."""
 
     async def _create() -> None:
-
-        cfg = load_config(config)
-        await init_db(cfg.state_home)
         existing = await User.filter(username=username).first()
         if existing is not None:
             typer.echo(f"Error: user {username!r} already exists", err=True)
@@ -84,7 +80,7 @@ def create_user(
         )
         typer.echo(f"Created user {username!r} (superuser={superuser})")
 
-    _run(_create())
+    _run(_create, config)
 
 
 @users_app.command("reset-password")
@@ -96,9 +92,6 @@ def reset_password(
     """Reset a user's password."""
 
     async def _reset() -> None:
-
-        cfg = load_config(config)
-        await init_db(cfg.state_home)
         user = await User.filter(username=username).first()
         if user is None:
             typer.echo(f"Error: user {username!r} not found", err=True)
@@ -113,7 +106,7 @@ def reset_password(
         await user.save(update_fields=["hashed_password", "updated_at"])
         typer.echo(f"Reset password for {username!r}")
 
-    _run(_reset())
+    _run(_reset, config)
 
 
 @users_app.command("list")
@@ -123,9 +116,6 @@ def list_users(
     """List all users."""
 
     async def _list() -> None:
-
-        cfg = load_config(config)
-        await init_db(cfg.state_home)
         users = await User.all().order_by("id")
         if not users:
             typer.echo("(no users)")
@@ -137,7 +127,7 @@ def list_users(
                 f"{'yes' if u.is_active else 'no':<7} {'yes' if u.is_superuser else 'no'}"
             )
 
-    _run(_list())
+    _run(_list, config)
 
 
 @users_app.command("deactivate")
@@ -148,9 +138,6 @@ def deactivate_user(
     """Deactivate a user (set is_active=False; login will be rejected)."""
 
     async def _deactivate() -> None:
-
-        cfg = load_config(config)
-        await init_db(cfg.state_home)
         user = await User.filter(username=username).first()
         if user is None:
             typer.echo(f"Error: user {username!r} not found", err=True)
@@ -159,7 +146,7 @@ def deactivate_user(
         await user.save(update_fields=["is_active", "updated_at"])
         typer.echo(f"Deactivated user {username!r}")
 
-    _run(_deactivate())
+    _run(_deactivate, config)
 
 
 __all__ = ["users_app"]

@@ -33,6 +33,7 @@ from progress.observability.scrub import scrub_secrets_processor
 
 LOG_BACKUP_COUNT: int = 14
 LOG_FORMAT: str = "%(message)s"
+_owned_handlers: list[logging.Handler] = []
 
 
 def inject_trace_context(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
@@ -90,7 +91,9 @@ def configure_structlog(
     Timestamp format is local timezone ``yyyy-mm-dd HH:MM:SS`` (for human reading);
     trace_id/span_id still cross-reference across timezones.
 
-    ``log_dir`` is created if missing.
+    ``log_dir`` is created if missing. Restart-safe: the handlers a previous
+    call installed are removed first, so a hot-reloaded row (L0) reconfigures
+    instead of duplicating sinks.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "progress.log"
@@ -150,8 +153,13 @@ def configure_structlog(
     # root 放最低,让各 handler 各自过滤(file 收全量,console 仅 INFO+)。
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    for stale in _owned_handlers:
+        root.removeHandler(stale)
+        stale.close()
+    _owned_handlers.clear()
     root.addHandler(file_handler)
     root.addHandler(console_handler)
+    _owned_handlers.extend([file_handler, console_handler])
 
     # HTTP 请求日志降级:不进 console(console=INFO),但仍进 file(file=DEBUG)。
     for noisy in ("uvicorn.access", "aiohttp.server", "aiohttp.access"):
@@ -168,6 +176,12 @@ def configure_structlog(
     # them to WARNING while keeping the root logger at DEBUG for our own code.
     for noisy in ("httpx", "httpcore", "openai", "markdown_it", "openai._base_client"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    # aiosqlite logs every SQL statement + connection repr at DEBUG ("executing
+    # functools.partial(<...Connection...>, 'SELECT ...')" / "operation ...
+    # completed"). tortoise is already raised to WARNING above; without this the
+    # raw-driver noise dominates the file sink and buries business logs.
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
     logging.captureWarnings(True)
     # aiohttp emits a misleading RuntimeWarning about TLS-in-TLS being disabled

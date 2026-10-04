@@ -1,12 +1,11 @@
 {
   "app": {
-    "title": "Progress 报告",
+    "title": "Progress",
     "description": "通过 AI 驱动的报告跟踪开源项目进展"
   },
   "nav": {
     "reports": "报告",
-    "integrations": "集成",
-    "config": "配置",
+    "settings": "设置",
     "language": "语言",
     "rss": "RSS 订阅",
     "themeSystem": "跟随系统",
@@ -39,22 +38,74 @@
     "commitHash": "提交",
     "commitCount_other": "提交数"
   },
-  "integrations": {
-    "title": "集成",
-    "description": "已注册的跟踪集成及其配置 schema。",
-    "notFound": "集成未找到",
-    "backToList": "返回集成列表",
-    "configSchema": "配置 schema"
+  "settings": {
+    "title": "设置",
+    "group": {
+      "core": "核心配置",
+      "preferences": "偏好",
+      "integrations": "集成",
+      "notifications": "通知",
+      "system": "系统",
+      "account": "账户"
+    },
+    "nav": {
+      "core": "核心配置",
+      "preferences": "偏好设置",
+      "github": "GitHub",
+      "analysis": "AI 分析",
+      "notification": "通知",
+      "markpost": "Markpost",
+      "web": "Web",
+      "auth": "认证",
+      "observability": "可观测性",
+      "repo": "仓库",
+      "changelog": "更新日志",
+      "proposal": "提案",
+      "feed": "订阅源",
+      "account": "修改密码",
+      "schemas": "原始 Schema"
+    },
+    "field": {
+      "modified": "已修改",
+      "defaultValue": "默认值：{{value}}",
+      "range": "范围：{{min}}–{{max}}",
+      "examples": "示例：{{values}}",
+      "showDetails": "展开详情",
+      "hideDetails": "收起详情",
+      "required": "必填",
+      "selectPlaceholder": "请选择…",
+      "recipientPlaceholder": "输入邮箱，按回车添加…",
+      "invalidNumber": "必须是数字",
+      "invalidEmail": "请输入有效的邮箱地址",
+      "invalidUrl": "请输入有效的网址",
+      "valid": "有效"
+    },
+    "changePassword": "修改密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "newPasswordPlaceholder": "至少 8 个字符",
+    "confirmPassword": "确认新密码",
+    "submit": "修改密码",
+    "changing": "修改中…",
+    "passwordChanged": "密码修改成功。",
+    "passwordMismatch": "两次输入的密码不一致。",
+    "passwordSameAsCurrent": "新密码不能与当前密码相同。",
+    "incorrectPassword": "当前密码不正确。",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "userLabel": "用户：{{username}}",
+    "sections": "分区"
   },
   "config": {
     "title": "配置",
-    "description": "查看与编辑运行时配置。敏感信息已脱敏。",
+    "description": "查看与编辑运行时配置。敏感信息在浏览器端遮蔽显示。",
     "coreSection": "核心",
     "pluginsSection": "插件",
-    "sections": "分区",
     "save": "保存",
     "saved": "已保存",
     "saveFailed": "保存失败",
+    "saving": "保存中…",
+    "saveFailedFields": "保存失败 — {{count}} 个字段需要修正",
     "reload": "从数据库重新加载",
     "reloaded": "已重新加载",
     "reloadFailed": "重新加载失败",
@@ -78,7 +129,12 @@
     "schemaDriven": "表单驱动",
     "editSection": "编辑",
     "addItem": "添加{{item}}",
-    "removeItem": "移除"
+    "removeItem": "移除",
+    "integrations": {
+      "title": "集成",
+      "description": "已注册的跟踪集成及其配置 schema。",
+      "configSchema": "配置 schema"
+    }
   },
   "common": {
     "loading": "加载中...",
@@ -97,29 +153,24 @@
   },
   "auth": {
     "title": "登录",
+    "welcomeHeading": "欢迎回来",
+    "welcomeSubtitle": "登录以继续",
     "username": "用户名",
+    "usernamePlaceholder": "请输入用户名",
     "password": "密码",
+    "passwordPlaceholder": "请输入密码",
     "signIn": "登录",
     "signingIn": "登录中…",
-    "loginFailed": "登录失败",
+    "invalidCredentials": "用户名或密码错误",
+    "accountDisabled": "该账户已被停用，请联系管理员。",
+    "loginFailed": "暂时无法登录，请稍后重试。",
+    "usernameRequired": "请输入用户名",
+    "usernameTooShort": "用户名至少需要 3 个字符",
+    "passwordRequired": "请输入密码",
+    "passwordTooShort": "密码至少需要 8 个字符",
     "logout": "退出登录",
     "showPassword": "显示密码",
-    "hidePassword": "隐藏密码"
-  },
-  "settings": {
-    "title": "设置",
-    "changePassword": "修改密码",
-    "currentPassword": "当前密码",
-    "newPassword": "新密码",
-    "newPasswordPlaceholder": "至少 8 个字符",
-    "confirmPassword": "确认新密码",
-    "submit": "修改密码",
-    "changing": "修改中…",
-    "passwordChanged": "密码修改成功。",
-    "passwordMismatch": "两次输入的密码不一致。",
-    "passwordSameAsCurrent": "新密码不能与当前密码相同。",
-    "showPassword": "显示密码",
     "hidePassword": "隐藏密码",
-    "userLabel": "用户：{{username}}"
+    "loadingApp": "加载中…"
   }
 }

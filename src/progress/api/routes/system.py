@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Response, status
 from tortoise import Tortoise
@@ -59,8 +60,13 @@ async def readyz(response: Response) -> ReadyResponse:
     tags=["system"],
 )
 async def version() -> VersionResponse:
-    """Runtime version info (spec 12)."""
-    return VersionResponse(name="progress", version=__version__)
+    """Runtime version info (spec 12).
+
+    ``git_sha`` is injected at image build time via the ``GIT_SHA`` build arg
+    (``unknown`` outside a container). Deploy automation compares it against
+    the expected commit to confirm the new image is actually live.
+    """
+    return VersionResponse(name="progress", version=__version__, git_sha=os.environ.get("GIT_SHA", "unknown"))
 
 
 __all__ = ["router"]

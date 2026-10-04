@@ -1,0 +1,33 @@
+{# v2ex email HTML (spec v2ex §10).
+
+Reuses the shared ``email_shell`` frame + ``cta_button``. High-density body:
+AI summary + per-tab count badges + top posts as bare linked titles
+(score/replies are internal selection signals users don't care about).
+Takeaways live in the report — never duplicated here. All styles are inline /
+table-based for email-client compatibility (see ``_email.j2``). External data
+(title/url) escaped.
+#}
+{% from "_email.j2" import email_shell, cta_button, badge %}
+{% set tabs = tabs or [] %}
+{% set top_posts = top_posts or [] %}
+{% call email_shell(title, "wathet", selected_count ~ " " ~ _("picks"), "wathet", generated_at=generated_at) %}
+{% if summary %}<div style="background-color:#E8F3FF;border-radius:8px;padding:14px 16px;margin-bottom:8px;font-size:14px;line-height:1.6;color:#1D2129;">{{ summary }}</div>{% endif %}
+<div style="margin:8px 0;">
+  {%- for t in tabs %}{{ badge(t.icon ~ " " ~ t.tab_title ~ " " ~ t.count, "blue") }} {% endfor %}
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:6px;margin:4px 0;">
+  {% for p in top_posts %}
+  <tr>
+    <td valign="middle" style="background-color:#F7F8FA;border-radius:8px;padding:10px 14px;font-size:14px;color:#1D2129;">
+      <a href="{{ p.url }}" style="color:#0091FF;text-decoration:none;font-weight:600;word-break:break-word;">{{ p.title }}</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% if total_batches is defined and total_batches > 1 %}
+<div style="font-size:12px;color:#86909C;margin-top:4px;">{{ _("Part {n} of {total}").format(n=batch_index + 1, total=total_batches) }}</div>
+{% endif %}
+{% if markpost_url %}
+{{ cta_button(markpost_url, _("View Report"), "wathet") }}
+{% endif %}
+{% endcall %}

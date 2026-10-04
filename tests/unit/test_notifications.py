@@ -13,6 +13,7 @@ import io
 import json
 from unittest.mock import AsyncMock, MagicMock
 
+from pydantic import SecretStr
 import pytest
 from rich.console import Console as RichConsole
 
@@ -24,8 +25,9 @@ from progress.cli.notifications.base import (
     SendResult,
 )
 from progress.cli.notifications.channels.console import ConsoleChannel
+from progress.cli.notifications.channels.email import EmailChannel
 from progress.cli.notifications.channels.feishu import FeishuChannel
-from progress.cli.notifications.config import FeishuChannelConfig
+from progress.cli.notifications.config import EmailChannelConfig, FeishuChannelConfig
 from progress.cli.notifications.dispatcher import (
     DispatchOutcome,
     Dispatcher,
@@ -34,6 +36,7 @@ from progress.cli.notifications.dispatcher import (
 from progress.cli.notifications.events import (
     NotificationEvent,
     ReportEvent,
+    TestNotificationEvent,
 )
 from progress.cli.notifications.renderer import JinjaRenderer
 from progress.errors import NotificationException
@@ -219,6 +222,35 @@ class TestJinjaRenderer:
         assert "uTools" in entry_md
         assert "7.8.0" in entry_md
 
+    def test_render_test_notification_plain_text(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.PLAIN_TEXT)
+        assert "This is a test notification from Progress." in payload.body
+        assert "Your notification channel is working correctly." in payload.body
+
+    def test_render_test_notification_html(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.HTML)
+        assert "This is a test notification from Progress." in payload.body
+        assert "Your notification channel is working correctly." in payload.body
+        assert "<br>" not in payload.body
+        assert "Go to Progress Settings" not in payload.body
+        assert "no reply needed" not in payload.body.lower()
+
+    def test_render_test_notification_card_json(self) -> None:
+        r = JinjaRenderer()
+        payload = r.render(TestNotificationEvent(), ContentType.CARD_JSON)
+        card = json.loads(payload.body)
+        elements = card["body"]["elements"]
+        all_content = " ".join(e.get("content", "") for e in elements if e.get("tag") == "markdown")
+        assert "This is a test notification from Progress." in all_content
+        assert "Your notification channel is working correctly." in all_content
+        assert "<br>" not in all_content
+        assert "Notification channel configured correctly" not in all_content
+        assert "no reply needed" not in all_content.lower()
+        button_tags = [e for e in elements if e.get("tag") == "button"]
+        assert len(button_tags) == 0
+
 
 class TestConsoleChannel:
     async def test_send_ok(self) -> None:
@@ -250,7 +282,7 @@ class TestConsoleChannel:
         assert "Progress Report" in output
         assert "FAILED" in output
         assert "bad/repo" in output
-        assert "View Detailed Report" in output
+        assert "View Report" in output
 
     async def test_send_falls_back_to_body_for_unknown_kind(self) -> None:
         ch = ConsoleChannel()
@@ -300,3 +332,40 @@ class TestFeishuWebhookValidation:
         ch = self._channel("not-a-url")
         with pytest.raises(NotificationException, match="invalid or appears masked"):
             await ch.send(ChannelPayload(title="t", body="{}", content_type=ContentType.CARD_JSON))
+
+
+class TestEmailChannelValidation:
+    """Empty host/from_addr/recipient must produce a readable NotificationException,
+    not an opaque aiosmtplib internal error (parallels FeishuWebhookValidation)."""
+
+    @staticmethod
+    def _channel(**overrides) -> EmailChannel:
+        defaults: dict[str, object] = {
+            "type": "email",
+            "enabled": True,
+            "host": "smtp.example.com",
+            "port": 465,
+            "user": "user@example.com",
+            "password": SecretStr("pass"),
+            "from_addr": "from@example.com",
+            "recipient": ["to@example.com"],
+            "starttls": False,
+            "ssl": True,
+        }
+        defaults.update(overrides)
+        return EmailChannel(EmailChannelConfig(**defaults))
+
+    async def test_empty_recipient_raises_readable_error(self) -> None:
+        ch = self._channel(recipient=[])
+        with pytest.raises(NotificationException, match="no recipients"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))
+
+    async def test_empty_host_raises_readable_error(self) -> None:
+        ch = self._channel(host="")
+        with pytest.raises(NotificationException, match="no SMTP host"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))
+
+    async def test_empty_from_addr_raises_readable_error(self) -> None:
+        ch = self._channel(from_addr="")
+        with pytest.raises(NotificationException, match="no from address"):
+            await ch.send(ChannelPayload(title="t", body="<p></p>", content_type=ContentType.HTML))

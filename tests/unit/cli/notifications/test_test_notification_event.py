@@ -19,13 +19,10 @@ from progress.cli.notifications.events import TestNotificationEvent
 from progress.cli.notifications.renderer import JinjaRenderer, _derive_title, _fallback_text
 from progress.utils.i18n import override
 
-# ``TestNotificationEvent`` is a production dataclass whose name starts with
-# ``Test``, so pytest tries (and fails) to collect it as a test class. Mark it
-# non-collectable so the suite stays warning-free.
 TestNotificationEvent.__test__ = False  # ty: ignore[unresolved-attribute]
 
-_BODY_MSGID = "This is a test notification. If you received this, the notification channel is configured correctly."
-_CONSOLE_MSGID = "Sent from Progress config console."
+_BODY_MSGID = "This is a test notification from Progress."
+_CONFIRM_MSGID = "Your notification channel is working correctly."
 
 
 class TestEventDefaults:
@@ -33,8 +30,6 @@ class TestEventDefaults:
         assert TestNotificationEvent().kind == "test"
 
     def test_takes_no_business_data(self) -> None:
-        # The event carries nothing business-specific; attribute access to other
-        # fields must not exist.
         event = TestNotificationEvent()
         public_attrs = {a for a in dir(event) if not a.startswith("_")}
         assert public_attrs == {"kind"}
@@ -61,22 +56,21 @@ class TestFallbackText:
 
 
 class TestHtmlTemplate:
-    def test_renders_branded_test_message_in_english(self) -> None:
+    def test_renders_simplified_test_message_in_english(self) -> None:
         with override("en"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.HTML)
         assert payload.content_type is ContentType.HTML
-        assert "✅ Test Notification from Progress" in payload.body
         assert _BODY_MSGID in payload.body
-        assert _CONSOLE_MSGID in payload.body
-        # title comes from _derive_title (i18n)
+        assert _CONFIRM_MSGID in payload.body
+        assert "<br>" not in payload.body
+        assert "no reply needed" not in payload.body.lower()
         assert payload.title == "Test Notification"
 
     def test_renders_translated_message_in_chinese(self) -> None:
         with override("zh-hans"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.HTML)
-        assert "✅ Progress 测试通知" in payload.body
-        assert "这是一条测试通知。如果你收到了这条消息，说明通知通道已正确配置。" in payload.body
-        assert "由 Progress 配置控制台发送。" in payload.body
+        assert "这是一条来自 Progress 的测试通知。" in payload.body
+        assert "你的通知渠道已配置正常。" in payload.body
         assert payload.title == "测试通知"
 
 
@@ -85,44 +79,42 @@ class TestPlainTextTemplate:
         with override("en"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.PLAIN_TEXT)
         assert payload.content_type is ContentType.PLAIN_TEXT
-        lines = payload.body.split("\n")
-        assert lines[0] == "✅ Test Notification from Progress"
         assert _BODY_MSGID in payload.body
-        assert _CONSOLE_MSGID in payload.body
+        assert _CONFIRM_MSGID in payload.body
 
     def test_chinese_plain_text(self) -> None:
         with override("zh-hans"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.PLAIN_TEXT)
-        assert "✅ Progress 测试通知" in payload.body
-        assert "这是一条测试通知。如果你收到了这条消息，说明通知通道已正确配置。" in payload.body
-        assert "由 Progress 配置控制台发送。" in payload.body
+        assert "这是一条来自 Progress 的测试通知。" in payload.body
+        assert "你的通知渠道已配置正常。" in payload.body
 
 
 class TestCardJsonTemplate:
-    def test_card_is_v2_with_green_header_and_confirmation_body(self) -> None:
+    def test_card_is_v2_with_green_header_and_concise_body(self) -> None:
         with override("en"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.CARD_JSON)
         assert payload.content_type is ContentType.CARD_JSON
         card = json.loads(payload.body)
-        # v2 invariants
         assert card["schema"] == "2.0"
         assert card["config"]["width_mode"] == "fill"
-        # success-state green header with TEST badge + check icon
         assert card["header"]["template"] == "green"
         assert card["header"]["title"]["content"] == "Test Notification"
         assert card["header"]["icon"]["token"] == "check-circle-outlined"
         tag = card["header"]["text_tag_list"][0]
         assert tag["text"]["content"] == "TEST"
-        # body.elements (not top-level elements); a centered confirmation + CTA
         tags = [e["tag"] for e in card["body"]["elements"]]
         assert tags[0] == "markdown"
-        assert "button" in tags
+        assert "button" not in tags
+        all_content = " ".join(e.get("content", "") for e in card["body"]["elements"] if e.get("tag") == "markdown")
+        assert _BODY_MSGID in all_content
+        assert _CONFIRM_MSGID in all_content
+        assert "<br>" not in all_content
 
-    def test_card_translates_header_in_chinese(self) -> None:
+    def test_card_translates_body_in_chinese(self) -> None:
         with override("zh-hans"):
             payload = JinjaRenderer().render(TestNotificationEvent(), ContentType.CARD_JSON)
         card = json.loads(payload.body)
         assert card["header"]["title"]["content"] == "测试通知"
-        # the confirmation body line is localized
-        first_md = card["body"]["elements"][0]["content"]
-        assert "通知渠道配置正确" in first_md
+        all_content = " ".join(e.get("content", "") for e in card["body"]["elements"] if e.get("tag") == "markdown")
+        assert "这是一条来自 Progress 的测试通知。" in all_content
+        assert "你的通知渠道已配置正常。" in all_content

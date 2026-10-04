@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record docs/proposal_tracking.md
+proposal_tracking.md: 3fb4022f4cb7b3028890b2dd947d92694fa3c25f
+proposal_tracking.zh.md: 9b34ec05785c5c75decefc94fd671af3786e7ea9

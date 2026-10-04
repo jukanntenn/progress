@@ -23,10 +23,11 @@ from dataclasses import dataclass, field
 import logging
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import aiohttp
+from jinja2 import StrictUndefined
 from pydantic import ValidationError
+import sentry_sdk
 from tortoise.transactions import in_transaction
 
 from progress.cli.ai import (
@@ -36,6 +37,7 @@ from progress.cli.ai import (
     run_extraction,
 )
 from progress.cli.notifications.events import ReportEvent, ReportRepo
+from progress.cli.notifications.status import status_label
 from progress.cli.outcome import RunOutcome
 from progress.cli.reports.markpost import MarkpostClient, MarkpostError, split_batches, split_sections
 from progress.cli.reports.prompts import render_prompt
@@ -45,11 +47,11 @@ from progress.db.models.report import Report
 from progress.errors import ProgressException
 from progress.integrations.base import ReportSection
 from progress.integrations.registry import discover_integrations
-from progress.observability import record_business_event
+from progress.observability import record_business_event, report_severe
 from progress.utils.i18n import gettext as _, ngettext, npgettext, pgettext
 from progress.utils.markdown import downgrade_headings
 from progress.utils.templating import create_environment
-from progress.utils.timezone import now_utc
+from progress.utils.timezone import format_now_local
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,7 @@ _REPORT_TYPE_MAP: dict[str, str] = {
     "proposal": "proposal",
     "changelog": "changelog",
     "feed": "feed",
+    "v2ex": "v2ex",
 }
 
 
@@ -84,6 +87,8 @@ def _commit_count_for(integration_name: str, report_type: str, sections: list[Re
     - changelog:          total new versions (sum of payload's ``new_entries`` length)
     - feed:               total entries across sections (sum of payload's
       ``entries`` length)
+    - v2ex:               total selected posts across sections (sum of
+      payload's ``posts`` length)
     - others:             len(sections)
     """
     if integration_name == "repo":
@@ -94,6 +99,8 @@ def _commit_count_for(integration_name: str, report_type: str, sections: list[Re
         return sum(len(s.payload.get("new_entries", []) or []) for s in sections)
     if integration_name == "feed":
         return sum(len(s.payload.get("entries", []) or []) for s in sections)
+    if integration_name == "v2ex":
+        return sum(len(s.payload.get("posts", []) or []) for s in sections)
     return len(sections)
 
 
@@ -122,8 +129,9 @@ def _get_env() -> Any:
     """
     global _env
     if _env is None:
-        env = create_environment(_collect_integration_template_dirs(), autoescape=False)
+        env = create_environment(_collect_integration_template_dirs(), autoescape=False, undefined=StrictUndefined)
         env.globals.update({"_": _, "ngettext": ngettext, "npgettext": npgettext, "pgettext": pgettext})  # ty:ignore[no-matching-overload]
+        env.globals.update({"status_label": status_label})  # ty:ignore[no-matching-overload]
         _env = env
     return _env
 
@@ -301,6 +309,7 @@ def render_sections(ctx: ReportContext) -> list[Section]:
             # repo sections) — without this event, template/variable bugs show
             # up only as mysteriously blank sections with no signal.
             logger.warning("failed to render section for %s: %s", ctx.integration_name, e, exc_info=True)
+            sentry_sdk.capture_exception(e)
             record_business_event(
                 "progress.report.section_render_failed",
                 attributes={
@@ -413,6 +422,7 @@ async def generate_title_summary(
         return TitleSummary.model_validate(result)
     except (ProgressException, ValidationError) as e:
         logger.warning("AI title/summary generation failed (downgraded): %s", e)
+        report_severe(e)
         return TitleSummary(title=DEFAULT_TITLE, summary="")
 
 
@@ -544,14 +554,10 @@ async def _persist_batch_rows(report_id: int, clean_title: str, urls: list[Batch
 def _format_generation_time(cfg: CoreConfig) -> str:
     """Format now in the configured core timezone for the report footer.
 
-    Mirrors ``feed.tracker._format_local_run_at``: UTC now → configured zone →
-    ``strftime("%Y-%m-%d %H:%M:%S %Z")``. Falls back to UTC ISO on failure.
+    Thin wrapper over :func:`progress.utils.timezone.format_now_local`. Kept as
+    a call-site local for readability where ``cfg`` is already in scope.
     """
-    try:
-        local_now = now_utc().astimezone(ZoneInfo(cfg.timezone))
-        return local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
-    except Exception:
-        return now_utc().strftime("%Y-%m-%d %H:%M:%S %Z")
+    return format_now_local(cfg.timezone)
 
 
 async def run(
@@ -573,10 +579,12 @@ async def run(
         for ctx in contexts:
             await _run_one_integration(ctx, cfg, session=session, outcome=result)
     except ProgressException as e:
+        report_severe(e)
         result.add_error(e)
         if result.status == "success":
             result.status = "partial"
     except Exception as e:
+        report_severe(e)
         result.add_error(ProgressException(f"report pipeline failed: {e}"))
         result.status = "failed"
     return result
@@ -602,10 +610,12 @@ async def run_for_integration(
         for ctx in contexts:
             await _run_one_integration(ctx, cfg, session=session, outcome=result)
     except ProgressException as e:
+        report_severe(e)
         result.add_error(e)
         if result.status == "success":
             result.status = "partial"
     except Exception as e:
+        report_severe(e)
         result.add_error(ProgressException(f"report pipeline failed for {integration_name}: {e}"))
         result.status = "failed"
     return result
@@ -802,6 +812,7 @@ async def _run_one_integration(
                 )
                 outcome.add_error(ProgressException(reason))
             except ProgressException as e:
+                report_severe(e)
                 outcome.add_error(e)
         outcome.by_integration.append(
             IntegrationReport(
@@ -815,8 +826,10 @@ async def _run_one_integration(
             )
         )
     except ProgressException as e:
+        report_severe(e)
         outcome.add_error(e)
     except Exception as e:
+        report_severe(e)
         outcome.add_error(ProgressException(f"integration {ctx.integration_name} report pipeline failed: {e}"))
 
 

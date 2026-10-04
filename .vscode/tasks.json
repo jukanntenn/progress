@@ -5,7 +5,7 @@
       "label": "Start Backend",
       "type": "shell",
       "command": "uv",
-      "args": ["run", "fastapi", "dev"],
+      "args": ["run", "fastapi", "dev", "src/progress/api/main.py"],
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
@@ -29,7 +29,11 @@
       "command": "pnpm",
       "args": ["dev"],
       "options": {
-        "cwd": "${workspaceFolder}/web"
+        "cwd": "${workspaceFolder}/web",
+        "env": {
+          "CHOKIDAR_USEPOLLING": "true",
+          "VITE_HMR_POLLING_INTERVAL": "1000"
+        }
       },
       "presentation": {
         "reveal": "always",

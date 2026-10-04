@@ -134,14 +134,15 @@ class GitHubClient:
         return _parse_release(data)
 
     async def iter_releases(self, ref: RepoRef) -> AsyncIterator[Release]:
-        """Yield all releases for the repo.
+        """Yield all published releases for the repo.
 
-        Per spec repo §6.5, draft and prerelease releases are filtered out
-        here so callers never see them.
+        Prereleases are included — they are published releases and valid
+        detection targets. Only drafts are filtered out (unpublished, and
+        invisible to unauthenticated callers anyway).
         """
         async for item in self._getiter(f"/repos/{ref.owner}/{ref.name}/releases"):
             release = _parse_release(item)
-            if release.draft or release.prerelease:
+            if release.draft:
                 continue
             yield release
 

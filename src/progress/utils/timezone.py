@@ -53,3 +53,30 @@ def from_utc(dt: datetime, timezone: ZoneInfo) -> datetime:
 
 def render_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
     return dt.strftime(format_str)
+
+
+def format_now_local(timezone: str) -> str:
+    """Format ``now`` in the given IANA timezone (e.g. ``Asia/Shanghai``).
+
+    Unified helper for every "generated at" timestamp rendered into report
+    footers and notification cards. Returns ``now`` in the requested zone via
+    ``strftime("%Y-%m-%d %H:%M:%S %Z")``. Falls back to the same format in UTC
+    when the timezone string is invalid.
+    """
+    try:
+        local_now = now_utc().astimezone(ZoneInfo(timezone))
+    except Exception:  # pragma: no cover - defensive against bad tz strings
+        return now_utc().strftime("%Y-%m-%d %H:%M:%S %Z")
+    return local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def format_now_utc() -> str:
+    """Format ``now`` in UTC for the notification-card footer.
+
+    Fallback only: ``JinjaRenderer`` computes the localized footer timestamp
+    (``format_now_local``) whenever a ``CoreConfig`` is reachable and threads
+    it to every channel via the payload metadata. This is used when no
+    configured timezone is reachable — e.g. unit tests building payloads
+    without a renderer. Precision to the second; ``%Z`` yields ``UTC``.
+    """
+    return now_utc().strftime("%Y-%m-%d %H:%M:%S %Z")
