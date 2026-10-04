@@ -11,6 +11,21 @@ services:
       - TZ=Asia/Shanghai
       - PYTHONUNBUFFERED=1
       - PROGRESS_SCHEDULE_CRON={{ cron }}
+{% if progress_otlp_endpoint is defined and progress_otlp_token is defined %}
+      # Observability wiring (markpost pattern): both vars set -> OTLP mode;
+      # either missing -> the app falls back to local file exporters.
+      - OTEL_EXPORTER_OTLP_ENDPOINT={{ progress_otlp_endpoint }}
+      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20{{ progress_otlp_token }}
+      - OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+      - OTEL_SERVICE_NAME=progress
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name={{ env }}
+{% endif %}
+{% if bugsink_dsn is defined %}
+      - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
+{% endif %}
+{% if kuma_push_url is defined %}
+      - PROGRESS_KUMA_PUSH_URL={{ kuma_push_url }}
+{% endif %}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5000/healthz"]
       interval: 30s
