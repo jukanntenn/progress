@@ -30,6 +30,7 @@ from progress.observability.logging import configure_structlog
 from progress.observability.metrics import mark_span_outcome, observe_span, observed, record_business_event
 from progress.observability.scrub import scrub_event, scrub_secrets
 from progress.observability.telemetry import (
+    effective_environment,
     instrument_fastapi_app,
     setup_telemetry,
     shutdown_telemetry,
@@ -59,14 +60,15 @@ def setup_observability(
         return
 
     root = Path(state_home)
+    environment = effective_environment(bugsink_environment)
     configure_structlog(root / "logs")
-    setup_telemetry(root / "observability", environment=bugsink_environment)
+    setup_telemetry(root / "observability", environment=environment)
 
     if bugsink_dsn:
         try:
             sentry_sdk.init(
                 dsn=bugsink_dsn,
-                environment=bugsink_environment,
+                environment=environment,
                 release=f"progress@{version}",
                 traces_sample_rate=0,
                 auto_session_tracking=False,
