@@ -2,14 +2,39 @@
 
 English | [中文](observability.zh.md)
 
-Progress ships two complementary observability channels:
+Progress ships three complementary observability channels:
 
-- **OpenTelemetry** exports **traces** and **metrics** as JSON-Lines files to `<state_home>/observability/` (`traces.jsonl` / `metrics.jsonl`). There is no external collector by default — humans or an AI read and search these files to understand bottlenecks, failures, performance, and whether the pipeline ran as expected. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship to an OTLP collector instead.
+- **OpenTelemetry** owns **traces**, **metrics**, and **logs**. Default mode writes traces/metrics as JSON-Lines files to `<state_home>/observability/` (`traces.jsonl` / `metrics.jsonl`) while logs go to the rotating `<state_home>/logs/progress.log`. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship all three signals to an OTLP collector instead (see `docs/observability-deploy.md`); in that mode logs are dual-written — INFO+ also go remote, the file stays as the crash channel.
 - **Bugsink** (a self-hosted, Sentry-compatible server) receives **errors and crashes** only, via `sentry-sdk`. It does not ingest traces/metrics/sessions.
+- **Availability monitoring** (Uptime Kuma probes + a run-outcome push heartbeat) is a separate layer, documented in `docs/monitoring.md`.
 
-OTel traces and metrics are **always on** (sampling rate = 1.0, code constants per spec 04) — there is no `[observability.otel]` config section or `enabled` toggle. Bugsink is opt-in: configured via the DB-stored `[core.observability.bugsink]` section or the `PROGRESS_OBSERVABILITY__BUGSINK__*` environment variables, and disabled when the DSN is empty.
+OTel signals are **always on** (sampling rate = 1.0, a code constant) — there is no `[observability.otel]` config section or `enabled` toggle. Bugsink is opt-in: configured via the DB-stored `[core.observability.bugsink]` section or the `PROGRESS_OBSERVABILITY__BUGSINK__*` environment variables, and disabled when the DSN is empty.
 
-## Configuration
+## Environment identity
+
+`deployment.environment.name` resolves once per boot: the standard `OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=<env>` (and `OTEL_SERVICE_NAME`) environment variables win over the config default (`core.observability.bugsink.environment`, `"production"`). The resolved value feeds both the OTel resource and the Bugsink `environment` tag, so Grafana and Bugsink can never label one deploy differently. Container deploys inject identity via environment variables only — no config-schema changes.
+
+## OTLP mode (remote telemetry)
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<otel-collector>:4318
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20<token>
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+OTEL_SERVICE_NAME=progress
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=staging
+```
+
+(Variables above are read natively by the OTel SDK; the Ansible compose template injects the block only when endpoint+token are both defined — either missing means file mode, which is the deployment-level degradation path.)
+
+With the endpoint set:
+
+- **Traces/metrics** export over OTLP HTTP (60-second metric cadence, batched spans). No local JSONL is written.
+- **Logs** are bridged by `OtelLogHandler`: a stdlib handler that forwards each record exactly once — severity from the level, the event name as body, remaining scalar fields as attributes, live trace context attached natively (VictoriaLogs exposes `trace_id` as the Jaeger link field). DEBUG stays file-only; the rotating file keeps everything, collector outage or not.
+- **Runtime metrics** from `opentelemetry-instrumentation-system-metrics` (process memory/CPU/threads, system gauges) provide an always-on anchor series — the "telemetry gap" alert watches it to catch a broken app→collector→store path.
+- **Scheduler gauges** export the run cadence: `progress.schedule.expected_max_gap_seconds` (computed from the cron at arm time) and `progress.pipeline.last_success_epoch`. Alert windows divide by the exported gap, so changing `schedule.cron` retunes alerting automatically — no assumed run counts.
+- `PROGRESS_KUMA_PUSH_URL` (optional) makes the in-process scheduler push each run's verdict to an Uptime Kuma push monitor, with a per-push retention derived from the expected gap. Empty → no push; a failed push is logged and swallowed (kuma's silence detection is the backstop).
+
+## File mode (default / fallback)
 
 Bugsink is a Web-class config field (DB `config` table, `section="core"`):
 
@@ -25,14 +50,6 @@ Environment overrides (used by Docker / `docker-compose`):
 PROGRESS_OBSERVABILITY__BUGSINK__DSN=http://<key>@192.168.5.50:8770/<project-id>
 PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
 ```
-
-To switch the OTel exporter from local files to an OTLP HTTP collector:
-
-```
-OTEL_EXPORTER_OTLP_ENDPOINT=http://<otel-collector>:4318
-```
-
-When unset, traces/metrics are written to `<state_home>/observability/traces.jsonl` and `<state_home>/observability/metrics.jsonl` via the `opentelemetry-exporter-otlp-json-file` file exporter.
 
 ## Where telemetry comes from
 
@@ -92,5 +109,5 @@ Note: Bugsink only ingests Sentry `event` items. Performance transactions, sessi
 
 ## Notes and follow-ups
 
-- **Retention:** telemetry files grow without bound (the file exporter appends, no built-in rotation per spec 04). Manage with an external `logrotate` (see `docs/observability-deploy.md` for a `copytruncate` recipe targeting `<state_home>/observability/*.jsonl`).
-- **OTel-native logs** (exporting stdlib logs as OTel LogRecords) are deferred — the logs signal is still Development-maturity. Trace ids in `progress.log` cover the correlation need today.
+- **Retention:** in file mode the telemetry JSONL grows without bound (the file exporter appends, with no built-in rotation). Manage with an external `logrotate` (see `docs/observability-deploy.md` for a `copytruncate` recipe targeting `<state_home>/observability/*.jsonl`). In OTLP mode retention belongs to the remote stores; only the rotated `progress.log` accumulates locally.
+- **Remote querying** (dashboards, Explore, alert routing) lives in `docs/monitoring.md`; deployment wiring for the collector/token in `docs/observability-deploy.md`.

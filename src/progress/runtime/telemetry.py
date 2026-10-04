@@ -25,7 +25,7 @@ from progress.kernel import Definition, Entry, declare_event
 from progress.observability.logging import configure_structlog
 from progress.observability.metrics import set_active_hub
 from progress.observability.scrub import scrub_event, scrub_secrets
-from progress.observability.telemetry import flush_telemetry, setup_telemetry
+from progress.observability.telemetry import effective_environment, flush_telemetry, setup_telemetry
 
 if TYPE_CHECKING:
     from progress.config.root import CoreConfig
@@ -165,7 +165,10 @@ def make_telemetry_otel_entry() -> Entry:
 
     async def _apply(ctx: Any, config: Any) -> None:
         cfg: CoreConfig = ctx.config
-        setup_telemetry(Path(cfg.state_home) / "observability", environment=cfg.observability.bugsink.environment)
+        setup_telemetry(
+            Path(cfg.state_home) / "observability",
+            environment=effective_environment(cfg.observability.bugsink.environment),
+        )
         ctx.provide(TelemetryOtel, True)
         undo_sink = ctx.telemetry.add_sink(_OtelBusinessEventSink())
         ctx.effect(undo_sink)
@@ -186,7 +189,12 @@ def make_telemetry_bugsink_entry(component: str = "cli") -> Entry:
         dsn = cfg.observability.bugsink.dsn.get_secret_value()
         if dsn:
             try:
-                init_bugsink(dsn, cfg.observability.bugsink.environment, __version__, component)
+                init_bugsink(
+                    dsn,
+                    effective_environment(cfg.observability.bugsink.environment),
+                    __version__,
+                    component,
+                )
             except Exception as e:
                 logger.warning("bugsink initialization failed; error events will not be sent: %s", e)
         else:

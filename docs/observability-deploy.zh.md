@@ -64,19 +64,34 @@ ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
 
 值形如 `http://<public-key>@192.168.5.50:8770/<project-id>`。
 
-### 2.2 在 compose 模板中启用
+### 2.2 compose 模板
 
-编辑 `devops/ansible/templates/docker-compose.yml.j2`，在 `environment:` 下追加：
+`devops/ansible/templates/docker-compose.yml.j2` 已内置带守卫的可观测性配置块，无需手工编辑：
 
 ```jinja
-    environment:
-      - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
-      # —— 可观测性（新增）——
+{% if progress_otlp_endpoint is defined and progress_otlp_token is defined %}
+      - OTEL_EXPORTER_OTLP_ENDPOINT={{ progress_otlp_endpoint }}
+      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20{{ progress_otlp_token }}
+      - OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+      - OTEL_SERVICE_NAME=progress
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name={{ env }}
+{% endif %}
+{% if bugsink_dsn is defined %}
       - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
-      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
+{% endif %}
+{% if kuma_push_url is defined %}
+      - PROGRESS_KUMA_PUSH_URL={{ kuma_push_url }}
+{% endif %}
 ```
 
-OTel traces/metrics 始终开启（写 `/app/data/observability/`，无需配置）。如需改走 OTLP collector，追加 `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector>:4318`。
+`progress_otlp_endpoint` 与 `progress_otlp_token` 都定义 → OTLP 模式（三个信号全部送往 collector）；任一缺失 → 应用回退到本地文件 exporter，即部署层面的降级路径。endpoint 放在明文 `group_vars/<env>/env.yml`；token 与 kuma push URL 是 vault secret：
+
+```bash
+ssh <nas> 'grep ^PROGRESS_OTLP_TOKEN_STAGING= ~/docker/otelcol/.env | cut -d= -f2-' \
+  | uv run python scripts/vault.py set staging progress_otlp_token --stdin
+```
+
+collector 侧（token 准入、Grafana 预配置）是可观测性 NAS 上的基础设施工作，布局与验收演练（包括证明文件回退有效的断连演练）见 [`monitoring.zh.md`](./monitoring.zh.md)。
 
 ### 2.3（可选）改走 Web UI / DB config
 
@@ -112,7 +127,7 @@ ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
   --vault-password-file ~/.ansible-vault/progress.pwd
 ```
 
-playbook 会：渲染 compose → `pull: always` 拉取新镜像 → 重建容器。容器内 s6-overlay 自动拉起 fastapi（长驻）、cron（supercronic，按 `30 8,22 * * *` 运行 `progress check`）等服务。
+playbook 会：渲染 compose → `pull: always` 拉取新镜像 → 重建容器。容器内 s6-overlay 拉起 Caddy 与 FastAPI 服务；调度由进程内调度器执行（`schedule.cron` / `PROGRESS_SCHEDULE_CRON`，当前为 `30 8,22 * * *`）。
 
 ---
 
@@ -126,12 +141,20 @@ docker compose logs app 2>&1 | grep -iE "Bugsink error reporting enabled|telemet
 ```
 期望看到 `Bugsink error reporting enabled (environment=prod)`。无报错即 `sentry-sdk` 初始化成功。
 
-### 5.2 遥测文件已生成
+### 5.2 遥测文件已生成（文件模式）
 ```bash
-# API 服务（长驻）会持续写 traces（HTTP/DB span）
 docker exec progress ls -la /app/data/observability/
 ```
-期望出现 `traces.jsonl`、`metrics.jsonl`。也可在宿主机查看 `./data/observability/`。
+文件模式下期望出现 `traces.jsonl`、`metrics.jsonl`（可在宿主机查看 `./data/observability/`）。OTLP 模式下这些文件按设计不会出现，应改为在远端验证：
+
+```bash
+# On the observability NAS: progress series present and fresh, environment label correct
+curl -s http://127.0.0.1:8428/api/v1/query \
+  --data-urlencode 'query=count({__name__="process.memory.usage","service.name"="progress"})'
+curl -s http://127.0.0.1:8428/api/v1/query \
+  --data-urlencode 'query=max(timestamp({__name__="process.memory.usage","service.name"="progress"}))'
+```
+然后在 Grafana 打开 progress 各仪表盘，确认 `env` 变量列出了已部署的环境。完整验收清单（含断连演练）见 [`monitoring.zh.md`](./monitoring.zh.md)。
 
 ### 5.3 触发一次 run，验证业务链路 span
 ```bash

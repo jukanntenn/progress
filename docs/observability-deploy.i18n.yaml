@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record docs/observability-deploy.md
-observability-deploy.md: cca008dea74091ca4b5754a70f6c166f52053197
-observability-deploy.zh.md: fba5504d021e029c08391abcdcd55fa8f2a49757
+observability-deploy.md: 10f11f4a52c3b74d46a9ce0b8f0314126b502cf8
+observability-deploy.zh.md: da3d839fa8cd3ad5e9f0ba8096347c2c8dd30312

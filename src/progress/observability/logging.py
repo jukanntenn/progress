@@ -15,7 +15,9 @@ Layout (per spec 04, source-verified against structlog ``stdlib.py:1010``):
 Two independent level thresholds: the console sink defaults to INFO (quiet
 interactive use) while the file sink defaults to DEBUG (full detail, local
 timezone ``yyyy-mm-dd HH:MM:SS`` timestamps for human reading; trace_id /
-span_id still cross-reference across timezones).
+span_id still cross-reference across timezones). A third sink —
+:class:`OtelLogHandler` — ships INFO+ records to the OTel logs signal when
+the process runs in OTLP mode, and is a no-op otherwise.
 """
 
 from __future__ import annotations
@@ -23,13 +25,17 @@ from __future__ import annotations
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from typing import Any
+import traceback
+from typing import Any, override
 import warnings
 
 from opentelemetry import trace
+from opentelemetry._logs import SeverityNumber
+from opentelemetry.context import get_current
 import structlog
 
 from progress.observability.scrub import scrub_secrets_processor
+from progress.observability.telemetry import get_otel_logger
 
 LOG_BACKUP_COUNT: int = 14
 LOG_FORMAT: str = "%(message)s"
@@ -46,6 +52,97 @@ def inject_trace_context(_logger: Any, _method_name: str, event_dict: dict[str, 
         event_dict.setdefault("trace_id", trace_id)
         event_dict.setdefault("span_id", span_id)
     return event_dict
+
+
+_LEVEL_RANK: dict[str, int] = {
+    "debug": 0,
+    "info": 1,
+    "warning": 2,
+    "warn": 2,
+    "error": 3,
+    "exception": 3,
+    "critical": 4,
+    "fatal": 4,
+}
+_LEVEL_SEVERITY: dict[str, SeverityNumber] = {
+    "debug": SeverityNumber.DEBUG,
+    "info": SeverityNumber.INFO,
+    "warning": SeverityNumber.WARN,
+    "warn": SeverityNumber.WARN,
+    "error": SeverityNumber.ERROR,
+    "exception": SeverityNumber.ERROR,
+    "critical": SeverityNumber.FATAL,
+    "fatal": SeverityNumber.FATAL,
+}
+# Keys the OTLP bridge must not ship as attributes: consumed by the protocol
+# itself (severity/body), renderer-internal, or already carried natively
+# (trace context via emit's ``context``).
+_BRIDGE_RESERVED = {
+    "event",
+    "level",
+    "timestamp",
+    "logger",
+    "_record",
+    "_from_structlog",
+    "trace_id",
+    "span_id",
+    "exc_info",
+    "positional_args",
+    "stack_info",
+}
+_ATTRIBUTE_TYPES = (str, int, float, bool)
+
+
+class OtelLogHandler(logging.Handler):
+    """Bridge stdlib records (structlog's included) to the OTel logs signal.
+
+    A stdlib ``Handler`` — not a structlog processor — so every record is
+    seen exactly once regardless of how many ``ProcessorFormatter`` sinks
+    (file, console) later format it. Structlog-originated records carry the
+    processed ``event_dict`` as ``record.msg``; stdlib records are built from
+    ``getMessage()``. Only INFO and above are shipped: DEBUG stays a
+    file-only affordance (rotation keeps it bounded; remote DEBUG would not
+    be). Outside OTLP mode ``get_otel_logger()`` is ``None`` and this handler
+    is a no-op, so the rotating file remains the always-on local sink.
+    """
+
+    def __init__(self, level: int = logging.INFO) -> None:
+        super().__init__(level=level)
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        otel_logger = get_otel_logger()
+        if otel_logger is None:
+            return
+        if isinstance(record.msg, dict):
+            event_dict: dict[str, Any] = record.msg
+        else:
+            event_dict = {"event": record.getMessage()}
+        level = str(event_dict.get("level") or record.levelname).lower()
+        if _LEVEL_RANK.get(level, 1) < 1:
+            return
+        attributes: dict[str, Any] = {}
+        for key, value in event_dict.items():
+            if key in _BRIDGE_RESERVED:
+                continue
+            if isinstance(value, _ATTRIBUTE_TYPES):
+                attributes[key] = value
+            elif isinstance(value, (list, tuple)) and all(isinstance(v, _ATTRIBUTE_TYPES) for v in value):
+                attributes[key] = list(value)
+        exc_info = event_dict.get("exc_info") or record.exc_info
+        if exc_info is True and record.exc_info:
+            exc_info = record.exc_info
+        if isinstance(exc_info, tuple) and exc_info[0] is not None:
+            error = exc_info[1]
+            if isinstance(error, BaseException):
+                attributes["exception"] = "".join(traceback.format_exception(error))
+        otel_logger.emit(
+            severity_number=_LEVEL_SEVERITY.get(level),
+            severity_text=level.upper(),
+            body=str(event_dict.get("event", "")),
+            attributes=attributes or None,
+            context=get_current(),
+        )
 
 
 class ConsoleRenderer:
@@ -82,11 +179,13 @@ def configure_structlog(
 ) -> None:
     """Configure structlog + stdlib logging.
 
-    Logs go to **two** sinks simultaneously:
+    Logs go to **three** sinks simultaneously:
     - **stderr** (console, ``console_level``): human-readable for interactive CLI observation.
     - **file** (``<log_dir>/progress.log``, ``file_level``): JSON for machine consumption,
       rotated daily, ``backup_count`` days retained. Default DEBUG so file keeps full detail
-      while console stays quiet.
+      while console stays quiet. Always on — the crash channel when remote sinks are down.
+    - **OTLP** (``OtelLogHandler``, INFO+): remote logs for the observability stack;
+      a no-op outside OTLP mode (``OTEL_EXPORTER_OTLP_ENDPOINT`` unset).
 
     Timestamp format is local timezone ``yyyy-mm-dd HH:MM:SS`` (for human reading);
     trace_id/span_id still cross-reference across timezones.
@@ -159,7 +258,9 @@ def configure_structlog(
     _owned_handlers.clear()
     root.addHandler(file_handler)
     root.addHandler(console_handler)
-    _owned_handlers.extend([file_handler, console_handler])
+    otel_handler = OtelLogHandler()
+    root.addHandler(otel_handler)
+    _owned_handlers.extend([file_handler, console_handler, otel_handler])
 
     # HTTP 请求日志降级:不进 console(console=INFO),但仍进 file(file=DEBUG)。
     for noisy in ("uvicorn.access", "aiohttp.server", "aiohttp.access"):
@@ -195,4 +296,10 @@ def configure_structlog(
     )
 
 
-__all__ = ["LOG_BACKUP_COUNT", "ConsoleRenderer", "configure_structlog", "inject_trace_context"]
+__all__ = [
+    "LOG_BACKUP_COUNT",
+    "ConsoleRenderer",
+    "OtelLogHandler",
+    "configure_structlog",
+    "inject_trace_context",
+]

@@ -148,7 +148,12 @@ with tracer.start_as_current_span("progress.run") as span:
 
 ## OTel Logs 信号
 
-**不用** OTel Logs SDK 信号(CHANGELOG 明示仍在稳定中,有 breaking change 风险)。日志走 structlog → 文件/stdio,trace 注入靠 structlog processor(稳定)。
+**启用** OTel Logs 远端信号(修订自 2026-10 前的"不用"决定;当年理由"SDK 仍在稳定中"已不成立——项目已依赖的 opentelemetry-sdk 1.44 里 logs 信号与 traces/metrics 同包同版本,零新增依赖)。
+
+- 桥接:`OtelLogHandler`(stdlib Handler)挂在 root logger 上,structlog 与 stdlib 记录各被转发**恰好一次**(Handler 语义,不受 ProcessorFormatter 多 sink 影响)。
+- 级别:INFO+ 才上送;DEBUG 是文件专属(轮转有界,远端不设)。
+- 结构:severity ← 级别映射,body ← event 名,attributes ← 其余标量字段;trace 上下文经 `emit(context=get_current())` 原生携带(VictoriaLogs 侧 `trace_id` 字段即 Jaeger 跳转锚点)。
+- 兜底:OTLP 模式下文件日志**双写不变**(崩溃证据通道);非 OTLP 模式该 Handler 为 no-op。
 
 ## 文件结构
 
@@ -165,11 +170,13 @@ src/progress/observability/
 
 | 项 | 默认 | 说明 |
 |---|---|---|
-| logs | 始终开 | TimedRotatingFileHandler 日切 |
+| logs | 始终开 | TimedRotatingFileHandler 日切(本地);OTLP 模式下 INFO+ 双写到远端 |
 | traces/metrics | 默认全开 | 文件 exporter 默认;sampling 1.0 |
-| exporter | `"file"` | 本地 JSONL;配 `otlp_endpoint` 走 OTLP |
+| exporter | `"file"` | 本地 JSONL;设 `OTEL_EXPORTER_OTLP_ENDPOINT` 环境变量走 OTLP(无 config 节) |
 | sampling_rate | 1.0 | 代码常量 |
 | Bugsink dsn | 空 | 空 → 错误捕获降级 + warning |
+| 环境标识 | `bugsink.environment` | 标准环境变量(`OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES`)优先于 config;解析结果同时喂 OTel resource 与 Bugsink |
+| 运行时指标 | 开 | `opentelemetry-instrumentation-system-metrics`(process/system gauges;telemetry-gap 告警锚点) |
 
 ## 删除清单
 

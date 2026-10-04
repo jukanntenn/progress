@@ -30,6 +30,7 @@ dependencies = [
     "opentelemetry-instrumentation-sqlite3>=0.64b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.64b0",
     "opentelemetry-instrumentation-logging>=0.64b0",
+    "opentelemetry-instrumentation-system-metrics>=0.64b0",
     "opentelemetry-exporter-otlp-proto-http>=1.28.0",
     "opentelemetry-exporter-otlp-json-file>=0.64b0",
     "sentry-sdk[fastapi]>=2.60.0",
@@ -232,6 +233,7 @@ known_first_party = ["progress", "_core", "agentlib", "doclib", "vault"]
 "opentelemetry-instrumentation-sqlite3" = ["opentelemetry"]
 "opentelemetry-instrumentation-aiohttp-client" = ["opentelemetry"]
 "opentelemetry-instrumentation-logging" = ["opentelemetry"]
+"opentelemetry-instrumentation-system-metrics" = ["opentelemetry"]
 "opentelemetry-exporter-otlp-proto-http" = ["opentelemetry"]
 "opentelemetry-exporter-otlp-json-file" = ["opentelemetry"]
 

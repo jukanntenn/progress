@@ -2,14 +2,39 @@
 
 [English](observability.md) | 中文
 
-Progress 内置两条互补的可观测性通道：
+Progress 内置三条互补的可观测性通道：
 
-- **OpenTelemetry** 把**追踪**（traces）与**指标**（metrics）以 JSON-Lines 文件导出到 `<state_home>/observability/`（`traces.jsonl` / `metrics.jsonl`）。默认没有外部 collector，由人或 AI（人工智能）读取并检索这些文件，理解瓶颈、故障、性能，以及流水线是否按预期运行。设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 可改为发送到 OTLP collector。
+- **OpenTelemetry** 负责**追踪**（traces）、**指标**（metrics）与**日志**（logs）。默认模式把追踪/指标以 JSON-Lines 文件写入 `<state_home>/observability/`（`traces.jsonl` / `metrics.jsonl`），日志则进入轮转的 `<state_home>/logs/progress.log`。设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 可改为把三个信号全部送往 OTLP collector（见 `docs/observability-deploy.md`）；该模式下日志双写：INFO 及以上同时发往远端，文件保留为崩溃通道（crash channel）。
 - **Bugsink**（自托管、与 Sentry 兼容的服务器）只接收**错误与崩溃**，数据经 `sentry-sdk` 发送。它不摄入追踪/指标/会话。
+- **可用性监控**（Uptime Kuma 探针 + 运行结果推送心跳）是独立的一层，记录在 `docs/monitoring.md`。
 
-OTel 追踪与指标**始终开启**（采样率 = 1.0，spec 04 规定的代码常量）：没有 `[observability.otel]` 配置 section，也没有 `enabled` 开关。Bugsink 需显式启用：通过存于数据库的 `[core.observability.bugsink]` section 或 `PROGRESS_OBSERVABILITY__BUGSINK__*` 环境变量配置，DSN 为空即禁用。
+OTel 信号**始终开启**（采样率 = 1.0，代码常量）：没有 `[observability.otel]` 配置 section，也没有 `enabled` 开关。Bugsink 需显式启用：通过存于数据库的 `[core.observability.bugsink]` section 或 `PROGRESS_OBSERVABILITY__BUGSINK__*` 环境变量配置，DSN 为空即禁用。
 
-## 配置
+## 环境标识
+
+`deployment.environment.name` 每次启动解析一次：标准环境变量 `OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=<env>`（以及 `OTEL_SERVICE_NAME`）优先于配置默认值（`core.observability.bugsink.environment`，`"production"`）。解析结果同时供给 OTel resource 与 Bugsink 的 `environment` 标签，因此 Grafana 与 Bugsink 绝不会给同一次部署标上不同环境。容器部署只通过环境变量注入标识，不改配置 schema。
+
+## OTLP 模式（远程遥测）
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<otel-collector>:4318
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20<token>
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+OTEL_SERVICE_NAME=progress
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=staging
+```
+
+（上述变量由 OTel SDK 原生读取；Ansible compose 模板仅在 endpoint 与 token 都已定义时才注入该配置块，任一缺失即文件模式，也就是部署层面的降级路径。）
+
+endpoint 设置后：
+
+- **追踪/指标**经 OTLP HTTP 导出（指标每 60 秒一次，span 批量发送）。本地不再写 JSONL。
+- **日志**由 `OtelLogHandler` 桥接：一个标准库 handler，把每条记录恰好转发一次——level 映射 severity，事件名作 body，其余标量字段作属性，并原生附带实时追踪上下文（VictoriaLogs 把 `trace_id` 暴露为 Jaeger 链接字段）。DEBUG 只进文件；无论 collector 是否中断，轮转文件保留全部内容。
+- **运行时指标**来自 `opentelemetry-instrumentation-system-metrics`（进程内存/CPU/线程、系统 gauge），提供常在的锚点序列（anchor series），「遥测断流」告警盯住它，用于捕捉应用→collector→存储链路的断裂。
+- **调度器 gauge** 导出运行节奏：`progress.schedule.expected_max_gap_seconds`（布防（arm）时由 cron 算出）与 `progress.pipeline.last_success_epoch`。告警窗口以导出的间隔为除数，因此修改 `schedule.cron` 会自动重调告警，不预设运行次数。
+- `PROGRESS_KUMA_PUSH_URL`（可选）让进程内调度器把每次运行的判定结果推送到一个 Uptime Kuma push monitor，每次推送的保留期由预期间隔推导。留空即不推送；推送失败只记日志并吞掉（kuma 的静默检测是兜底）。
+
+## 文件模式（默认/回退）
 
 Bugsink 是一个 Web 类配置字段（数据库 `config` 表，`section="core"`）：
 
@@ -26,20 +51,12 @@ PROGRESS_OBSERVABILITY__BUGSINK__DSN=http://<key>@192.168.5.50:8770/<project-id>
 PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
 ```
 
-要把 OTel exporter 从本地文件切换到 OTLP HTTP collector：
-
-```
-OTEL_EXPORTER_OTLP_ENDPOINT=http://<otel-collector>:4318
-```
-
-未设置时，追踪/指标经 `opentelemetry-exporter-otlp-json-file` 文件 exporter 写入 `<state_home>/observability/traces.jsonl` 与 `<state_home>/observability/metrics.jsonl`。
-
 ## 遥测来源
 
 `setup_observability()` 在每个进程中调用一次：由 CLI（命令行界面）的 `run` 命令（`component="cli"`）和 FastAPI 应用（`component="api"`）分别调用。
 
 - **自动插桩**：FastAPI 请求（仅 API）、SQLite（覆盖 tortoise）、出站 `aiohttp` HTTP 调用（覆盖 gidgethub）、标准库 `logging`（trace id 注入日志记录）。
-- **手动 span**：`progress.run` / `progress.check`（运行根）、`progress.integration.<name>`（每个集成）、`progress.git.op`（每个 git 子进程）、`progress.ai.call`（AI 提取）、`progress.changelog.parse`。
+- **手动 span**：`progress.run` / `progress.check`（运行根）、`progress.integration.<name>`（每个集成）、`progress.git.op`（每个 git 子进程）、`progress.ai.call`（AI（人工智能）提取）、`progress.changelog.parse`。
 - **业务事件**（`record_business_event`）：`progress.run.started`、`progress.run.completed`、`progress.integration.run`、`progress.repos.checked`、`progress.git.diff_decided`、`progress.git.diff_failed`、`progress.releases.truncated`、`progress.changelog.sync`、`progress.markpost.published` 等。
 
 跨信号关联依赖 OTel 的 `trace_id`（没有显式 run_id）：一次 `core.run()` 里的每个 span 共享同一条追踪，`structlog` 把 `trace_id`/`span_id` 注入每条日志记录，让日志与追踪无缝衔接。
@@ -92,5 +109,5 @@ tail -n 1 data/observability/metrics.jsonl | jq '.resourceMetrics[].scopeMetrics
 
 ## 备注与后续事项
 
-- **保留**：遥测文件会无限增长（文件 exporter 只追加，按 spec 04 无内置轮转）。用外部 `logrotate` 管理（针对 `<state_home>/observability/*.jsonl` 的 `copytruncate` 配方见 `docs/observability-deploy.md`）。
-- **OTel 原生日志**（把标准库日志导出为 OTel LogRecord）暂缓：logs 信号仍处于 Development 成熟度；目前 `progress.log` 中的 trace id 已覆盖关联需求。
+- **保留**：文件模式下遥测 JSONL 会无限增长（文件 exporter 只追加，无内置轮转）。用外部 `logrotate` 管理（针对 `<state_home>/observability/*.jsonl` 的 `copytruncate` 配方见 `docs/observability-deploy.md`）。OTLP 模式下保留归远端存储负责，本地只累积轮转的 `progress.log`。
+- **远程查询**（仪表盘、Explore、告警路由）见 `docs/monitoring.md`；collector/token 的部署接线见 `docs/observability-deploy.md`。
