@@ -2,6 +2,6 @@
 # hash of each side as of the last confirmed-consistent state. Both
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   hdsh pairing record docs/observability.md
-observability.md: 680698bb1d5126a4011c5af28ae4dcc862e8a57f
-observability.zh.md: fc0de452e0250fe01945595f0e30a7eeb40b0b33
+#   hdsh pairing record docs/monitoring.md
+monitoring.md: 78bdbf350d8ac4c47ae699427d21e68f3adc44fb
+monitoring.zh.md: 852738fc3c919773358a0a500e5deedfb5064fb1

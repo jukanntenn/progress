@@ -64,19 +64,34 @@ ansible-vault encrypt_string --vault-id progress-test@~/.local/bin/avpm-client \
 
 The value looks like `http://<public-key>@192.168.5.50:8770/<project-id>`.
 
-### 2.2 Enable it in the compose template
+### 2.2 The compose template
 
-Edit `devops/ansible/templates/docker-compose.yml.j2` and append under `environment:`:
+`devops/ansible/templates/docker-compose.yml.j2` already carries the observability block with guards — nothing to hand-edit:
 
 ```jinja
-    environment:
-      - PROGRESS_SCHEDULE_CRON=30 8,22 * * *
-      # —— 可观测性（新增）——
+{% if progress_otlp_endpoint is defined and progress_otlp_token is defined %}
+      - OTEL_EXPORTER_OTLP_ENDPOINT={{ progress_otlp_endpoint }}
+      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20{{ progress_otlp_token }}
+      - OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+      - OTEL_SERVICE_NAME=progress
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name={{ env }}
+{% endif %}
+{% if bugsink_dsn is defined %}
       - PROGRESS_OBSERVABILITY__BUGSINK__DSN={{ bugsink_dsn }}
-      - PROGRESS_OBSERVABILITY__BUGSINK__ENVIRONMENT=production
+{% endif %}
+{% if kuma_push_url is defined %}
+      - PROGRESS_KUMA_PUSH_URL={{ kuma_push_url }}
+{% endif %}
 ```
 
-OTel traces/metrics are always on (writing to `/app/data/observability/`, no configuration needed). To route through an OTLP collector instead, append `OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector>:4318`.
+Both `progress_otlp_endpoint` and `progress_otlp_token` defined → OTLP mode (all three signals ship to the collector); either missing → the app falls back to local file exporters, which is the deployment-level degradation path. The endpoint lives in plain `group_vars/<env>/env.yml`; the token and the kuma push URL are vault secrets:
+
+```bash
+ssh <nas> 'grep ^PROGRESS_OTLP_TOKEN_STAGING= ~/docker/otelcol/.env | cut -d= -f2-' \
+  | uv run python scripts/vault.py set staging progress_otlp_token --stdin
+```
+
+The collector side (token admission, Grafana provisioning) is infra work on the observability NAS — see [`monitoring.md`](./monitoring.md) for the layout and the acceptance drills, including the unplug drill that proves the file fallback.
 
 ### 2.3 (Optional) Go through the Web UI / DB config instead
 
@@ -112,7 +127,7 @@ ansible-playbook -i devops/ansible/hosts.yml devops/ansible/main.yml \
   --vault-password-file ~/.ansible-vault/progress.pwd
 ```
 
-The playbook renders the compose file → pulls the new image with `pull: always` → recreates the container. Inside the container, s6-overlay automatically brings up fastapi (long-running), cron (supercronic, running `progress check` on `30 8,22 * * *`), and the other services.
+The playbook renders the compose file → pulls the new image with `pull: always` → recreates the container. Inside the container, s6-overlay brings up Caddy and the FastAPI service; the schedule runs in-process on the scheduler (`schedule.cron` / `PROGRESS_SCHEDULE_CRON`, currently `30 8,22 * * *`).
 
 ---
 
@@ -126,12 +141,20 @@ docker compose logs app 2>&1 | grep -iE "Bugsink error reporting enabled|telemet
 ```
 Expect to see `Bugsink error reporting enabled (environment=prod)`. No errors means `sentry-sdk` initialized successfully.
 
-### 5.2 Telemetry files exist
+### 5.2 Telemetry files exist (file mode)
 ```bash
-# API 服务（长驻）会持续写 traces（HTTP/DB span）
 docker exec progress ls -la /app/data/observability/
 ```
-Expect `traces.jsonl` and `metrics.jsonl` to appear. You can also inspect `./data/observability/` on the host.
+In file mode expect `traces.jsonl` and `metrics.jsonl` to appear (inspect `./data/observability/` on the host). In OTLP mode these stay absent by design — verify remotely instead:
+
+```bash
+# On the observability NAS: progress series present and fresh, environment label correct
+curl -s http://127.0.0.1:8428/api/v1/query \
+  --data-urlencode 'query=count({__name__="process.memory.usage","service.name"="progress"})'
+curl -s http://127.0.0.1:8428/api/v1/query \
+  --data-urlencode 'query=max(timestamp({__name__="process.memory.usage","service.name"="progress"}))'
+```
+Then open the progress dashboards in Grafana and confirm the `env` variable lists the deployed environments. The full acceptance checklist (including the unplug drill) lives in [`monitoring.md`](./monitoring.md).
 
 ### 5.3 Trigger one run and verify the business-pipeline spans
 ```bash
