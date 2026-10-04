@@ -49,7 +49,7 @@ Rule inventory (`rules-progress.yaml`, labels carry `service: progress`; notific
 | HTTP 5xx occurring | warning | >2 5xx responses within 10m |
 | telemetry gap (staging) | critical | anchor series `process.memory.usage` unseen for 10m — the app→collector→store path is broken |
 | data-quality degradation | warning | >5 fallback/parse/diff/unmatched events within 1h — reports degraded but still produced |
-| ERROR log rate high | warning | >15 ERROR lines/min over 5m — provisioned **paused**: the victoriametrics-logs datasource emits integer frames (known wart, same as markpost's identical rule) |
+| ERROR log rate high | warning | >15 ERROR lines/min over 5m — provisioned **paused**: the victoriametrics-logs datasource emits integer frames (known upstream wart) |
 
 The production-environment telemetry-gap rule is added on promotion day (adding it while production runs the old build would fire permanently).
 

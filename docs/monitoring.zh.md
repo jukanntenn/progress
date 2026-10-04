@@ -49,7 +49,7 @@
 | HTTP 5xx occurring | 警告 | 10 分钟内 5xx 响应 >2 次 |
 | telemetry gap (staging) | 严重 | 锚点序列 `process.memory.usage` 10 分钟未出现，说明应用→collector→存储链路已断 |
 | data-quality degradation | 警告 | 1 小时内回退/解析/diff/未匹配事件 >5 起；报告已劣化但仍能产出 |
-| ERROR log rate high | 警告 | 5 分钟窗口内每分钟 ERROR 日志 >15 行；预配置为**暂停**状态：victoriametrics-logs 数据源输出整数帧（已知瑕疵，与 markpost 的同款规则一致） |
+| ERROR log rate high | 警告 | 5 分钟窗口内每分钟 ERROR 日志 >15 行；预配置为**暂停**状态：victoriametrics-logs 数据源输出整数帧（上游已知瑕疵） |
 
 生产环境的遥测断流规则在晋级日才加入（生产还跑旧构建时就加上会永久触发）。
 

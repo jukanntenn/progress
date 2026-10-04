@@ -148,7 +148,7 @@ with tracer.start_as_current_span("progress.run") as span:
 
 ## OTel Logs 信号
 
-**启用** OTel Logs 远端信号(修订自 2026-10 前的"不用"决定;当年理由"SDK 仍在稳定中"已不成立——项目已依赖的 opentelemetry-sdk 1.44 里 logs 信号与 traces/metrics 同包同版本,零新增依赖,markpost 在同一 VictoriaLogs 上生产验证)。
+**启用** OTel Logs 远端信号(修订自 2026-10 前的"不用"决定;当年理由"SDK 仍在稳定中"已不成立——项目已依赖的 opentelemetry-sdk 1.44 里 logs 信号与 traces/metrics 同包同版本,零新增依赖)。
 
 - 桥接:`OtelLogHandler`(stdlib Handler)挂在 root logger 上,structlog 与 stdlib 记录各被转发**恰好一次**(Handler 语义,不受 ProcessorFormatter 多 sink 影响)。
 - 级别:INFO+ 才上送;DEBUG 是文件专属(轮转有界,远端不设)。
