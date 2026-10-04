@@ -97,16 +97,18 @@ def _build_resource(environment: str) -> Resource:
 
 
 def _build_span_exporter(observability_dir: Path) -> FileSpanExporter | OTLPSpanExporter:
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if otlp_endpoint:
-        return OTLPSpanExporter(endpoint=otlp_endpoint)
+    if otlp_mode():
+        # Env-driven construction: the exporter appends the signal path
+        # (/v1/traces) to OTEL_EXPORTER_OTLP_ENDPOINT itself. Passing
+        # endpoint= as a kwarg would use the base URL verbatim and the
+        # collector would answer 404 for the root path.
+        return OTLPSpanExporter()
     return FileSpanExporter(str(observability_dir / "traces.jsonl"))
 
 
 def _build_metric_exporter(observability_dir: Path) -> FileMetricExporter | OTLPMetricExporter:
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if otlp_endpoint:
-        return OTLPMetricExporter(endpoint=otlp_endpoint)
+    if otlp_mode():
+        return OTLPMetricExporter()  # env-driven; see _build_span_exporter
     return FileMetricExporter(str(observability_dir / "metrics.jsonl"))
 
 
@@ -157,7 +159,7 @@ def setup_telemetry(observability_dir: Path, *, environment: str = ENVIRONMENT) 
     if otlp_mode():
         _logger_provider = LoggerProvider(resource=resource)
         _logger_provider.add_log_record_processor(
-            BatchLogRecordProcessor(OTLPLogExporter(endpoint=os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+            BatchLogRecordProcessor(OTLPLogExporter())  # env-driven; see _build_span_exporter
         )
         _logs.set_logger_provider(_logger_provider)
         _otel_logger = _logger_provider.get_logger("progress")

@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 import sys
 from typing import Any
 
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 import pytest
 
 from progress.observability import logging as obs_logging
 from progress.observability.logging import OtelLogHandler, configure_structlog
 from progress.observability.telemetry import (
+    _build_metric_exporter,
     _build_resource,
+    _build_span_exporter,
     effective_environment,
     otlp_mode,
 )
@@ -136,3 +142,16 @@ def test_otlp_mode_follows_env(monkeypatch: pytest.MonkeyPatch):
     assert otlp_mode() is False
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
     assert otlp_mode() is True
+
+
+def test_otlp_exporters_append_signal_path(monkeypatch: pytest.MonkeyPatch):
+    """kwarg-less construction appends /v1/<signal>; an explicit endpoint kwarg
+    would post to the base URL and the collector would answer 404."""
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+    span_exporter = _build_span_exporter(Path("/tmp/obs"))
+    metric_exporter = _build_metric_exporter(Path("/tmp/obs"))
+    assert isinstance(span_exporter, OTLPSpanExporter)
+    assert isinstance(metric_exporter, OTLPMetricExporter)
+    assert span_exporter._endpoint == "http://collector:4318/v1/traces"
+    assert metric_exporter._endpoint == "http://collector:4318/v1/metrics"
+    assert OTLPLogExporter()._endpoint == "http://collector:4318/v1/logs"
