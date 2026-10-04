@@ -102,6 +102,7 @@ async def push_run_verdict(base_url: str, *, success: bool, message: str, retent
 def make_scheduled_run_entry() -> Entry:
     async def _apply(ctx: Any, config: Any) -> None:
         from opentelemetry import metrics  # noqa: PLC0415
+        from opentelemetry.metrics import CallbackOptions, Observation  # noqa: PLC0415
 
         expression = _cron_expression(ctx.config)
         if not expression:
@@ -110,16 +111,32 @@ def make_scheduled_run_entry() -> Entry:
 
         max_gap = expected_max_gap_seconds(expression)
         retention = kuma_push_retention_seconds(expression)
+        state: dict[str, float] = {"last_success": 0.0}
 
+        # Observable (callback) gauges, not sync ones: a sync gauge emits a
+        # point only on .set(), so a once-per-boot set would go stale in the
+        # stores and the telemetry-gap anchor would flap. Callbacks run on
+        # every collection, so the series is continuously present while the
+        # process lives.
         meter = metrics.get_meter("progress.scheduler")
-        gap_gauge = meter.create_gauge(
+
+        def _observe_gap(_options: CallbackOptions) -> list[Observation]:
+            return [Observation(max_gap)]
+
+        def _observe_last_success(_options: CallbackOptions) -> list[Observation]:
+            if state["last_success"]:
+                return [Observation(state["last_success"])]
+            return []
+
+        meter.create_observable_gauge(
             "progress.schedule.expected_max_gap_seconds",
+            callbacks=[_observe_gap],
             unit="s",
             description="Largest gap between consecutive cron fires (alert windows divide by this)",
         )
-        gap_gauge.set(max_gap)
-        success_gauge = meter.create_gauge(
+        meter.create_observable_gauge(
             "progress.pipeline.last_success_epoch",
+            callbacks=[_observe_last_success],
             unit="s",
             description="Unix epoch of the last successful scheduled run",
         )
@@ -130,7 +147,7 @@ def make_scheduled_run_entry() -> Entry:
             success = outcome.exit_code == 0
             logger.info("scheduled run completed: exit_code=%s", outcome.exit_code)
             if success:
-                success_gauge.set(datetime.now(tz=UTC).timestamp())
+                state["last_success"] = datetime.now(tz=UTC).timestamp()
             push_url = os.environ.get(KUMA_PUSH_URL_ENV, "").strip()
             if push_url:
                 await push_run_verdict(
