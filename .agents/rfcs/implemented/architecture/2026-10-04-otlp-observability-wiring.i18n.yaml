@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record .agents/rfcs/implemented/architecture/2026-10-04-otlp-observability-wiring.md
-2026-10-04-otlp-observability-wiring.md: a5d15f74d8c8735b7729b998eafe1f5bd0cee34a
-2026-10-04-otlp-observability-wiring.zh.md: 4ddd1db221523765abe44c6f9a7b18645bfde304
+2026-10-04-otlp-observability-wiring.md: e97a7a341d2421b2caaa628663ce17a30fa830d2
+2026-10-04-otlp-observability-wiring.zh.md: 2a97a89c903f88468c926aa2fd65e0d75c8d25ea

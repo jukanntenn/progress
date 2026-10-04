@@ -8,7 +8,7 @@ Progress ships three complementary observability channels:
 - **Bugsink** (a self-hosted, Sentry-compatible server) receives **errors and crashes** only, via `sentry-sdk`. It does not ingest traces/metrics/sessions.
 - **Availability monitoring** (Uptime Kuma probes + a run-outcome push heartbeat) is a separate layer, documented in `docs/monitoring.md`.
 
-OTel signals are **always on** (sampling rate = 1.0, code constants per spec 04) — there is no `[observability.otel]` config section or `enabled` toggle. Bugsink is opt-in: configured via the DB-stored `[core.observability.bugsink]` section or the `PROGRESS_OBSERVABILITY__BUGSINK__*` environment variables, and disabled when the DSN is empty.
+OTel signals are **always on** (sampling rate = 1.0, a code constant) — there is no `[observability.otel]` config section or `enabled` toggle. Bugsink is opt-in: configured via the DB-stored `[core.observability.bugsink]` section or the `PROGRESS_OBSERVABILITY__BUGSINK__*` environment variables, and disabled when the DSN is empty.
 
 ## Environment identity
 
@@ -109,5 +109,5 @@ Note: Bugsink only ingests Sentry `event` items. Performance transactions, sessi
 
 ## Notes and follow-ups
 
-- **Retention:** in file mode the telemetry JSONL grows without bound (the file exporter appends, no built-in rotation per spec 04). Manage with an external `logrotate` (see `docs/observability-deploy.md` for a `copytruncate` recipe targeting `<state_home>/observability/*.jsonl`). In OTLP mode retention belongs to the remote stores; only the rotated `progress.log` accumulates locally.
+- **Retention:** in file mode the telemetry JSONL grows without bound (the file exporter appends, with no built-in rotation). Manage with an external `logrotate` (see `docs/observability-deploy.md` for a `copytruncate` recipe targeting `<state_home>/observability/*.jsonl`). In OTLP mode retention belongs to the remote stores; only the rotated `progress.log` accumulates locally.
 - **Remote querying** (dashboards, Explore, alert routing) lives in `docs/monitoring.md`; deployment wiring for the collector/token in `docs/observability-deploy.md`.

@@ -6,11 +6,11 @@ Status: implemented
 
 ## 问题
 
-Progress 此前只有文件模式可观测性：追踪/指标是本地 JSONL，日志在轮转文件里，错误进 Bugsink。外部部署的可观测性栈（一个 otelcol-contrib 之后的 Jaeger / VictoriaMetrics / VictoriaLogs / Grafana）什么也收不到，于是项目没有仪表盘、没有告警、也没有可用性监控。对照这套栈审计代码库，浮出三个纯配置无法弥合的缺口：deployment.environment.name 资源属性实际上硬编码为 `production`（staging 会错标自身，而 SDK 的「显式属性优先于环境变量」语义意味着标准环境变量纠正不了它）；OTel logs 信号缺席（spec 04 曾以其不成熟为由拒绝，本服务的 Grafana 日志支柱因此一直空着）；指标流没有常在序列（业务计数器只在流水线运行时才走动，一天两次），任何「遥测断流」告警都会在闲置静默时触发，而不是在链路断裂时触发。另外，每个显而易见的告警设计里都潜伏着一个节奏假设：「一天两次」是运行时配置项，不是系统的固有属性。
+Progress 此前只有文件模式可观测性：追踪/指标是本地 JSONL，日志在轮转文件里，错误进 Bugsink。外部部署的可观测性栈（一个 otelcol-contrib 之后的 Jaeger / VictoriaMetrics / VictoriaLogs / Grafana）什么也收不到，于是项目没有仪表盘、没有告警、也没有可用性监控。对照这套栈审计代码库，浮出三个纯配置无法弥合的缺口：deployment.environment.name 资源属性实际上硬编码为 `production`（staging 会错标自身，而 SDK 的「显式属性优先于环境变量」语义意味着标准环境变量纠正不了它）；OTel logs 信号缺席——日志只进本地文件和控制台，本服务的 Grafana 日志支柱因此一直空着（更早的一项决定曾以不成熟为由排除该信号）；指标流没有常在序列（业务计数器只在流水线运行时才走动，一天两次），任何「遥测断流」告警都会在闲置静默时触发，而不是在链路断裂时触发。另外，每个显而易见的告警设计里都潜伏着一个节奏假设：「一天两次」是运行时配置项，不是系统的固有属性。
 
 ## 决策
 
-**生产者侧（本仓库）。** 双模式 exporter 设计保留并扩展到全部三个信号：设置了 `OTEL_EXPORTER_OTLP_ENDPOINT` → OTLP HTTP（SDK 原生读取 `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_COMPRESSION`，因此鉴权与 gzip 都是部署环境变量，零代码）；未设置 → 文件 exporter，维持原样。日志经新的 `OtelLogHandler` 送出：root logger 上的一个标准库 handler（handler 语义保证每条记录恰好转发一次，无论后面有多少个 ProcessorFormatter sink 再格式化它），把 level 映射为 severity、事件名映射为 body、其余标量字段映射为属性，并通过 `emit(context=get_current())` 附带实时追踪上下文。INFO 及以上外发；DEBUG 只进文件；轮转的 `progress.log` 在每种模式下都双写，作为崩溃通道（crash channel）。spec 04 对 logs 信号的否决就此修订：锁定的 opentelemetry-sdk 1.44 与追踪/指标在同一批包里提供 logs（零新增依赖）。
+**生产者侧（本仓库）。** 双模式 exporter 设计保留并扩展到全部三个信号：设置了 `OTEL_EXPORTER_OTLP_ENDPOINT` → OTLP HTTP（SDK 原生读取 `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_COMPRESSION`，因此鉴权与 gzip 都是部署环境变量，零代码）；未设置 → 文件 exporter，维持原样。日志经新的 `OtelLogHandler` 送出：root logger 上的一个标准库 handler（handler 语义保证每条记录恰好转发一次，无论后面有多少个 ProcessorFormatter sink 再格式化它），把 level 映射为 severity、事件名映射为 body、其余标量字段映射为属性，并通过 `emit(context=get_current())` 附带实时追踪上下文。INFO 及以上外发；DEBUG 只进文件；轮转的 `progress.log` 在每种模式下都双写，作为崩溃通道（crash channel）。此前排除 logs 信号的决定就此修订：锁定的 opentelemetry-sdk 1.44 与追踪/指标在同一批包里提供 logs（零新增依赖）。
 
 **环境标识。** `effective_environment()` 先从标准 `OTEL_RESOURCE_ATTRIBUTES` 解析 `deployment.environment.name`，其次用配置默认值；`_build_resource` 对 `OTEL_SERVICE_NAME` 采用同一优先级。解析结果由一次调用同时供给 OTel resource 与 Bugsink 的 `environment` 标签，两个后端绝不会把同一次部署标成不同环境。（天真的 `Resource.create({}).merge(...)` 写法是错的：环境变量未设置时 env detector 会捏造 `service.name="unknown_service"`，盖掉显式常量——解析器因此改为直接解析这两个环境变量。）
 
@@ -26,7 +26,7 @@ Progress 此前只有文件模式可观测性：追踪/指标是本地 JSONL，�
 
 **主机侧日志搬运（promtail/alloy 跟踪 `progress.log`）。** 落选：每台主机多两个活动部件、日志轮转竞态，还要运维第二条遥测传输通道；对手是复用已锁定 SDK 与隔壁已验证模式的双写桥接。
 
-**配置 schema 里的 `[observability.otel]` section。** 落选：SDK 已拥有标准环境变量入口，部署身份本就该放在部署配置而非应用配置 schema 里，而 schema 变更要拖上 OpenAPI/前端/迁移一整串改动面，换来的能力增量为零。该 section 的 spec 04 草案在本 RFC 之前就已降为代码常量。
+**配置 schema 里的 `[observability.otel]` section。** 落选：SDK 已拥有标准环境变量入口，部署身份本就该放在部署配置而非应用配置 schema 里，而 schema 变更要拖上 OpenAPI/前端/迁移一整串改动面，换来的能力增量为零。该开关的 config-section 草案在本 RFC 之前就已降为代码常量。
 
 **每个环境复制一套仪表盘。** 败给单套加 `env` 变量的模式：按环境复制的仪表盘会静默漂移，而多维告警规则天然产出按环境的实例。
 

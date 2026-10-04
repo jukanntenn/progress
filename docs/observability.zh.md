@@ -8,7 +8,7 @@ Progress 内置三条互补的可观测性通道：
 - **Bugsink**（自托管、与 Sentry 兼容的服务器）只接收**错误与崩溃**，数据经 `sentry-sdk` 发送。它不摄入追踪/指标/会话。
 - **可用性监控**（Uptime Kuma 探针 + 运行结果推送心跳）是独立的一层，记录在 `docs/monitoring.md`。
 
-OTel 信号**始终开启**（采样率 = 1.0，spec 04 规定的代码常量）：没有 `[observability.otel]` 配置 section，也没有 `enabled` 开关。Bugsink 需显式启用：通过存于数据库的 `[core.observability.bugsink]` section 或 `PROGRESS_OBSERVABILITY__BUGSINK__*` 环境变量配置，DSN 为空即禁用。
+OTel 信号**始终开启**（采样率 = 1.0，代码常量）：没有 `[observability.otel]` 配置 section，也没有 `enabled` 开关。Bugsink 需显式启用：通过存于数据库的 `[core.observability.bugsink]` section 或 `PROGRESS_OBSERVABILITY__BUGSINK__*` 环境变量配置，DSN 为空即禁用。
 
 ## 环境标识
 
@@ -109,5 +109,5 @@ tail -n 1 data/observability/metrics.jsonl | jq '.resourceMetrics[].scopeMetrics
 
 ## 备注与后续事项
 
-- **保留**：文件模式下遥测 JSONL 会无限增长（文件 exporter 只追加，按 spec 04 无内置轮转）。用外部 `logrotate` 管理（针对 `<state_home>/observability/*.jsonl` 的 `copytruncate` 配方见 `docs/observability-deploy.md`）。OTLP 模式下保留归远端存储负责，本地只累积轮转的 `progress.log`。
+- **保留**：文件模式下遥测 JSONL 会无限增长（文件 exporter 只追加，无内置轮转）。用外部 `logrotate` 管理（针对 `<state_home>/observability/*.jsonl` 的 `copytruncate` 配方见 `docs/observability-deploy.md`）。OTLP 模式下保留归远端存储负责，本地只累积轮转的 `progress.log`。
 - **远程查询**（仪表盘、Explore、告警路由）见 `docs/monitoring.md`；collector/token 的部署接线见 `docs/observability-deploy.md`。
