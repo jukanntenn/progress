@@ -1,17 +1,15 @@
 # AI Agent Hooks
 
+English | [中文](agent-hooks.zh.md)
+
 Project-local lifecycle hooks for Claude Code, Codex, ZCode, and OpenCode that keep the code the agents write clean, and refuse to let an agent finish while lint fails.
 
 ## Design: prek is the single source of truth
 
-Every hook delegates formatting and linting to **prek** (the project's pre-commit runner). prek runs in **workspace mode**: the root `prek.toml` holds the backend
-+ builtin hooks, and `web/prek.toml` holds the frontend (eslint/prettier) hooks.
-Both files define the same two group names:
+Every hook delegates formatting and linting to **prek** (the project's pre-commit runner). prek runs in **workspace mode**: the root `prek.toml` holds the backend + builtin hooks, and `web/prek.toml` holds the frontend (eslint/prettier) hooks. Both files define the same two group names:
 
-- **`format`** — byte-mutating formatters that never fail: `ruff-format`,
-  `prettier`, `trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`.
-- **`lint`** — linters that can fail (and `--fix` what they can): `ruff-check`,
-  `eslint`.
+- **`format`** — byte-mutating formatters that never fail: `ruff-format`, `prettier`, `trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`.
+- **`lint`** — linters that can fail (and `--fix` what they can): `ruff-check`, `eslint`.
 
 The agent-agnostic operations live in **`.agents/hooks/_core.py`**, which just runs prek:
 
@@ -44,9 +42,7 @@ Fires after every edit. The shell extracts the edited path(s) and runs `_core.fo
 Fires when the agent wants to end the turn. The shell runs `_core.lint(all_files=True)` (`prek run --group lint --all-files`):
 
 - **Lint clean** → exit 0, no output. The agent stops normally.
-- **Lint dirty** → the shell prints the agent's block form (Claude/Codex/ZCode:
-  `{"decision":"block","reason":...}` JSON with prek's output; OpenCode: a
-  synthetic user message). The agent is sent back for another pass.
+- **Lint dirty** → the shell prints the agent's block form (Claude/Codex/ZCode: `{"decision":"block","reason":...}` JSON with prek's output; OpenCode: a synthetic user message). The agent is sent back for another pass.
 
 prek treats "a fixer modified a file" as nonzero too (re-stage semantics). In a CI-gated clean tree nothing modifies at Stop — the edited files were already fixed by PostToolUse — so nonzero cleanly means unfixable lint remains.
 
@@ -58,15 +54,8 @@ The hook input carries a "stop already active" flag (`stop_hook_active` / `stopH
 
 Generated artifacts (`progress.pot`, `web/openapi.json`, `web/src/api/schema.ts`) are kept verbatim — their bytes are owned by their generator, not by any hook (see the project's drift conventions). They are excluded in two complementary places:
 
-- **The prek `exclude`** — the root `prek.toml` lists all of them (it is the
-  workspace-root config, so its exclude is applied globally before files reach
-  any project's hooks, including the root builtin hooks), and `web/prek.toml`
-  repeats the two web/ artifacts for the `cd web && prek run` case. So no prek
-  hook (format, lint, builtin) touches them, and the `_core` format/lint calls
-  skip them automatically.
-- **`web/.prettierignore`** (`openapi.json`, `src/api/schema.ts`) and the eslint
-  `ignores` — so `pnpm format` / `pnpm lint` (direct dev invocations, not via
-  prek) skip them too.
+- **The prek `exclude`** — the root `prek.toml` lists all of them (it is the workspace-root config, so its exclude is applied globally before files reach any project's hooks, including the root builtin hooks), and `web/prek.toml` repeats the two web/ artifacts for the `cd web && prek run` case. So no prek hook (format, lint, builtin) touches them, and the `_core` format/lint calls skip them automatically.
+- **`web/.prettierignore`** (`openapi.json`, `src/api/schema.ts`) and the eslint `ignores` — so `pnpm format` / `pnpm lint` (direct dev invocations, not via prek) skip them too.
 
 `web/pnpm-lock.yaml` and the `.po` catalogs (hand-translated) are the tracked exceptions: lockfiles are ignored via `.prettierignore`, and `.po` stays in scope for its hygiene + catalog-lint hooks.
 

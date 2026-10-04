@@ -1,5 +1,7 @@
 # Proposal Tracking
 
+English | [中文](proposal_tracking.zh.md)
+
 Progress can track proposal repositories such as EIPs, Rust RFCs, PEPs, and Django DEPs. It parses proposal metadata, detects lifecycle events from git history, stores events in the database, and sends notifications for high-priority events.
 
 ## Event Types
@@ -33,8 +35,4 @@ High-priority events that trigger notifications by default:
 ### AI analysis unavailable
 
 - Symptom: event records exist but analysis summary/detail is missing.
-- Fix: the proposal tracker uses the shared Pydantic AI agent
-  (`progress.cli.ai`, configured under the `analysis` section — `provider`,
-  `model`, `api_key`, `base_url`). When `analysis.model` is empty the agent
-  is skipped and events are stored without summaries; set a model and restart
-  the run. A failed analysis is logged at WARNING and does not abort the run.
+- Fix: the proposal tracker uses the shared Pydantic AI agent (`progress.cli.ai`, configured under the `analysis` section — `provider`, `model`, `api_key`, `base_url`). When `analysis.model` is empty the agent is skipped and events are stored without summaries; set a model and restart the run. A failed analysis is logged at WARNING and does not abort the run.

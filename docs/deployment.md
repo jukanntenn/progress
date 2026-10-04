@@ -1,5 +1,7 @@
 # Deployment Guide
 
+English | [中文](deployment.zh.md)
+
 Progress ships as a single hardened container: a static Vite SPA served by Caddy, a FastAPI backend, and a supercronic scheduler, all supervised by s6-overlay. This guide covers the Docker deployment and the one-time migration from the legacy (pre-redesign) build.
 
 ## Docker Quick Start

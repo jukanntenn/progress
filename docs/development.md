@@ -1,5 +1,7 @@
 # Development Guide
 
+English | [中文](development.zh.md)
+
 ## Prerequisites
 
 | Tool              | Version | Description                                     | Install                                                                                             |
@@ -46,9 +48,7 @@ pnpm dev
 
 The Vite dev server runs on [http://localhost:5173](http://localhost:5173) and proxies `/api/*`, `/healthz`, `/readyz` to the backend at `http://127.0.0.1:8000` (see `web/vite.config.ts`).
 
-> No `config.toml` is needed for local dev. The backend reads `state_home` from
-> the `PROGRESS_STATE_HOME` env var (default `"data"` relative to the cwd). The
-> VS Code tasks set `PROGRESS_STATE_HOME` to `${workspaceFolder}/data`.
+> No `config.toml` is needed for local dev. The backend reads `state_home` from > the `PROGRESS_STATE_HOME` env var (default `"data"` relative to the cwd). The > VS Code tasks set `PROGRESS_STATE_HOME` to `${workspaceFolder}/data`.
 
 ### Debug (VS Code)
 
@@ -114,8 +114,7 @@ PROGRESS_LANGUAGE="en"
 PROGRESS_GITHUB__GH_TOKEN="ghp_your_token_here"
 ```
 
-See [docs/config.md](config.md) for the full model and
-[docs/deployment.md](deployment.md) for runtime/Docker configuration.
+See [docs/config.md](config.md) for the full model and [docs/deployment.md](deployment.md) for runtime/Docker configuration.
 
 ## Database Migrations
 
@@ -135,8 +134,7 @@ It runs the seven checks from CI's `drift-checks` job, each with a banner and `[
 2. **import-linter** — forbidden cross-layer imports ([tool.importlinter]).
 3. **OpenAPI drift** — `web/openapi.json` matches what FastAPI produces.
 4. **Frontend type drift** — `web/src/api/schema.ts` matches `openapi.json`.
-5. **i18n .pot drift** — `src/progress/locales/progress.pot` matches freshly
-   extracted strings (POT-Creation-Date is stripped — non-deterministic).
+5. **i18n .pot drift** — `src/progress/locales/progress.pot` matches freshly extracted strings (POT-Creation-Date is stripped — non-deterministic).
 6. **i18n catalog lint** — no fuzzy / empty / obsolete `.po` entries.
 7. **Migration drift** — every model change has a matching migration file.
 

@@ -157,12 +157,19 @@ jobs:
       - name: Drift checks (deptry / import-linter / OpenAPI / types / i18n / migrations)
         run: uv run python scripts/check_drift.py
 
-      # Documentation gates over the full corpus (links / wrap /
-      # current-state prose / PRFC format / word budgets) — the prek
-      # doc-check hook runs the same script on staged files only, so CI
-      # owns the full-corpus truth. Same local/CI parity as check_drift.
-      - name: Documentation gates (doc_sync)
-        run: uv run python scripts/doc_sync.py
+      # hdsh documentation gates over the full corpus (bilingual pairing /
+      # RFC format / wrap / links / word budgets / adoption completion) — the
+      # same commands the prek `hdsh` group runs locally, pinned to the ref
+      # prek.toml carries. Same local/CI parity as check_drift.
+      - name: Documentation gates (hdsh)
+        run: |
+          uv tool install "harness-deepseek-harness @ git+https://github.com/jukanntenn/harness-deepseek-harness@8684da520df25a446a10745063d40d72544d5653"
+          hdsh pairing verify
+          hdsh rfc verify
+          hdsh docs wrap
+          hdsh docs links
+          hdsh docs budgets
+          hdsh adopt verify
 
   docker-build:
     name: Docker image build (smoke)

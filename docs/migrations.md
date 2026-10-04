@@ -1,5 +1,7 @@
 # Database Migrations
 
+English | [中文](migrations.zh.md)
+
 Progress uses [tortoise-orm](https://github.com/tortoise/tortoise-orm)'s built-in migration CLI (`python -m tortoise`). Aerich does not support tortoise-orm ≥1.0; this project does **not** use it.
 
 Migrations live per-app, next to each app's models:

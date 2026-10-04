@@ -1,5 +1,7 @@
 # User & Password Management
 
+English | [中文](users.zh.md)
+
 The auth subsystem is always active (`src/progress/api/auth.py`). On first boot with `auth.enabled=true` and an empty users table, an initial superuser is created from `cfg.auth.initial_admin_username` / `initial_admin_password`; a random password is printed to the logs once.
 
 Manage users from the CLI (`progress users ...`, see `src/progress/cli/users.py`):

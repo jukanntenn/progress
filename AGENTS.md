@@ -17,7 +17,7 @@ progress/
 ├── prek.toml               # pre-commit hooks (backend ruff/ty + builtin); frontend in web/prek.toml (workspace)
 ├── babel.cfg               # Babel extraction config (i18n, spec 11)
 ├── config.example.toml     # Example Ansible-class config (spec 02)
-├── README.md / README_zh.md
+├── README.md / README.zh.md   # bilingual pair (+ README.i18n.yaml record)
 ├── AGENTS.md               # This file (standing orders every session loads)
 ├── CLAUDE.md               # Byte-identical twin of AGENTS.md (edit either; scripts/sync_agent_instructions.py)
 │
@@ -119,10 +119,11 @@ progress/
 │   ├── Dockerfile docker-compose.yml docker-compose.local.yml Caddyfile build.py
 │   └── s6/                 # s6-overlay service definitions
 ├── devops/                 # ansible/ deployment
-├── scripts/                # migration.py + export_openapi.py + doc gates (doc_sync.py) + agent-instruction sync
+├── scripts/                # migration.py + export_openapi.py + drift checks (check_drift.py) + agent-instruction sync
 ├── docs/                   # single docs tree (spec 01) + AGENTS.md (the documentation standard)
 ├── specs/redesign/         # authoritative redesign specs (00-17)
-├── .agents/                # skills/ (source, mirrored to .zcode/skills) + prfcs/ (decision records) + hooks/
+├── .agents/                # skills/ (source, mirrored to .zcode/skills) + rfcs/ (decision records) + hooks/
+├── .hdsh/                  # hdsh adoption manifests (adopt / pairing / docs)
 └── data/                   # runtime products (gitignored): progress.db, logs/, repos/, observability/
 ```
 
@@ -157,11 +158,25 @@ uv run ruff check                     # backend linter
 uv run ruff format                    # backend formatter
 uv run ty check                       # backend type checker
 uv run deptry .                       # dependency hygiene (unused / undeclared)
-prek run --all-files                  # everything (ruff + ty + eslint + prettier + hygiene)
+prek run --all-files                  # everything (ruff + ty + eslint + prettier + hygiene + hdsh gates)
 ./scripts/check_drift.py              # all 7 drift checks CI runs (deptry / import-linter / OpenAPI / TS types / i18n .pot + catalog / migrations)
 uv run python scripts/check_drift.py  # (equivalent — preferred form in docs)
-uv run python scripts/doc_sync.py     # all documentation gates (pass paths to restrict scope)
 ```
+
+Documentation gates (hdsh, host-installed; also run by the prek `hdsh` group and CI):
+
+```bash
+hdsh pairing verify    # bilingual pairs complete and consistent (records, switchers, structure)
+hdsh rfc verify        # RFC header/status/section skeleton under .agents/rfcs/
+hdsh docs wrap         # one physical line per prose paragraph
+hdsh docs links        # relative Markdown links and #fragments resolve
+hdsh docs budgets      # word ceilings from .hdsh/docs.manifest.json
+hdsh adopt verify      # adoption placeholders filled, managed files not drifted
+```
+
+<a id="run-relevant-checks-locally"></a>
+
+Run the narrowest checks that cover the changed surface (a touched module gets its owning test file; a doc pair gets `hdsh pairing record <pair>` then `hdsh pairing verify <pair>`); exhaustive rehearsal belongs to CI.
 
 Frontend commands (lint / format / typecheck / test) and Playwright e2e live in [`web/AGENTS.md`](web/AGENTS.md).
 
@@ -211,6 +226,10 @@ uv run tortoise -c progress.db.tortoise_config.TORTOISE_ORM makemigrations
 - Async↔Sync Bridge: asgiref 3.8.0+ (sync_to_async, thread_sensitive for requests.Session safety)
 - GitHub CLI: GitHub CLI (gh) - only for initial repository clone
 
+## Conventions
+
+Every change follows the [documentation standard](docs/AGENTS.md), the [bilingual documentation contract](docs/i18n/README.md), and the [RFC rules](.agents/rfcs/README.md). Issues precede implementation and every non-trivial change adds or updates an RFC in the same PR.
+
 ## Standards
 
 MUST FOLLOW THESE RULES, NO EXCEPTIONS
@@ -224,7 +243,7 @@ MUST FOLLOW THESE RULES, NO EXCEPTIONS
 - For adding or modifying configuration items, refer to `docs/config.md`
 - For development server usage, refer to `docs/development.md`
 - For writing test code, refer to `docs/testing.md`
-- For documentation placement, bilingual PRFC pairs, and the Markdown gates, refer to `docs/AGENTS.md`
+- For documentation placement and the Markdown gates, refer to `docs/AGENTS.md`; for bilingual pairs, `docs/i18n/README.md`
 - For i18n, refer to the `src/progress/locales/` catalogs and `scripts/makemessages.py` / `scripts/compile_messages.py`
 - For database migrations, refer to `docs/migrations.md`
 - For AI agent hooks, refer to `docs/agent-hooks.md`
@@ -262,7 +281,7 @@ tortoise-orm's built-in CLI (not aerich) manages schema migrations; each app own
 
 ## CI / CD
 
-GitHub Actions under `.github/workflows/` — `ci.yml` (lint / type-check / tests / frontend / drift checks / documentation gates / Docker smoke, on every push to `main` and every PR), `codeql.yml` (security analysis), `release.yml` (multi-arch image to GHCR and Docker Hub on `v*` tags + GitHub Release), `e2e.yml` (Playwright browser e2e, path-filtered). The full inventory lives in `docs/ci-cd.md`.
+GitHub Actions under `.github/workflows/` — `ci.yml` (lint / type-check / tests / frontend / drift checks / hdsh documentation gates / Docker smoke, on every push to `main` and every PR), `codeql.yml` (security analysis), `release.yml` (multi-arch image to GHCR and Docker Hub on `v*` tags + GitHub Release), `e2e.yml` (Playwright browser e2e, path-filtered), `issue-policy.yml` + `issue-lifecycle.yml` (hdsh issue management). The full inventory lives in `docs/ci-cd.md`.
 
 ## Users
 
@@ -272,10 +291,10 @@ The auth subsystem is always active; an initial superuser is created from config
 
 Proposal tracking is one of the built-in `integrations` (spec 06), configured via the `proposal` config section; the `run` command dispatches every registered integration. See `docs/proposal_tracking.md`.
 
-## PRFCs
+## RFCs
 
-Every non-trivial change adds or updates a PRFC in the same PR ([`.agents/prfcs/README.md`](.agents/prfcs/README.md)) — grep `.agents/prfcs/` for the topic first; only mechanical/local edits are exempt.
+Every non-trivial change adds or updates an RFC in the same PR ([`.agents/rfcs/README.md`](.agents/rfcs/README.md)) — grep `.agents/rfcs/` for the topic first; only mechanical/local edits are exempt. RFCs live at `.agents/rfcs/{proposed,implemented,rejected}/{class}/yyyy-mm-dd-topic.md` as bilingual triplets; `hdsh rfc verify` enforces the format.
 
 ## Editing these instructions
 
-This file loads in every agent session — keep it to standing orders and link everything else to its home. `CLAUDE.md` is a byte-identical copy with no primary: edit either file; [`scripts/sync_agent_instructions.py`](scripts/sync_agent_instructions.py) copies the newer side over the older and refuses to guess when both changed. Word ceilings live in [`scripts/doc_budgets.manifest.json`](scripts/doc_budgets.manifest.json): relocate or condense before raising one, and justify any raise in the PR.
+This file loads in every agent session — keep it to standing orders and link everything else to its home. `CLAUDE.md` is a byte-identical copy with no primary: edit either file; [`scripts/sync_agent_instructions.py`](scripts/sync_agent_instructions.py) copies the newer side over the older and refuses to guess when both changed. Word ceilings live in [`.hdsh/docs.manifest.json`](.hdsh/docs.manifest.json): relocate or condense before raising one, and justify any raise in the PR.

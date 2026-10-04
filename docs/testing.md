@@ -1,15 +1,12 @@
 # Testing Guide
 
+English | [中文](testing.zh.md)
+
 Progress uses a **three-layer test suite** (spec 15):
 
 - **`unit`** — pure-function / single-class tests with injected fakes, no IO.
-- **`component`** — multi-module collaboration under real SQLite and real local
-  git; external services (GitHub API, AI, changelog HTTP, SMTP) are mocked.
-  Former API-layer tests (FastAPI routes via httpx ASGITransport) live here too.
-- **`e2e`** — end-to-end tests driving the full pipeline via direct
-  `cli/core.run()` calls against **real external services**. The `feed` e2e
-  needs a real Miniflux + Postgres stack (brought up via Docker Compose); all
-  other e2e integrations use local git + mocked GitHub API / pytest-httpserver.
+- **`component`** — multi-module collaboration under real SQLite and real local git; external services (GitHub API, AI, changelog HTTP, SMTP) are mocked. Former API-layer tests (FastAPI routes via httpx ASGITransport) live here too.
+- **`e2e`** — end-to-end tests driving the full pipeline via direct `cli/core.run()` calls against **real external services**. The `feed` e2e needs a real Miniflux + Postgres stack (brought up via Docker Compose); all other e2e integrations use local git + mocked GitHub API / pytest-httpserver.
 
 **Guiding philosophy**: mock only what you cannot control, keep everything else real. Match the mock to the boundary, never to convenience. Local and CI run the **identical** command — `uv run pytest` — with coverage always on.
 
@@ -76,8 +73,7 @@ Shared fixtures (`tmp_state_home`, `workspace`, `git_helper`, `patch_clone_local
 
 ### 2.1 Why `component/` instead of `integration/`
 
-`integration` collides with the `integrations/` plugin package (spec 06). The community-standard term for "multi-module collaboration under real SQLite but mocked external services" is **component testing**, so we use that (spec 15). The former `tests/api/` suite is merged here: FastAPI route tests are component tests (they mock observability and drive the app in-process via
-httpx ASGITransport).
+`integration` collides with the `integrations/` plugin package (spec 06). The community-standard term for "multi-module collaboration under real SQLite but mocked external services" is **component testing**, so we use that (spec 15). The former `tests/api/` suite is merged here: FastAPI route tests are component tests (they mock observability and drive the app in-process via httpx ASGITransport).
 
 ### 2.2 File naming
 
@@ -213,10 +209,8 @@ async with LifespanManager(app):
         resp = await client.get("/api/v1/reports")
 ```
 
-- Replaces the legacy sync `TestClient` (which runs the async lifespan in a
-  separate thread/loop and breaks tortoise-orm's contextvar-bound connection).
-- `asgi-lifespan.LifespanManager` drives the FastAPI lifespan so `init_db` runs
-  before any request.
+- Replaces the legacy sync `TestClient` (which runs the async lifespan in a separate thread/loop and breaks tortoise-orm's contextvar-bound connection).
+- `asgi-lifespan.LifespanManager` drives the FastAPI lifespan so `init_db` runs before any request.
 
 ### 7.1 Error-handler testing caveat
 
@@ -244,14 +238,10 @@ cfg = CoreConfig(
 
 Unit tests live in `tests/unit/` and target a single module or class. They inject fakes for collaborators and perform no IO. The unit layer covers:
 
-- `cli/core.py` orchestration is covered by e2e (direct `core.run` calls), not
-  by unit tests.
+- `cli/core.py` orchestration is covered by e2e (direct `core.run` calls), not by unit tests.
 - `tests/unit/test_config.py` uses direct `CoreConfig` construction.
-- Notification / scrub / text / timezone / markdown / i18n / git_url / changelog
-  parsers / proposal sources all have narrow unit tests.
-- Per-integration pure functions (parsers, `normalize`, `should_notify`, status
-  enums, template selection) live here per spec 15 §1.2 — see each
-  integration's spec (`specs/integrations/*.md`) for the full acceptance list.
+- Notification / scrub / text / timezone / markdown / i18n / git_url / changelog parsers / proposal sources all have narrow unit tests.
+- Per-integration pure functions (parsers, `normalize`, `should_notify`, status enums, template selection) live here per spec 15 §1.2 — see each integration's spec (`specs/integrations/*.md`) for the full acceptance list.
 
 ## 10. CI (CI spec)
 
@@ -264,7 +254,5 @@ Drift checks (OpenAPI / i18n / migrations / TS types) are a separate CI concern 
 ## 11. Frontend tests (spec 13)
 
 - **Vitest + Testing Library + msw** for component-level tests (`web/`).
-- **Playwright** for browser e2e covering real user interaction flows
-  (`web/e2e/`).
-- **`openapi-typescript`** generates types from the OpenAPI schema, so frontend
-  API calls are type-checked at compile time.
+- **Playwright** for browser e2e covering real user interaction flows (`web/e2e/`).
+- **`openapi-typescript`** generates types from the OpenAPI schema, so frontend API calls are type-checked at compile time.

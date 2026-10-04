@@ -1,5 +1,7 @@
 # Configuration
 
+English | [中文](config.zh.md)
+
 Progress uses a **two-file configuration model** (spec 02) that physically separates infrastructure settings (owned by Ansible/deployer) from user-facing settings (owned by the Web UI / DB). The two classes never overlap, so a deploy cannot clobber a user edit and vice versa.
 
 ## How configuration is split
@@ -84,28 +86,16 @@ Copy `config.example.db.toml` as a starting point.
 
 When `config.db.toml` exists next to `config.toml`, every startup re-imports it into the DB `config` table:
 
-- **Priority**: `DB > seed > code defaults`. The seed only fills keys the DB
-  doesn't already have — Web UI edits survive a restart.
-- **All sections** are imported: `[core]` plus plugin sections (`[repo]`,
-  `[changelog]`, `[proposal]`), so each integration reads its config from the DB.
-- **Validation**: `[core]` passes through; plugin sections are validated against
-  their registered Pydantic schema. A failing section is logged and skipped.
-- **Production**: operators must ensure `config.db.toml` does **not** exist
-  (the DB is the single source of truth; `.gitignore` excludes it). Edit via the
-  Web UI or `PUT /api/v1/config/{section}`.
-- **Testing / first deploy**: place `config.db.toml` to seed initial config
-  without touching the Web UI.
+- **Priority**: `DB > seed > code defaults`. The seed only fills keys the DB doesn't already have — Web UI edits survive a restart.
+- **All sections** are imported: `[core]` plus plugin sections (`[repo]`, `[changelog]`, `[proposal]`), so each integration reads its config from the DB.
+- **Validation**: `[core]` passes through; plugin sections are validated against their registered Pydantic schema. A failing section is logged and skipped.
+- **Production**: operators must ensure `config.db.toml` does **not** exist (the DB is the single source of truth; `.gitignore` excludes it). Edit via the Web UI or `PUT /api/v1/config/{section}`.
+- **Testing / first deploy**: place `config.db.toml` to seed initial config without touching the Web UI.
 
 ## Editing configuration
 
-- **Web UI** — the *Configuration* page renders an RJSF form from the JSON
-  Schema (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
-- **API** — `GET /api/v1/config` returns all sections in **plaintext**
-  (secret fields carry real values; the Web UI masks them with
-  `type="password"` inputs); `PUT /api/v1/config/{section}` validates the
-  payload with the section's Pydantic model (`extra="forbid"`) and writes a
-  normalized plaintext copy. A failed validation returns 422 and leaves the
-  DB untouched.
+- **Web UI** — the *Configuration* page renders an RJSF form from the JSON Schema (`GET /api/v1/config/schema`) and writes via `PUT /api/v1/config/{section}`.
+- **API** — `GET /api/v1/config` returns all sections in **plaintext** (secret fields carry real values; the Web UI masks them with `type="password"` inputs); `PUT /api/v1/config/{section}` validates the payload with the section's Pydantic model (`extra="forbid"`) and writes a normalized plaintext copy. A failed validation returns 422 and leaves the DB untouched.
 - **Seed file** — edit `config.db.toml` and restart (re-imports into the DB).
 
 Secrets (`gh_token`, `api_key`, `password`, `webhook_url`, `dsn`, markpost `url`) are `pydantic.SecretStr`: stored as real plaintext values in the DB (trusted internal store) and returned as-is by the API. The browser renders them as password fields (with a reveal toggle); there is no mask sentinel — what you submit is what gets stored.
@@ -137,8 +127,7 @@ Every optional feature degrades gracefully when its prerequisite is missing — 
 ## Precedence
 
 - **Ansible** (`state_home`): `PROGRESS_STATE_HOME` env > `config.toml` > default `"data"`.
-- **Web class**: `PROGRESS_*` env vars (prefix `PROGRESS_`, separator `__`) override
-  on top of DB + seed at startup.
+- **Web class**: `PROGRESS_*` env vars (prefix `PROGRESS_`, separator `__`) override on top of DB + seed at startup.
 
 ## Plugin configuration
 
@@ -198,8 +187,7 @@ trackers = ["eip", "erc", "pep", "rfc", "dep"]
 
 ### `feed` (section `"feed"`)
 
-Miniflux RSS reader connection. Empty `base_url` → feed integration disabled
-+ warning (zero config). See `specs/integrations/feed.md`.
+Miniflux RSS reader connection. Empty `base_url` → feed integration disabled + warning (zero config). See `specs/integrations/feed.md`.
 
 ```toml
 [feed]

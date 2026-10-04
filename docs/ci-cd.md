@@ -1,5 +1,7 @@
 # CI / CD
 
+English | [中文](ci-cd.zh.md)
+
 GitHub Actions workflows under `.github/workflows/`:
 
 - `ci.yml` — lint (ruff), type-check (ty), tests (unit/component/e2e, feed e2e included via Docker compose), frontend (lint/typecheck/test/build), drift checks (`scripts/check_drift.py` — deptry / import-linter / OpenAPI / TS types / i18n .pot + catalog / migrations), documentation gates (`scripts/doc_sync.py`), Docker build smoke. Runs on every push to `main` and every PR.

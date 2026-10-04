@@ -11,8 +11,8 @@
 #
 # Under .agents/ only skills/ (a byte-for-byte mirror owned by
 # agent-instructions-sync) and hooks/ (agent hook shells, same category as
-# .claude/.codex/.zcode) stay excluded; prfcs/ is hand-written content and is
-# gated like any other Markdown (see the doc-check hook).
+# .claude/.codex/.zcode) stay excluded; rfcs/ is hand-written content gated by
+# the hdsh pairing/docs hooks (managed block below).
 #
 # This is the workspace-root config, so this exclude is applied GLOBALLY before
 # files are distributed to nested projects (e.g. web/prek.toml) — that is why
@@ -181,26 +181,6 @@ files = "(^|/)(AGENTS|CLAUDE)\\.md$|^\\.agents/skills/|^\\.zcode/skills/"
 pass_filenames = false
 stages = ["pre-commit"]
 
-# ---- documentation gates ----------------------------------------------------
-# scripts/doc_sync.py runs the Markdown gates (links / wrap / current-state
-# prose / PRFC format / word budgets) over the staged files only — prek
-# stashes unstaged changes during hook runs, so a wider scan would see a
-# stale tree; the full corpus is CI's job (same command). The .zcode/skills
-# mirror and the app's gettext catalogs sit outside doc scope; .agents/skills
-# is globally excluded above, so it is gated by CI's full run only.
-[[repos]]
-repo = "local"
-
-[[repos.hooks]]
-id = "doc-check"
-name = "documentation gates (doc_sync)"
-language = "system"
-entry = "uv run python scripts/doc_sync.py"
-files = "\\.md$"
-exclude = "^\\.zcode/|^\\.local/|^data/"
-pass_filenames = true
-stages = ["pre-commit"]
-
 # ---- commit-msg: Conventional Commits ---------------------------------------
 [[repos]]
 repo = "local"
@@ -212,3 +192,17 @@ language = "system"
 entry = "uv run python scripts/check_commit_msg.py"
 pass_filenames = true
 stages = ["commit-msg"]
+# BEGIN hdsh adopt (managed by hdsh adopt apply)
+[[repos]]
+repo = "https://github.com/jukanntenn/harness-deepseek-harness"
+rev = "8684da520df25a446a10745063d40d72544d5653"
+hooks = [
+  { id = "hdsh-pairing-verify", groups = ["hdsh"] },
+  { id = "hdsh-rfc-verify", groups = ["hdsh"] },
+  { id = "hdsh-rfc-archive", groups = ["hdsh"] },
+  { id = "hdsh-docs-wrap", groups = ["hdsh"] },
+  { id = "hdsh-docs-links", groups = ["hdsh"] },
+  { id = "hdsh-docs-budgets", groups = ["hdsh"] },
+  { id = "hdsh-adopt-verify", groups = ["hdsh"] },
+]
+# END hdsh adopt

@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/implemented/architecture/2026-08-31-cordis-kernel-plugin-architecture.md
+2026-08-31-cordis-kernel-plugin-architecture.md: 5046a2c63ef8bc42440e1b1e7ab78240e5579c2a
+2026-08-31-cordis-kernel-plugin-architecture.zh.md: bc5b981cc8a0888af12575322471eab9a1fc2557
