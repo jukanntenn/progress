@@ -47,15 +47,15 @@ Rule inventory (`rules-progress.yaml`, labels carry `service: progress`; notific
 | git op failures occurring | warning | any git op failure within 30m (per-command instances) |
 | notification failures occurring | warning | a report notification failed within 1h |
 | HTTP 5xx occurring | warning | >2 5xx responses within 10m |
-| telemetry gap (staging) | critical | anchor series `process.memory.usage` unseen for 10m — the app→collector→store path is broken |
+| telemetry gap (staging / production) | critical | anchor series `process.memory.usage` unseen for 10m — the app→collector→store path is broken |
 | data-quality degradation | warning | >5 fallback/parse/diff/unmatched events within 1h — reports degraded but still produced |
 | ERROR log rate high | warning | >15 ERROR lines/min over 5m — provisioned **paused**: the victoriametrics-logs datasource emits integer frames (known upstream wart) |
 
-The production-environment telemetry-gap rule is added on promotion day (adding it while production runs the old build would fire permanently).
+Both environments carry their own telemetry-gap rule; a rule for an environment that emits no telemetry would fire permanently, which is why the production rule landed together with the production deployment rather than before it.
 
 ## Uptime Kuma monitors
 
-Group `progress · staging` (production group added on promotion day), leaves with tags `env:` / `service:progress` / `layer:`:
+One group per environment (`progress · staging`, `progress · production`), leaves with tags `env:` / `service:progress` / `layer:`:
 
 | Monitor | Type | Meaning |
 |---|---|---|
