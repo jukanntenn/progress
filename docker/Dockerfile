@@ -48,7 +48,9 @@ FROM node:26-alpine AS node-build
 WORKDIR /app
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+# node >= 25 images no longer bundle corepack; install it so the
+# packageManager field in web/package.json stays the single pnpm version source
+RUN npm install --global corepack && corepack enable && pnpm install --frozen-lockfile
 
 COPY web/ .
 RUN pnpm build
