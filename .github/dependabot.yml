@@ -16,7 +16,9 @@ updates:
       actions:
         patterns: ["*"]
 
-  - package-ecosystem: pip
+  # The uv ecosystem updates pyproject.toml and uv.lock together; pip left the
+  # lockfile stale, so every python-group PR failed the Lockfile drift check.
+  - package-ecosystem: uv
     directory: /
     schedule:
       interval: monthly
@@ -26,6 +28,14 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    ignore:
+      # aioresponses cannot construct ClientResponse on aiohttp >=3.11; the
+      # >=3.10,<3.11 pin in pyproject.toml documents the compat boundary
+      - dependency-name: aiohttp
+        versions: [">=3.11"]
+      # ty >=0.0.84 turns the unsound-* rules into a repo-wide wave; held at
+      # ==0.0.55 until a dedicated adoption pass
+      - dependency-name: ty
 
   - package-ecosystem: npm
     directory: /web
@@ -37,6 +47,20 @@ updates:
     groups:
       web:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint and openapi-typescript do not support TS 7 yet
+      - dependency-name: typescript
+        versions: [">=7"]
+      # the lint-toolchain majors enable react-compiler diagnostics and new
+      # core rules that need a dedicated refactor pass
+      - dependency-name: eslint
+        versions: [">=10"]
+      - dependency-name: "@eslint/js"
+        versions: [">=10"]
+      - dependency-name: eslint-plugin-react-hooks
+        versions: [">=7"]
+      - dependency-name: eslint-plugin-react-refresh
+        versions: [">=0.5"]
 
   - package-ecosystem: docker
     directory: /docker
