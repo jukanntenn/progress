@@ -55,7 +55,7 @@ def check_git_sha(base_url: str, expected: str, timeout: float) -> tuple[bool, s
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--url", default="http://localhost:5053", help="Base URL of the deployed instance")
     parser.add_argument("--sha", help="Expected git_sha; verify the running image matches it")
     parser.add_argument("--interval", type=float, default=5.0, help="Poll interval in seconds (default: 5)")
