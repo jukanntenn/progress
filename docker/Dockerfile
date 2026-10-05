@@ -43,7 +43,7 @@ RUN python /tmp/compile_messages.py /app/src/progress/locales progress || \
 # ============================================================================
 # Stage 2: node-build — Vite produces static dist/ (no node runtime needed)
 # ============================================================================
-FROM node:22-alpine AS node-build
+FROM node:26-alpine AS node-build
 
 WORKDIR /app
 
