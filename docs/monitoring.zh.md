@@ -47,21 +47,21 @@
 | git op failures occurring | 警告 | 30 分钟内出现任意一次 git 操作失败（按命令分实例） |
 | notification failures occurring | 警告 | 1 小时内有报告通知发送失败 |
 | HTTP 5xx occurring | 警告 | 10 分钟内 5xx 响应 >2 次 |
-| telemetry gap (staging) | 严重 | 锚点序列 `process.memory.usage` 10 分钟未出现，说明应用→collector→存储链路已断 |
+| telemetry gap (staging / production) | 严重 | 锚点序列 `process.memory.usage` 10 分钟未出现，说明应用→collector→存储链路已断 |
 | data-quality degradation | 警告 | 1 小时内回退/解析/diff/未匹配事件 >5 起；报告已劣化但仍能产出 |
 | ERROR log rate high | 警告 | 5 分钟窗口内每分钟 ERROR 日志 >15 行；预配置为**暂停**状态：victoriametrics-logs 数据源输出整数帧（上游已知瑕疵） |
 
-生产环境的遥测断流规则在晋级日才加入（生产还跑旧构建时就加上会永久触发）。
+两个环境各有一条遥测断流规则；对不产遥测的环境设规则会永久触发，因此生产规则与生产部署同步落地。
 
 ## Uptime Kuma 监控项
 
-组 `progress · staging`（生产组在晋级日加入），各叶子监控项带 `env:` / `service:progress` / `layer:` 标签：
+每环境一个组（`progress · staging`、`progress · production`），各叶子监控项带 `env:` / `service:progress` / `layer:` 标签：
 
 | 监控项 | 类型 | 含义 |
 |---|---|---|
 | `progress · stg · web ui (origin)` | HTTP GET `/` | 从外部可达 Caddy + SPA + 代理链 |
 | `progress · stg · readiness (origin)` | HTTP GET `/readyz` | 同上且数据库能应答（`SELECT 1`）；两项都红 = 进程/主机问题，仅此项红 = 数据库问题 |
-| `progress · stg · pipeline heartbeat (push)` | push | serve 进程推送每次运行的判定结果（`status=up/down`、msg、动态 `ping` 保留期 = 2× 预期间隔 + 30 分钟，封顶 24 小时）；尽力而为，kuma 的静默检测是兜底 |
+| `progress · {stg,prod} · pipeline heartbeat (push)` | push | serve 进程推送每次运行的判定结果（`status=up/down`、msg）；推送窗口取监控项的心跳间隔（86400 秒）——尽力而为，kuma 的静默检测是兜底 |
 
 推送 URL 是 vault secret（`kuma_push_url`，纯 URL——查询串由应用自行追加）。`PROGRESS_KUMA_PUSH_URL` 为空则完全禁用推送。
 
