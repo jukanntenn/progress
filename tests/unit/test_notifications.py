@@ -316,7 +316,7 @@ class TestFeishuWebhookValidation:
 
     @staticmethod
     def _channel(webhook_url: str) -> FeishuChannel:
-        return FeishuChannel(session=MagicMock(), config=FeishuChannelConfig(webhook_url=webhook_url))
+        return FeishuChannel(session=MagicMock(), config=FeishuChannelConfig(webhook_url=SecretStr(webhook_url)))
 
     async def test_empty_url_raises_readable_error(self) -> None:
         ch = self._channel("")
