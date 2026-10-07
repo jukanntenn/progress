@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/proposed/feature/2026-10-08-per-integration-schedule-overrides.md
+2026-10-08-per-integration-schedule-overrides.md: df2d6ce57e2e2b8e74b983407e0151b245e747b7
+2026-10-08-per-integration-schedule-overrides.zh.md: f519878ba120055b0f1b333a810c3556c6b5a9b7
