@@ -11,6 +11,8 @@ class Migration(migrations.Migration):
         ops.AddField(
             model_name="ChangelogTracker",
             name="proxy",
-            field=fields.CharField(default="", max_length=1024),
+            # db_default must reach the DDL: SQLite refuses ADD COLUMN ... NOT NULL
+            # without a database-level default, so a python-only default fails.
+            field=fields.CharField(default="", db_default="", max_length=1024),
         ),
     ]
