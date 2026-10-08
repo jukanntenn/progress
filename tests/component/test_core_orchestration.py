@@ -166,6 +166,25 @@ class TestRunOrchestration:
             await ctx.runner.run_once(trackers_only=False)
         assert integration.last_concurrency == 4
 
+    async def test_only_runs_requested_subset(self, pipeline_tree) -> None:
+        selected = FakeIntegration(name="a")
+        excluded = FakeIntegration(name="b")
+        _DISCOVER["a"] = lambda: selected
+        _DISCOVER["b"] = lambda: excluded
+        async with pipeline_tree() as (ctx, _cfg):
+            outcome = await ctx.runner.run_once(only={"a"})
+            assert selected.run_calls == 1
+            assert excluded.run_calls == 0
+            assert set(outcome.results) == {"a"}
+
+    async def test_only_ignores_unknown_names(self, pipeline_tree) -> None:
+        integration = FakeIntegration(name="a")
+        _DISCOVER["a"] = lambda: integration
+        async with pipeline_tree() as (ctx, _cfg):
+            outcome = await ctx.runner.run_once(only={"a", "ghost"})
+            assert integration.run_calls == 1
+            assert set(outcome.results) == {"a"}
+
     async def test_trackers_only_skips_reports_and_notifications(self, pipeline_tree, monkeypatch) -> None:
         integration = FakeIntegration()
         _DISCOVER["fake"] = lambda: integration

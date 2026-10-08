@@ -104,6 +104,8 @@ base_url = ""                       # public base URL for report back-links
 
 系统内部字段（`state_home`、`auth.secret_key`、`auth.initial_admin_password`）不出现在可编辑 schema 中，也不出现在 API 响应中；写入时始终保留其数据库值。
 
+<a id="scheduling"></a>
+
 ## 调度
 
 `schedule` section 驱动进程内的定时流水线运行（PRFC 2026-08-31）：
@@ -116,6 +118,7 @@ cron = "0 6 * * *"   # daily at 06:00 local time; empty disables scheduled runs
 - cron 表达式由 serve 树上的 `scheduled-run` 行经 `ctx.scheduler`（croniter）求值：使用本地时间；逐条目互斥（上一次运行尚未结束时到来的触发会被跳过并给出警告）；不补跑错过的触发。
 - 变更即时生效：通过 API 写入该 section 即可重载调度，无需重启（L0）。
 - 容器的 `PROGRESS_SCHEDULE_CRON` 环境变量是 `schedule.cron` 为空时使用的兼容回退；调度在进程内运行。
+- config schema 声明了 `schedule_cron` 字段的集成可以脱离这条全局节奏：存储值非空时，会布防一条只运行该集成的专属调度条目，且该集成从全局组中排除——覆盖是替换全局节奏，而非叠加。空值继承全局调度；无效的存储值以警告降级为继承全局。首个采用者是 `feed`（见下文）。
 
 ## 零配置
 
@@ -195,6 +198,9 @@ Miniflux RSS 阅读器连接。`base_url` 为空 → feed 集成禁用 + 警告�
 [feed]
 base_url = "https://miniflux.example.org"   # empty → disabled
 api_key = "MF-api-key-xxxx"                  # SecretStr; base_url set but empty → disabled
+schedule_cron = "0 */4 * * *"                # optional: schedule only feed on its own cron; empty → global schedule
 ```
 
 跟踪哪些 feed 由**数据源驱动**（完全取决于 Miniflux 订阅了什么），因此该 section 只承载 Miniflux 凭据，不含 feed 列表。逐 feed 的去重水位线存放在 `feed_trackers` 状态表中，在 `run` 内部推进。
+
+`schedule_cron` 仅覆盖该集成自身的调度（见[调度](#scheduling)）；无效值在写入时以 422 拒绝。

@@ -1,4 +1,4 @@
-"""scheduled-run consumer (PRFC phase 4c): arming, idling, env fallback, cadence math."""
+"""scheduled-run consumer (PRFC phase 4c): arming, idling, env fallback, cadence math, override grouping."""
 
 from __future__ import annotations
 
@@ -7,23 +7,38 @@ from typing import Any
 import pytest
 
 from progress.config.root import CoreConfig
+from progress.integrations.feed.config import FeedIntegrationConfig
 from progress.kernel import Entry, boot
 from progress.runtime.scheduled_run import (
     KUMA_PUSH_MAX_RETENTION,
     SCHEDULE_CRON_ENV,
+    ScheduleGroup,
     build_kuma_push_url,
     expected_max_gap_seconds,
     kuma_push_retention_seconds,
     make_scheduled_run_entry,
+    resolve_schedule_groups,
+    resolve_schedule_overrides,
 )
 
 
-def _tree(cfg: CoreConfig) -> list[Entry]:
+class _FakeIntegration:
+    """Integration stand-in; ``config_schema`` declaring ``schedule_cron`` is the capability."""
+
+    def __init__(self, name: str, config_schema: type | None = None) -> None:
+        self.name = name
+        self.config_schema = config_schema
+
+
+def _tree(cfg: CoreConfig, instances: list[Any] | None = None) -> list[Entry]:
+    mounted = instances if instances is not None else []
+
     async def config_entry(ctx: Any, config: Any) -> None:
         ctx.provide("config", cfg)
 
     async def integrations_entry(ctx: Any, config: Any) -> None:
-        ctx.provide("integrations", object())
+        registry = type("Registry", (), {"instances": mounted, "names": [i.name for i in mounted]})
+        ctx.provide("integrations", registry())
 
     async def runner_entry(ctx: Any, config: Any) -> None:
         handle = type("Handle", (), {"run_once": staticmethod(_noop_run)})()
@@ -73,6 +88,122 @@ async def test_env_fallback_arms_when_config_empty(tmp_state_home: str, monkeypa
     async with boot(_tree(cfg) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
         entries = ctx.scheduler.entries()
         assert entries == [{"name": "scheduled-run", "cron": "0 6 * * *", "running": "False"}]
+
+
+async def test_override_arms_separate_group_and_leaves_global(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def fake_get_config(section: str) -> dict[str, Any]:
+        return {"feed": {"schedule_cron": "0 */4 * * *"}}.get(section, {})
+
+    monkeypatch.setattr("progress.db.get_config", fake_get_config)
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    instances = [
+        _FakeIntegration("feed", FeedIntegrationConfig),
+        _FakeIntegration("repo"),
+    ]
+    async with boot(_tree(cfg, instances) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        entries = {e["name"]: e["cron"] for e in ctx.scheduler.entries()}
+        assert entries == {
+            "scheduled-run": "0 6 * * *",
+            "scheduled-run[0 */4 * * *]": "0 */4 * * *",
+        }
+
+
+async def test_override_equal_to_global_joins_global_group(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def fake_get_config(section: str) -> dict[str, Any]:
+        return {"feed": {"schedule_cron": "0 6 * * *"}}.get(section, {})
+
+    monkeypatch.setattr("progress.db.get_config", fake_get_config)
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    instances = [_FakeIntegration("feed", FeedIntegrationConfig)]
+    async with boot(_tree(cfg, instances) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        entries = ctx.scheduler.entries()
+        assert [(e["name"], e["cron"]) for e in entries] == [("scheduled-run", "0 6 * * *")]
+
+
+async def test_global_empty_with_override_arms_override_only(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def fake_get_config(section: str) -> dict[str, Any]:
+        return {"feed": {"schedule_cron": "0 */4 * * *"}}.get(section, {})
+
+    monkeypatch.setattr("progress.db.get_config", fake_get_config)
+    cfg = CoreConfig(state_home=tmp_state_home)
+    instances = [_FakeIntegration("feed", FeedIntegrationConfig)]
+    async with boot(_tree(cfg, instances) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        entries = ctx.scheduler.entries()
+        assert [(e["name"], e["cron"]) for e in entries] == [("scheduled-run[0 */4 * * *]", "0 */4 * * *")]
+
+
+async def test_invalid_stored_override_degrades_to_global(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def fake_get_config(section: str) -> dict[str, Any]:
+        return {"feed": {"schedule_cron": "not a cron"}}.get(section, {})
+
+    monkeypatch.setattr("progress.db.get_config", fake_get_config)
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    instances = [_FakeIntegration("feed", FeedIntegrationConfig)]
+    async with boot(_tree(cfg, instances) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        entries = ctx.scheduler.entries()
+        assert [(e["name"], e["cron"]) for e in entries] == [("scheduled-run", "0 6 * * *")]
+
+
+async def test_resolve_schedule_overrides_reads_only_capable_schemas(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def fake_get_config(section: str) -> dict[str, Any]:
+        return {
+            "feed": {"schedule_cron": "0 */4 * * *"},
+            "repo": {"schedule_cron": "0 */4 * * *"},
+        }.get(section, {})
+
+    monkeypatch.setattr("progress.db.get_config", fake_get_config)
+    overrides = await resolve_schedule_overrides(
+        [_FakeIntegration("feed", FeedIntegrationConfig), _FakeIntegration("repo"), _FakeIntegration("v2ex")]
+    )
+    assert overrides == {"feed": "0 */4 * * *"}
+
+
+def test_resolve_schedule_groups_pure_function():
+    groups = resolve_schedule_groups("0 6 * * *", ["feed", "repo", "v2ex"], {"feed": "0 */4 * * *"})
+    assert [(g.expression, g.names) for g in groups] == [
+        ("0 6 * * *", ["repo", "v2ex"]),
+        ("0 */4 * * *", ["feed"]),
+    ]
+    assert groups[0].attributes() == {"schedule": "0 6 * * *", "integrations": "repo,v2ex"}
+    assert groups[1].label == "feed"
+
+
+def test_resolve_schedule_groups_same_expression_merges():
+    groups = resolve_schedule_groups("0 6 * * *", ["feed", "repo"], {"feed": "0 6 * * *"})
+    assert [(g.expression, g.names) for g in groups] == [("0 6 * * *", ["repo", "feed"])]
+
+
+def test_resolve_schedule_groups_empty_global_returns_no_groups():
+    assert resolve_schedule_groups("", ["feed", "repo"], {}) == []
+
+
+def test_resolve_schedule_groups_empty_global_keeps_overrides():
+    groups = resolve_schedule_groups("", ["feed"], {"feed": "0 */4 * * *"})
+    assert [(g.expression, g.names) for g in groups] == [("0 */4 * * *", ["feed"])]
+
+
+def test_schedule_group_default_factory_isolation():
+    a, b = ScheduleGroup("x"), ScheduleGroup("x")
+    a.names.append("feed")
+    assert b.names == []
 
 
 @pytest.mark.parametrize(
