@@ -1,28 +1,35 @@
 """scheduled-run consumer (PRFC 2026-08-31 phase 4c).
 
-The serve tree mounts integrations + runner + this row; when
-``schedule.cron`` (or the container's ``PROGRESS_SCHEDULE_CRON``
-compatibility env) is non-empty, the row registers
-``every(cron, runner.run_once)`` on the in-process scheduler. Empty cron
-leaves the row mounted as a no-op — the tree shape is stable, the cadence
-is data.
+The serve tree mounts integrations + runner + this row; it arms one scheduler
+entry per schedule group. Groups are resolved at (re)arm time from the global
+``schedule.cron`` (or the container's ``PROGRESS_SCHEDULE_CRON`` compatibility
+env) plus every mounted integration's ``schedule_cron`` override: integrations
+whose config schema declares the field and whose stored section sets it leave
+the global group and run on their own cron (an override equal to the global
+expression joins the global group). No cron and no overrides leaves the row
+mounted as a no-op — the tree shape is stable, the cadence is data.
 
-The row also owns run-cadence observability, cadence-agnostic by design
-(the cron is a runtime config knob, never a baked-in "N times a day"):
+Run-cadence observability is per group (the cron is a runtime config knob,
+never a baked-in "N times a day"):
 
 * ``progress.schedule.expected_max_gap_seconds`` — largest gap between the
-  next consecutive fires, exported at arm time. Alert rules divide by this
-  instead of assuming a fixed daily count, so changing the cron changes the
+  next consecutive fires of each group's cron, exported at arm time with the
+  group's cron and member names as attributes. Alert rules divide by this
+  instead of assuming a fixed daily count, so changing a cron changes the
   alert windows automatically.
-* ``progress.pipeline.last_success_epoch`` — set after each successful run;
-  staleness against the expected gap is the "pipeline silent" signal.
+* ``progress.pipeline.last_success_epoch`` — set after each successful group
+  run, attributed the same way; staleness against the expected gap is the
+  "pipeline silent" signal.
 * Uptime Kuma push (``PROGRESS_KUMA_PUSH_URL``) — best-effort verdict push
-  after every run with a per-push retention derived from the same expected
-  gap; an empty URL disables the push entirely.
+  after every group run with a per-push retention derived from that group's
+  expected gap; the most frequent group dominates the single push monitor's
+  silence window. An empty URL disables the push entirely.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import pairwise
 import logging
@@ -33,6 +40,7 @@ from urllib.parse import urlencode
 from croniter import croniter
 
 from progress.kernel import Entry
+from progress.utils.cron import is_valid_cron_expression
 
 if TYPE_CHECKING:
     from progress.cli.outcome import RunOutcome
@@ -46,8 +54,87 @@ KUMA_PUSH_MAX_RETENTION = 86_400
 EXPECTED_GAP_FIRES = 8
 
 
+@dataclass
+class ScheduleGroup:
+    """One scheduler entry: a cron expression and the integrations it runs."""
+
+    expression: str
+    names: list[str] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        return ",".join(self.names)
+
+    def attributes(self) -> dict[str, str]:
+        return {"schedule": self.expression, "integrations": self.label}
+
+
 def _cron_expression(cfg: CoreConfig) -> str:
     return cfg.schedule.cron or os.environ.get(SCHEDULE_CRON_ENV, "").strip()
+
+
+async def resolve_schedule_overrides(instances: Iterable[Any]) -> dict[str, str]:
+    """Per-integration cron overrides from DB sections, keyed by name.
+
+    Only integrations whose config schema declares ``schedule_cron``
+    participate — the field is the capability. An invalid stored value
+    (schema downgrade, hand edit) degrades to inherit-global with a warning.
+    """
+
+    from progress.db import get_config  # noqa: PLC0415
+
+    overrides: dict[str, str] = {}
+    for instance in instances:
+        schema = getattr(instance, "config_schema", None)
+        fields = getattr(schema, "model_fields", None) or {}
+        if "schedule_cron" not in fields:
+            continue
+        raw = await get_config(instance.name)
+        value = raw.get("schedule_cron", "") if isinstance(raw, dict) else ""
+        if not value:
+            continue
+        if not is_valid_cron_expression(value):
+            logger.warning(
+                "integration %s has invalid schedule_cron %r; inheriting global schedule",
+                instance.name,
+                value,
+            )
+            continue
+        overrides[instance.name] = value
+    return overrides
+
+
+def resolve_schedule_groups(
+    global_expression: str,
+    names: Iterable[str],
+    overrides: Mapping[str, str],
+) -> list[ScheduleGroup]:
+    """Group integrations by effective cron; overrides leave the global group.
+
+    The global group is armed whenever the global cron is set (even with no
+    members), preserving the pre-override idle-cron behaviour; an override
+    equal to the global expression joins the global group instead of creating
+    a duplicate entry.
+    """
+
+    groups: list[ScheduleGroup] = []
+    by_expression: dict[str, ScheduleGroup] = {}
+    if global_expression:
+        inherited = ScheduleGroup(global_expression, [name for name in names if not overrides.get(name)])
+        groups.append(inherited)
+        by_expression[global_expression] = inherited
+    for name in names:
+        expression = overrides.get(name)
+        if not expression:
+            continue
+        group = by_expression.get(expression)
+        if group is not None:
+            group.names.append(name)
+        else:
+            group = ScheduleGroup(expression, [name])
+            by_expression[expression] = group
+            groups.append(group)
+    return groups
 
 
 def expected_max_gap_seconds(expression: str, *, fires: int = EXPECTED_GAP_FIRES) -> float:
@@ -104,14 +191,16 @@ def make_scheduled_run_entry() -> Entry:
         from opentelemetry import metrics  # noqa: PLC0415
         from opentelemetry.metrics import CallbackOptions, Observation  # noqa: PLC0415
 
-        expression = _cron_expression(ctx.config)
-        if not expression:
-            logger.info("schedule.cron empty; scheduled-run row idle")
+        global_expression = _cron_expression(ctx.config)
+        overrides = await resolve_schedule_overrides(ctx.integrations.instances)
+        groups = resolve_schedule_groups(global_expression, ctx.integrations.names, overrides)
+        if not groups:
+            logger.info("schedule.cron empty and no integration overrides; scheduled-run row idle")
             return
 
-        max_gap = expected_max_gap_seconds(expression)
-        retention = kuma_push_retention_seconds(expression)
-        state: dict[str, float] = {"last_success": 0.0}
+        max_gaps = {group.expression: expected_max_gap_seconds(group.expression) for group in groups}
+        retentions = {group.expression: kuma_push_retention_seconds(group.expression) for group in groups}
+        last_success: dict[str, float] = {}
 
         # Observable (callback) gauges, not sync ones: a sync gauge emits a
         # point only on .set(), so a once-per-boot set would go stale in the
@@ -121,45 +210,55 @@ def make_scheduled_run_entry() -> Entry:
         meter = metrics.get_meter("progress.scheduler")
 
         def _observe_gap(_options: CallbackOptions) -> list[Observation]:
-            return [Observation(max_gap)]
+            return [Observation(max_gaps[group.expression], attributes=group.attributes()) for group in groups]
 
         def _observe_last_success(_options: CallbackOptions) -> list[Observation]:
-            if state["last_success"]:
-                return [Observation(state["last_success"])]
-            return []
+            return [
+                Observation(last_success[group.expression], attributes=group.attributes())
+                for group in groups
+                if group.expression in last_success
+            ]
 
         meter.create_observable_gauge(
             "progress.schedule.expected_max_gap_seconds",
             callbacks=[_observe_gap],
             unit="s",
-            description="Largest gap between consecutive cron fires (alert windows divide by this)",
+            description="Largest gap between consecutive cron fires per schedule group (alert windows divide by this)",
         )
         meter.create_observable_gauge(
             "progress.pipeline.last_success_epoch",
             callbacks=[_observe_last_success],
             unit="s",
-            description="Unix epoch of the last successful scheduled run",
+            description="Unix epoch of the last successful scheduled run per schedule group",
         )
 
-        async def _trigger() -> None:
-            logger.info("scheduled run starting (cron=%s)", expression)
-            outcome: RunOutcome = await ctx.runner.run_once()
-            success = outcome.exit_code == 0
-            logger.info("scheduled run completed: exit_code=%s", outcome.exit_code)
-            if success:
-                state["last_success"] = datetime.now(tz=UTC).timestamp()
-            push_url = os.environ.get(KUMA_PUSH_URL_ENV, "").strip()
-            if push_url:
-                await push_run_verdict(
-                    push_url,
-                    success=success,
-                    message=f"scheduled run exit_code={outcome.exit_code}",
-                    retention=retention,
-                )
+        def _make_trigger(group: ScheduleGroup) -> Any:
+            async def _trigger() -> None:
+                logger.info("scheduled run starting (cron=%s integrations=%s)", group.expression, group.label)
+                outcome: RunOutcome = await ctx.runner.run_once(only=set(group.names))
+                success = outcome.exit_code == 0
+                logger.info("scheduled run completed: integrations=%s exit_code=%s", group.label, outcome.exit_code)
+                if success:
+                    last_success[group.expression] = datetime.now(tz=UTC).timestamp()
+                push_url = os.environ.get(KUMA_PUSH_URL_ENV, "").strip()
+                if push_url:
+                    await push_run_verdict(
+                        push_url,
+                        success=success,
+                        message=f"scheduled run integrations={group.label} exit_code={outcome.exit_code}",
+                        retention=retentions[group.expression],
+                    )
 
-        dispose = ctx.scheduler.every(expression, _trigger, name="scheduled-run")
-        ctx.effect(dispose)
-        logger.info("scheduled-run armed: cron=%s (local time, per-entry mutex, no catch-up)", expression)
+            return _trigger
+
+        for group in groups:
+            name = "scheduled-run" if group.expression == global_expression else f"scheduled-run[{group.expression}]"
+            dispose = ctx.scheduler.every(group.expression, _make_trigger(group), name=name)
+            ctx.effect(dispose)
+        logger.info(
+            "scheduled-run armed: %s (local time, per-entry mutex, no catch-up)",
+            "; ".join(f"{group.expression} -> {group.label or '(none)'}" for group in groups),
+        )
 
     return Entry(id="scheduled-run", plugin=_apply, inject=["config", "scheduler", "integrations", "runner"])
 
@@ -169,9 +268,12 @@ __all__ = [
     "KUMA_PUSH_MAX_RETENTION",
     "KUMA_PUSH_URL_ENV",
     "SCHEDULE_CRON_ENV",
+    "ScheduleGroup",
     "build_kuma_push_url",
     "expected_max_gap_seconds",
     "kuma_push_retention_seconds",
     "make_scheduled_run_entry",
     "push_run_verdict",
+    "resolve_schedule_groups",
+    "resolve_schedule_overrides",
 ]

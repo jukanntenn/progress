@@ -15,6 +15,7 @@ ACTIVE: the pipeline runs on demand (``progress run``) or on schedule
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Set as AbstractSet
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -50,8 +51,15 @@ class RunnerHandle:
     def __init__(self, ctx: Any) -> None:
         self.ctx = ctx
 
-    async def run_once(self, *, trackers_only: bool = False) -> RunOutcome:
-        integrations: list[Integration] = list(self.ctx.integrations.instances)
+    async def run_once(self, *, trackers_only: bool = False, only: AbstractSet[str] | None = None) -> RunOutcome:
+        mounted: list[Integration] = list(self.ctx.integrations.instances)
+        if only is None:
+            integrations = mounted
+        else:
+            integrations = [i for i in mounted if i.name in only]
+            missing = set(only) - {i.name for i in mounted}
+            if missing:
+                logger.warning("run subset ignored unknown integrations: %s", ",".join(sorted(missing)))
         names = [i.name for i in integrations]
         cfg = self.ctx.config  # noqa: F841
         logger.info("run started: integrations=%s trackers_only=%s", names, trackers_only)

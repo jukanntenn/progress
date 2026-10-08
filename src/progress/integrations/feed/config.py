@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from progress.utils.cron import CronExpression
+
 
 class FeedIntegrationConfig(BaseModel):
     """Top-level config for the ``feed`` integration (spec feed §3)."""
@@ -32,6 +34,13 @@ class FeedIntegrationConfig(BaseModel):
         default=SecretStr(""),
         title="Miniflux API Key",
         description="API key for accessing the Miniflux API.",
+    )
+    schedule_cron: CronExpression = Field(
+        default="",
+        title="Schedule Override (cron)",
+        description="5-field cron expression that schedules only this integration, replacing the global "
+        "schedule for it. Leave empty to inherit the global schedule.",
+        examples=["0 */4 * * *"],
     )
 
 
