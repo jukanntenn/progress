@@ -37,7 +37,7 @@ timezone = "UTC"
 
 [core.github]
 gh_token = ""                       # SecretStr; empty → GitHub tracking disabled + warning
-proxy = ""                          # HTTP proxy for aiohttp + git (e.g. "http://127.0.0.1:7890")
+proxy = ""                          # HTTP proxy for GitHub + git; v2ex opts in (e.g. "http://127.0.0.1:7890")
 
 [core.analysis]
 provider = ""                       # e.g. "anthropic"; empty → AI disabled (truncation fallback)
@@ -170,10 +170,12 @@ name = "Vite"
 url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
 parser_type = "markdown_heading"    # "markdown_heading" | "html_chinese_version"
 enabled = true
+proxy = ""                          # per-tracker HTTP(S) proxy URL; empty → direct fetch
 ```
 
 - `markdown_heading`：带 `## 1.2.3` 标题的 Markdown。
 - `html_chinese_version`：带 `uTools v7.5.1` 这类模式的 HTML。
+- `proxy`：仅用于该 tracker 拉取的 HTTP(S) 代理 URL（如 `http://127.0.0.1:7890`，用于不走代理无法访问的 URL，如 `raw.githubusercontent.com`）。留空（默认）→ 直连拉取。与 `core.github.proxy` 相互独立。
 
 ### `proposal`（section `"proposal"`）
 

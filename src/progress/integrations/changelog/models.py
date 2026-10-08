@@ -5,7 +5,7 @@ parser type, and the last-seen version checkpoint that the tracker advances.
 
 Per spec changelog §2 the **URL is the identity key** (unique, used for upsert
 and GC). Changing the URL is equivalent to delete + create (the watermark is
-not carried over). ``name``/``parser_type``/``enabled`` are mutable fields that
+not carried over). ``name``/``parser_type``/``enabled``/``proxy`` are mutable fields that
 trigger updates without rebuilding the watermark.
 """
 
@@ -27,6 +27,7 @@ class ChangelogTracker(BaseModel):
     url = fields.CharField(max_length=1024, unique=True)
     parser_type = fields.CharField(max_length=64, default="auto")
     enabled = fields.BooleanField(default=True)
+    proxy = fields.CharField(max_length=1024, default="")
     last_seen_version = fields.CharField(max_length=255, null=True)
     last_check_time = fields.DatetimeField(null=True)
     # Feature 6: a deterministic ChangelogRule (JSON) learned from the AI

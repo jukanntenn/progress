@@ -288,6 +288,7 @@ class ChangelogIntegration:
                     url=cfg_item.url,
                     parser_type=cfg_item.parser_type,
                     enabled=cfg_item.enabled,
+                    proxy=cfg_item.proxy,
                 )
                 result.created += 1
             else:
@@ -300,6 +301,9 @@ class ChangelogIntegration:
                     changed = True
                 if row.enabled != cfg_item.enabled:
                     row.enabled = cfg_item.enabled
+                    changed = True
+                if row.proxy != cfg_item.proxy:
+                    row.proxy = cfg_item.proxy
                     changed = True
                 if changed:
                     await row.save()
@@ -409,8 +413,10 @@ class ChangelogIntegration:
         if not tracker_row.enabled:
             return ChangelogCheckResult(status="skipped")
 
+        proxy = tracker_row.proxy or None
+
         try:
-            text = await self._fetch_text(session, tracker_row.url)
+            text = await self._fetch_text(session, tracker_row.url, proxy=proxy)
         except Exception as e:
             report_severe(e)
             return ChangelogCheckResult(status="failed", error=str(e) or f"{type(e).__name__} (no message)")
@@ -442,7 +448,7 @@ class ChangelogIntegration:
             error=warning,
         )
 
-    async def _fetch_text(self, session: aiohttp.ClientSession, url: str) -> str:
+    async def _fetch_text(self, session: aiohttp.ClientSession, url: str, *, proxy: str | None = None) -> str:
         """Fetch the changelog page (spec changelog §9).
 
         User-Agent: ``progress``. Total timeout 300s. 4xx/5xx → ExternalServiceException.
@@ -452,6 +458,10 @@ class ChangelogIntegration:
         changelog URL is a config error, not a transient blip.
         Character-set decoding is delegated to aiohttp's automatic detection
         with a mojibake-fallback chain (spec §9 allows minor adjustments).
+        ``proxy`` is the tracker's own configured proxy URL, threaded per
+        request (the shared session is ``trust_env=False`` and never proxies
+        on its own); ``None`` fetches directly. Independent of
+        ``core.github.proxy``.
         """
 
         timeout = aiohttp.ClientTimeout(total=FETCH_TIMEOUT_SECONDS)
@@ -459,7 +469,7 @@ class ChangelogIntegration:
 
         async def _do_get() -> str:
             try:
-                async with session.get(url, timeout=timeout, headers=headers) as resp:
+                async with session.get(url, timeout=timeout, headers=headers, proxy=proxy) as resp:
                     if resp.status >= 500:
                         raise ExternalServiceException(f"changelog fetch {url} failed: HTTP {resp.status}")
                     if resp.status >= 400:

@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/proposed/bug-fix/2026-10-08-changelog-proxy-fetch.md
+2026-10-08-changelog-proxy-fetch.md: 29e62a4b42181da2f0fed96237ac6dd049c00f8a
+2026-10-08-changelog-proxy-fetch.zh.md: 17cf99762304ffd63464c87baa75d0fadc87fbaf

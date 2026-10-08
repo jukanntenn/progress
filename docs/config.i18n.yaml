@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record docs/config.md
-config.md: 3235065daf17e80dba154d52fcd5ae236914a745
-config.zh.md: 500216188622d5d7117891cd55bb6054ef577d88
+config.md: fc82b8ed9b776cdd0e2043b8a93211989c39e7e2
+config.zh.md: b275297447c5f2cf8689db5fb999a25149ba13d4

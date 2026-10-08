@@ -7,6 +7,10 @@ Covers:
 - ``aiohttp.ClientError`` wrapped as ExternalServiceException (retried)
 - User-Agent: ``progress`` (literal, no version suffix)
 - Total timeout 30s (configurable in code constant)
+- Proxy routing: a tracker's configured ``proxy`` URL is threaded per request
+  (``proxy=``); empty ``proxy`` fetches directly regardless of
+  ``core.github.proxy``; malformed proxy URLs fail config validation; ``sync``
+  mirrors ``proxy`` onto the row
 - Charset decoding strategy:
   * HTTP header charset wins when valid
   * UTF-8 as ultimate fallback
@@ -22,9 +26,11 @@ from typing import TYPE_CHECKING
 import unittest.mock
 
 import aiohttp
+from pydantic import ValidationError
 import pytest
 from werkzeug.wrappers import Response
 
+from progress.config.root import CoreConfig, GitHubConfig
 from progress.db import close_db, init_db, set_config
 from progress.errors import ExternalServiceException
 from progress.integrations.base import Components
@@ -95,7 +101,7 @@ class TestFetchConstants:
             async def __aexit__(self, *args):
                 return False
 
-        def _fake_get(url, timeout=None, headers=None):
+        def _fake_get(url, timeout=None, headers=None, proxy=None):
             nonlocal captured_timeout
             captured_timeout = timeout
             return _FakeCM()
@@ -485,6 +491,125 @@ class TestUserAgentHeader:
         assert row is not None
         await integration._check(row, db_and_session)
         assert captured["user_agent"] == "progress"
+
+
+class TestProxyRouting:
+    """Per-tracker ``proxy`` URL routing; empty means direct."""
+
+    @staticmethod
+    def _fake_session(captured: dict[str, object]) -> unittest.mock.MagicMock:
+        session = unittest.mock.MagicMock()
+
+        class _FakeResp:
+            status = 200
+            charset = "utf-8"
+
+            async def read(self):
+                return b"## 1.0.0\nbody"
+
+        class _FakeCM:
+            async def __aenter__(self):
+                return _FakeResp()
+
+            async def __aexit__(self, *args):
+                return False
+
+        def _fake_get(url, timeout=None, headers=None, proxy=None):
+            captured["proxy"] = proxy
+            return _FakeCM()
+
+        session.get = _fake_get
+        return session
+
+    @staticmethod
+    async def _integration_with_core_cfg(
+        session: aiohttp.ClientSession,
+        plugin_cfg: ChangelogIntegrationConfig,
+        core_cfg: CoreConfig | None,
+    ) -> ChangelogIntegration:
+        integration = ChangelogIntegration()
+        await set_config("changelog", plugin_cfg.model_dump(mode="json"))
+        await integration.setup(Components(cfg=core_cfg, session=session))
+        return integration
+
+    async def test_configured_proxy_threads_per_request(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[
+                ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", proxy="http://127.0.0.1:7890")
+            ],
+        )
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, None)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.proxy == "http://127.0.0.1:7890"
+
+        captured: dict[str, object] = {}
+        result = await integration._check(row, self._fake_session(captured))
+        assert result.status == "success"
+        assert captured["proxy"] == "http://127.0.0.1:7890"
+
+    async def test_empty_proxy_fetches_direct_even_with_global_github_proxy(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://direct.example/CHANGELOG.md")],
+        )
+        core_cfg = CoreConfig(github=GitHubConfig(proxy="http://127.0.0.1:7890"))
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, core_cfg)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.proxy == ""
+
+        captured: dict[str, object] = {}
+        result = await integration._check(row, self._fake_session(captured))
+        assert result.status == "success"
+        assert captured["proxy"] is None
+
+    async def test_sync_mirrors_proxy_changes(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[
+                ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", proxy="http://127.0.0.1:7890")
+            ],
+        )
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, None)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.proxy == "http://127.0.0.1:7890"
+
+        flipped = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", proxy="")],
+        )
+        reloaded = await self._integration_with_core_cfg(db_and_session, flipped, None)
+        result = await reloaded.sync()
+
+        await row.refresh_from_db()
+        assert row.proxy == ""
+        assert result.updated == 1
+
+
+class TestProxyConfigValidation:
+    def test_accepts_http_https_and_empty(self) -> None:
+        for value in ("", "http://127.0.0.1:7890", "https://proxy.example:8080", "  "):
+            item = ChangelogItemConfig(name="X", url="https://example.com/c.md", proxy=value)
+            assert item.proxy == value.strip()
+
+    def test_rejects_non_http_scheme(self) -> None:
+        with pytest.raises(ValidationError, match="http:// or https://"):
+            ChangelogItemConfig(name="X", url="https://example.com/c.md", proxy="127.0.0.1:7890")
+
+    def test_rejects_socks_scheme(self) -> None:
+        with pytest.raises(ValidationError, match="http:// or https://"):
+            ChangelogItemConfig(name="X", url="https://example.com/c.md", proxy="socks5://127.0.0.1:7890")
 
 
 class TestTimeoutHandling:
