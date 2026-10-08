@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record .agents/rfcs/proposed/bug-fix/2026-10-08-changelog-proxy-fetch.md
-2026-10-08-changelog-proxy-fetch.md: 75e128442356e28900c2cda884d00a693b96f575
-2026-10-08-changelog-proxy-fetch.zh.md: 8d0031467c226def8ee9bfb73cf71e1b6fcda218
+2026-10-08-changelog-proxy-fetch.md: 29e62a4b42181da2f0fed96237ac6dd049c00f8a
+2026-10-08-changelog-proxy-fetch.zh.md: 17cf99762304ffd63464c87baa75d0fadc87fbaf

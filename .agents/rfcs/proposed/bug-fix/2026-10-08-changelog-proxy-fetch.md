@@ -10,23 +10,23 @@ Changelog trackers fetch arbitrary URLs through the shared aiohttp session. Sinc
 
 ## Proposal
 
-### Per-tracker opt-in, single proxy source
+### A proxy URL per tracker, decoupled from the GitHub proxy
 
-`ChangelogItemConfig` — and the `ChangelogTracker` row `sync` mirrors it onto — gains `use_proxy: bool = false`. A tracker with `use_proxy = true` has its fetch sent with the per-request `proxy=` argument set to `core.github.proxy`, the same single knob the GitHub clients and v2ex already consume; no new proxy URL field exists to drift out of sync. Default `false` keeps every existing tracker's behavior identical on upgrade: the proxy applies only where the user asked for it.
+`ChangelogItemConfig` — and the `ChangelogTracker` row `sync` mirrors it onto — gains `proxy: str = ""`. A non-empty value is the HTTP(S) proxy URL used for that tracker's fetch, threaded as the per-request `proxy=` argument; empty (default) fetches directly. The field is independent of `core.github.proxy`: the GitHub proxy serves GitHub/git/v2ex traffic, and changelog URLs — arbitrary hosts, not GitHub services — carry their own routing. Default empty keeps every existing tracker's behavior identical on upgrade.
 
-### Fail loud on half configuration
+### Malformed URLs fail at config time
 
-`use_proxy = true` with an empty `core.github.proxy` returns `failed` for that tracker with an error naming the missing setting, before any request is made. Silently attempting direct would reproduce today's opaque timeout failure — the exact confusion this change removes.
+A non-empty `proxy` must start with `http://` or `https://`; anything else (a bare `host:port`, a `socks5://` URL the HTTP client cannot use) is rejected by config validation — 422 on PUT, load-time degrade-to-defaults with a logged warning for a stored bad value — instead of surfacing as an opaque aiohttp error mid-run.
 
 ### Everything else rides existing machinery
 
-The settings editor renders the field from the section schema; `sync` mirrors it onto the row like `enabled`/`parser_type`; one migration adds a boolean column; per-request proxying is the established aiohttp 3.10 pattern (`ProxiedGitHubAPI`, `V2exClient`), so the shared session stays `trust_env=False` and Feishu/MarkPost/AI/Miniflux traffic stays direct.
+The settings editor renders the field from the section schema; `sync` mirrors it onto the row like `enabled`/`parser_type`; one migration adds a varchar column; per-request proxying is the established aiohttp 3.10 pattern (`ProxiedGitHubAPI`, `V2exClient`), so the shared session stays `trust_env=False` and Feishu/MarkPost/AI/Miniflux traffic stays direct.
 
 ## Alternatives considered
 
-**Route all changelog fetches through `core.github.proxy` (v2ex-style blanket).** v2ex's traffic is one uniformly blocked site; a changelog tracker list is heterogeneous by design, and the deployed set mixes directly reachable URLs with proxy-only ones. Blanket proxying would newly depend on the proxy reaching every tracker's host, regressing currently working trackers with no per-tracker escape hatch.
+**Reuse `core.github.proxy` via a per-tracker `use_proxy` boolean.** The v2ex precedent makes one shared knob look sufficient, but v2ex's traffic is a single uniformly blocked site while a changelog list is arbitrary hosts: coupling changelog fetches to the GitHub proxy makes the GitHub setting load-bearing for unrelated URLs and makes GitHub-proxy edits risk changelog behavior. Rejected in review for this coupling.
 
-**A per-tracker proxy URL field.** Duplicates the one proxy URL a deployment has into N tracker entries — a second source of truth for the same fact; v2ex already established `core.github.proxy` as the project's single proxy knob.
+**Route all changelog fetches through `core.github.proxy` (blanket).** The deployed tracker set mixes directly reachable URLs with proxy-only ones; blanket proxying would newly depend on the proxy reaching every tracker's host, regressing currently working trackers with no per-tracker escape hatch.
 
 **Honor `HTTP_PROXY`/`HTTPS_PROXY` (`trust_env=True`).** Rejected by spec 07: it drags every HTTP client in the process — Feishu, MarkPost, AI, Miniflux — through the proxy meant for blocked-external traffic; per-request threading is the supported way to scope a proxy to the requests that need it.
 
@@ -34,14 +34,14 @@ The settings editor renders the field from the section schema; `sync` mirrors it
 
 ## Acceptance criteria
 
-- A tracker with `use_proxy = true` and a non-empty `core.github.proxy`: its fetch request carries `proxy=<configured url>`; check behavior is otherwise unchanged.
-- A tracker with default `use_proxy = false`: fetched directly even when a proxy is configured.
-- `use_proxy = true` with empty `core.github.proxy`: the tracker's check returns `failed` with an error naming `core.github.proxy`; no request is sent; other trackers are unaffected.
-- Existing DB config rows without the key load unchanged (`false`); `sync` mirrors `use_proxy` changes onto rows without touching the watermark.
-- The settings UI renders the toggle in the changelog section from the section schema alone.
+- A tracker with a non-empty `proxy`: its fetch request carries `proxy=<that url>`; check behavior is otherwise unchanged.
+- A tracker with empty `proxy`: fetched directly even when `core.github.proxy` is configured.
+- A `proxy` value not starting with `http://`/`https://`: rejected by config validation (422 on PUT); a stored bad value degrades to defaults with a logged warning.
+- Existing DB config rows without the key load unchanged (`""`); `sync` mirrors `proxy` changes onto rows without touching the watermark.
+- The settings UI renders the field in the changelog section from the section schema alone.
 
 ## Risks
 
-- The opted-in tracker's host must be reachable *through* the proxy; a proxy that blocks it turns a direct timeout into a proxied error. The existing fetch error paths still name the tracker and URL either way.
-- The proxy URL is resolved from the integration's held `CoreConfig` at check time — the same freshness semantics as the repo/proposal/v2ex clients, not a new cache.
-- One more mirrored boolean on the row: divergence between config and row is bounded by the sync comparison and the CI migration drift gate.
+- The tracker's host must be reachable *through* its configured proxy; a proxy that blocks it surfaces through the normal fetch error paths, which still name the tracker and URL.
+- One more mirrored varchar on the row: divergence between config and row is bounded by the sync comparison and the CI migration drift gate.
+- Scheme validation is the only static check; a well-formed but wrong URL (right scheme, wrong host) fails only at fetch time — same visibility as any other network misconfiguration.

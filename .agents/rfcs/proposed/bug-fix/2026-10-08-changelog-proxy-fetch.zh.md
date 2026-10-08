@@ -10,23 +10,23 @@ Changelog tracker 通过共享的 aiohttp session 拉取任意 URL。[spec 07 �
 
 ## 方案
 
-### Per-tracker 选择启用，单一代理配置源
+### Per-tracker 代理 URL，与 GitHub 代理解耦
 
-`ChangelogItemConfig`——以及 `sync` 镜像到的 `ChangelogTracker` 行——新增 `use_proxy: bool = false`。`use_proxy = true` 的 tracker，其拉取请求以 per-request `proxy=` 参数携带 `core.github.proxy`，即 GitHub 客户端与 v2ex 已在消费的同一个配置项；不新增代理 URL 字段，也就没有会失同步的第二份配置。默认 `false` 使升级后所有存量 tracker 行为逐字节不变：代理只作用于用户明确要求的地方。
+`ChangelogItemConfig`——以及 `sync` 镜像到的 `ChangelogTracker` 行——新增 `proxy: str = ""`。非空值即该 tracker 拉取使用的 HTTP(S) 代理 URL，以 per-request `proxy=` 参数透传；空（默认）直连。该字段与 `core.github.proxy` 相互独立：GitHub 代理服务的是 GitHub/git/v2ex 流量，而 changelog 的 URL 是任意主机、并非 GitHub 服务，应自带路由。默认空值使升级后所有存量 tracker 行为不变。
 
-### 半配置状态显式失败
+### 畸形 URL 在配置期失败
 
-`use_proxy = true` 而 `core.github.proxy` 为空时，该 tracker 的检查直接返回 `failed`，错误信息指明缺失的配置项，且不发起任何请求。静默回退直连只会复刻今天那种不透明的超时失败——那正是本次修改要消除的困惑。
+非空 `proxy` 必须以 `http://` 或 `https://` 开头；其他值（裸 `host:port`、HTTP 客户端无法使用的 `socks5://`）在配置校验时被拒绝——PUT 返回 422，存储的坏值在加载时回退默认并记录警告——而不是在运行中期以难解的 aiohttp 错误浮现。
 
 ### 其余全部复用既有机制
 
-设置界面从 section schema 自动渲染该字段；`sync` 像 `enabled`/`parser_type` 一样把它镜像到行上；一个迁移增加一列布尔值；per-request 代理是 aiohttp 3.10 的既定模式（`ProxiedGitHubAPI`、`V2exClient`），共享 session 保持 `trust_env=False`，Feishu/MarkPost/AI/Miniflux 流量继续直连。
+设置界面从 section schema 自动渲染该字段；`sync` 像 `enabled`/`parser_type` 一样把它镜像到行上；一个迁移增加一列 varchar；per-request 代理是 aiohttp 3.10 的既定模式（`ProxiedGitHubAPI`、`V2exClient`），共享 session 保持 `trust_env=False`，Feishu/MarkPost/AI/Miniflux 流量继续直连。
 
 ## 已考虑的替代方案
 
-**所有 changelog 拉取整体走 `core.github.proxy`（v2ex 式全量代理）。** v2ex 的流量是单一被整体封锁的站点；changelog 的 tracker 列表天然异构，且已部署集合混合了直连可达与仅代理可达的 URL。全量代理会新引入「代理必须能到达每个 tracker 主机」的依赖，让当前正常工作的 tracker 也面临回归，且没有任何按 tracker 的退路。
+**通过 per-tracker `use_proxy` 布尔复用 `core.github.proxy`。** v2ex 先例让「单一共享配置项」看似足够，但 v2ex 的流量是单一被整体封锁的站点，而 changelog 列表是任意主机：把 changelog 拉取耦合到 GitHub 代理，会让 GitHub 的配置项对外来 URL 承担载荷，GitHub 代理的改动也会波及 changelog 行为。评审中因该耦合被否决。
 
-**per-tracker 代理 URL 字段。** 把部署环境里唯一的一个代理 URL 复制进 N 个 tracker 条目——同一事实的第二事实源；v2ex 已确立 `core.github.proxy` 是项目唯一的代理配置项。
+**所有 changelog 拉取整体走 `core.github.proxy`（全量代理）。** 已部署集合混合了直连可达与仅代理可达的 URL；全量代理会新引入「代理必须能到达每个 tracker 主机」的依赖，让当前正常工作的 tracker 也面临回归，且没有按 tracker 的退路。
 
 **读取 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量（`trust_env=True`）。** spec 07 已否决：这会拖拽进程内所有 HTTP 客户端——Feishu、MarkPost、AI、Miniflux——经过为封锁外网流量准备的代理；逐请求透传才是把代理限定在需要它的请求上的受支持方式。
 
@@ -34,14 +34,14 @@ Changelog tracker 通过共享的 aiohttp session 拉取任意 URL。[spec 07 �
 
 ## 验收标准
 
-- `use_proxy = true` 且 `core.github.proxy` 非空：该 tracker 的拉取请求携带 `proxy=<配置的代理>`；检查行为其余不变。
-- 默认 `use_proxy = false`：即使配置了代理，该 tracker 也直连拉取。
-- `use_proxy = true` 而 `core.github.proxy` 为空：该 tracker 的检查返回 `failed`，错误信息指明 `core.github.proxy`；不发起请求；其他 tracker 不受影响。
-- 缺少该键的存量 DB 配置行加载行为不变（`false`）；`sync` 把 `use_proxy` 的变化镜像到行上，不触碰水位。
-- 设置界面仅凭 section schema 就能在 changelog 分节渲染出该开关。
+- `proxy` 非空的 tracker：其拉取请求携带 `proxy=<该 URL>`；检查行为其余不变。
+- `proxy` 为空的 tracker：即使配置了 `core.github.proxy` 也直连拉取。
+- 不以 `http://`/`https://` 开头的 `proxy` 值：配置校验拒绝（PUT 返回 422）；存储的坏值加载时回退默认并记录警告。
+- 缺少该键的存量 DB 配置行加载行为不变（`""`）；`sync` 把 `proxy` 的变化镜像到行上，不触碰水位。
+- 设置界面仅凭 section schema 就能在 changelog 分节渲染出该字段。
 
 ## 风险
 
-- 被启用代理的 tracker 主机必须**经由代理**可达；代理若封锁它，只是把直连超时换成经代理的错误。无论哪种情况，既有的拉取错误路径都会给出 tracker 名称与 URL。
-- 代理 URL 在检查时从 integration 持有的 `CoreConfig` 解析——与 repo/proposal/v2ex 客户端相同的时效语义，不是新增缓存。
-- 行上多了一个镜像布尔值：config 与行之间的分歧由 sync 比较逻辑和 CI 迁移 drift 门禁约束。
+- tracker 的主机必须**经由其配置的代理**可达；代理若封锁它，会通过正常的拉取错误路径浮现，且错误仍带 tracker 名称与 URL。
+- 行上多了一个镜像 varchar：config 与行之间的分歧由 sync 比较逻辑和 CI 迁移 drift 门禁约束。
+- scheme 校验是唯一的静态检查；格式正确但内容错误的 URL（scheme 对、主机错）只能在拉取时暴露——与任何其他网络误配置的可见性相同。

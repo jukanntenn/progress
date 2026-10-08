@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     operations = [
         ops.AddField(
             model_name="ChangelogTracker",
-            name="use_proxy",
-            field=fields.BooleanField(default=False),
+            name="proxy",
+            field=fields.CharField(default="", max_length=1024),
         ),
     ]

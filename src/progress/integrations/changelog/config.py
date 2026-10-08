@@ -7,7 +7,7 @@ Per spec 02 the changelog plugin config looks like::
     url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
     parser_type = "auto"      # "auto" | "markdown_heading" | "html_generic"
     enabled = true
-    use_proxy = false         # true → fetch through core.github.proxy
+    proxy = ""                # per-tracker HTTP(S) proxy; empty → direct fetch
 """
 
 from __future__ import annotations
@@ -45,13 +45,22 @@ class ChangelogItemConfig(BaseModel):
         title="Enabled",
         description="Whether to track this changelog source.",
     )
-    use_proxy: bool = Field(
-        default=False,
-        title="Use Proxy",
-        description="Route this tracker's fetch through the proxy configured in core.github.proxy. "
-        "Enable for URLs unreachable without a proxy (e.g. raw.githubusercontent.com); "
-        "requires a non-empty core.github.proxy.",
+    proxy: str = Field(
+        default="",
+        title="Proxy",
+        description="HTTP(S) proxy URL used for this tracker's fetch (e.g. http://127.0.0.1:7890). "
+        "Empty → fetch directly. Independent of core.github.proxy.",
+        examples=["http://127.0.0.1:7890"],
     )
+
+    @field_validator("proxy", mode="before")
+    @classmethod
+    def _validate_proxy_scheme(cls, v: object) -> object:
+        if isinstance(v, str):
+            v = v.strip()
+            if v and not v.startswith(("http://", "https://")):
+                raise ValueError("proxy must be an http:// or https:// URL, or empty for direct fetch")
+        return v
 
     @field_validator("parser_type", mode="before")
     @classmethod

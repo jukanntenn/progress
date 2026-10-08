@@ -288,7 +288,7 @@ class ChangelogIntegration:
                     url=cfg_item.url,
                     parser_type=cfg_item.parser_type,
                     enabled=cfg_item.enabled,
-                    use_proxy=cfg_item.use_proxy,
+                    proxy=cfg_item.proxy,
                 )
                 result.created += 1
             else:
@@ -302,8 +302,8 @@ class ChangelogIntegration:
                 if row.enabled != cfg_item.enabled:
                     row.enabled = cfg_item.enabled
                     changed = True
-                if row.use_proxy != cfg_item.use_proxy:
-                    row.use_proxy = cfg_item.use_proxy
+                if row.proxy != cfg_item.proxy:
+                    row.proxy = cfg_item.proxy
                     changed = True
                 if changed:
                     await row.save()
@@ -413,18 +413,10 @@ class ChangelogIntegration:
         if not tracker_row.enabled:
             return ChangelogCheckResult(status="skipped")
 
-        proxy = (self._cfg.github.proxy if self._cfg else "") or None
-        if tracker_row.use_proxy and not proxy:
-            return ChangelogCheckResult(
-                status="failed",
-                error=(
-                    f"use_proxy is enabled for {tracker_row.name} but core.github.proxy is empty; "
-                    "configure the proxy or disable use_proxy"
-                ),
-            )
+        proxy = tracker_row.proxy or None
 
         try:
-            text = await self._fetch_text(session, tracker_row.url, proxy=proxy if tracker_row.use_proxy else None)
+            text = await self._fetch_text(session, tracker_row.url, proxy=proxy)
         except Exception as e:
             report_severe(e)
             return ChangelogCheckResult(status="failed", error=str(e) or f"{type(e).__name__} (no message)")
@@ -466,9 +458,10 @@ class ChangelogIntegration:
         changelog URL is a config error, not a transient blip.
         Character-set decoding is delegated to aiohttp's automatic detection
         with a mojibake-fallback chain (spec §9 allows minor adjustments).
-        ``proxy`` is threaded per request (the shared session is
-        ``trust_env=False`` and never proxies on its own); the caller passes it
-        only for trackers with ``use_proxy`` enabled.
+        ``proxy`` is the tracker's own configured proxy URL, threaded per
+        request (the shared session is ``trust_env=False`` and never proxies
+        on its own); ``None`` fetches directly. Independent of
+        ``core.github.proxy``.
         """
 
         timeout = aiohttp.ClientTimeout(total=FETCH_TIMEOUT_SECONDS)
