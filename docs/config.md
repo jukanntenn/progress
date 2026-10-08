@@ -37,7 +37,7 @@ timezone = "UTC"
 
 [core.github]
 gh_token = ""                       # SecretStr; empty → GitHub tracking disabled + warning
-proxy = ""                          # HTTP proxy for aiohttp + git (e.g. "http://127.0.0.1:7890")
+proxy = ""                          # HTTP proxy for GitHub + git; v2ex/changelog trackers opt in (e.g. "http://127.0.0.1:7890")
 
 [core.analysis]
 provider = ""                       # e.g. "anthropic"; empty → AI disabled (truncation fallback)
@@ -165,10 +165,12 @@ name = "Vite"
 url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
 parser_type = "markdown_heading"    # "markdown_heading" | "html_chinese_version"
 enabled = true
+use_proxy = false                   # true → fetch this tracker through core.github.proxy
 ```
 
 - `markdown_heading`: Markdown with `## 1.2.3` headings.
 - `html_chinese_version`: HTML with patterns like `uTools v7.5.1`.
+- `use_proxy = true`: fetch this one tracker through the proxy configured in `core.github.proxy` (needed for URLs unreachable without a proxy, e.g. `raw.githubusercontent.com`). Default `false` — a tracker is fetched directly even when a proxy is configured.
 
 ### `proposal` (section `"proposal"`)
 

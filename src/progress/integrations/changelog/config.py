@@ -7,6 +7,7 @@ Per spec 02 the changelog plugin config looks like::
     url = "https://raw.githubusercontent.com/vitejs/vite/main/packages/vite/CHANGELOG.md"
     parser_type = "auto"      # "auto" | "markdown_heading" | "html_generic"
     enabled = true
+    use_proxy = false         # true → fetch through core.github.proxy
 """
 
 from __future__ import annotations
@@ -43,6 +44,13 @@ class ChangelogItemConfig(BaseModel):
         default=True,
         title="Enabled",
         description="Whether to track this changelog source.",
+    )
+    use_proxy: bool = Field(
+        default=False,
+        title="Use Proxy",
+        description="Route this tracker's fetch through the proxy configured in core.github.proxy. "
+        "Enable for URLs unreachable without a proxy (e.g. raw.githubusercontent.com); "
+        "requires a non-empty core.github.proxy.",
     )
 
     @field_validator("parser_type", mode="before")

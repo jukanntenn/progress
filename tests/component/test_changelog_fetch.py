@@ -7,6 +7,9 @@ Covers:
 - ``aiohttp.ClientError`` wrapped as ExternalServiceException (retried)
 - User-Agent: ``progress`` (literal, no version suffix)
 - Total timeout 30s (configurable in code constant)
+- Proxy routing: ``use_proxy`` trackers fetch through ``core.github.proxy``
+  (per-request ``proxy=``); default trackers stay direct; ``use_proxy`` without
+  a configured proxy fails loudly; ``sync`` mirrors ``use_proxy`` onto the row
 - Charset decoding strategy:
   * HTTP header charset wins when valid
   * UTF-8 as ultimate fallback
@@ -25,6 +28,7 @@ import aiohttp
 import pytest
 from werkzeug.wrappers import Response
 
+from progress.config.root import CoreConfig, GitHubConfig
 from progress.db import close_db, init_db, set_config
 from progress.errors import ExternalServiceException
 from progress.integrations.base import Components
@@ -95,7 +99,7 @@ class TestFetchConstants:
             async def __aexit__(self, *args):
                 return False
 
-        def _fake_get(url, timeout=None, headers=None):
+        def _fake_get(url, timeout=None, headers=None, proxy=None):
             nonlocal captured_timeout
             captured_timeout = timeout
             return _FakeCM()
@@ -485,6 +489,124 @@ class TestUserAgentHeader:
         assert row is not None
         await integration._check(row, db_and_session)
         assert captured["user_agent"] == "progress"
+
+
+class TestProxyRouting:
+    """Per-tracker ``use_proxy`` routing through ``core.github.proxy``."""
+
+    @staticmethod
+    def _fake_session(captured: dict[str, object]) -> unittest.mock.MagicMock:
+        session = unittest.mock.MagicMock()
+
+        class _FakeResp:
+            status = 200
+            charset = "utf-8"
+
+            async def read(self):
+                return b"## 1.0.0\nbody"
+
+        class _FakeCM:
+            async def __aenter__(self):
+                return _FakeResp()
+
+            async def __aexit__(self, *args):
+                return False
+
+        def _fake_get(url, timeout=None, headers=None, proxy=None):
+            captured["proxy"] = proxy
+            return _FakeCM()
+
+        session.get = _fake_get
+        return session
+
+    @staticmethod
+    async def _integration_with_core_cfg(
+        session: aiohttp.ClientSession,
+        plugin_cfg: ChangelogIntegrationConfig,
+        core_cfg: CoreConfig | None,
+    ) -> ChangelogIntegration:
+        integration = ChangelogIntegration()
+        await set_config("changelog", plugin_cfg.model_dump(mode="json"))
+        await integration.setup(Components(cfg=core_cfg, session=session))
+        return integration
+
+    async def test_use_proxy_threads_configured_proxy_per_request(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", use_proxy=True)],
+        )
+        core_cfg = CoreConfig(github=GitHubConfig(proxy="http://127.0.0.1:7890"))
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, core_cfg)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.use_proxy is True
+
+        captured: dict[str, object] = {}
+        result = await integration._check(row, self._fake_session(captured))
+        assert result.status == "success"
+        assert captured["proxy"] == "http://127.0.0.1:7890"
+
+    async def test_default_tracker_stays_direct_even_with_global_proxy(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://direct.example/CHANGELOG.md")],
+        )
+        core_cfg = CoreConfig(github=GitHubConfig(proxy="http://127.0.0.1:7890"))
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, core_cfg)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.use_proxy is False
+
+        captured: dict[str, object] = {}
+        result = await integration._check(row, self._fake_session(captured))
+        assert result.status == "success"
+        assert captured["proxy"] is None
+
+    async def test_use_proxy_without_configured_proxy_fails_loudly(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", use_proxy=True)],
+        )
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, CoreConfig())
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None
+
+        result = await integration._check(row, db_and_session)
+        assert result.status == "failed"
+        assert "core.github.proxy" in (result.error or "")
+
+    async def test_sync_mirrors_use_proxy_changes(
+        self,
+        db_and_session: aiohttp.ClientSession,
+    ) -> None:
+        plugin_cfg = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", use_proxy=True)],
+        )
+        integration = await self._integration_with_core_cfg(db_and_session, plugin_cfg, None)
+        await integration.sync()
+
+        row = await ChangelogTracker.first()
+        assert row is not None and row.use_proxy is True
+
+        flipped = ChangelogIntegrationConfig(
+            trackers=[ChangelogItemConfig(name="X", url="https://raw.example/CHANGELOG.md", use_proxy=False)],
+        )
+        reloaded = await self._integration_with_core_cfg(db_and_session, flipped, None)
+        result = await reloaded.sync()
+
+        await row.refresh_from_db()
+        assert row.use_proxy is False
+        assert result.updated == 1
 
 
 class TestTimeoutHandling:

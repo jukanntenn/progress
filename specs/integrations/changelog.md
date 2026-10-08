@@ -48,6 +48,7 @@ changelog integration 周期性地从配置的远程 URL 拉取变更日志页�
 | `parser_type` | CharField(255) | required | — | `"markdown_heading"` 或 `"html_chinese_version"` | — |
 | `last_seen_version` | CharField(255) | nullable | None | 已上报的最新版本号(水位) | None:该 tracker 从未成功上报过版本(首次运行或历史检查全部失败) |
 | `enabled` | BooleanField | — | True | 是否启用 | — |
+| `use_proxy` | BooleanField | — | False | 拉取是否经 `core.github.proxy` 配置的代理路由 | — |
 | `last_check_time` | DatetimeField | nullable | None | 上次检查时间戳 | None:该 tracker 从未执行过检查(新建后尚未运行,或一直处于禁用状态) |
 | `created_at` / `updated_at` | DatetimeField | — | `now_utc` | `updated_at` 由 `BaseModel` 在每次 save 时自动刷新 | — |
 
@@ -55,7 +56,7 @@ changelog integration 周期性地从配置的远程 URL 拉取变更日志页�
 
 **`url` 是身份键**:
 - config 中修改 `url` 等价于"删除旧 tracker(含其水位)+ 创建新 tracker"——水位不会随 URL 变更迁移。
-- 修改 `name`/`parser_type`/`enabled` 触发 update(不重建,水位保留)。
+- 修改 `name`/`parser_type`/`enabled`/`use_proxy` 触发 update(不重建,水位保留)。
 
 **`last_seen_version`(水位)的推进规则**:
 仅当检查返回 `success` **且**有新增版本时,水位推进到新增版本列表中的第一个(即最新的那个新增版本)。其他三种结果(`no_new_version`、`failed`、`skipped`)都**不**推进水位。
@@ -76,6 +77,7 @@ changelog integration 周期性地从配置的远程 URL 拉取变更日志页�
 | `url` | str | 是 | — | changelog 页面 URL |
 | `parser_type` | `Literal["markdown_heading", "html_chinese_version"]` | 是 | — | 解析器类型 |
 | `enabled` | bool | 否 | True | 是否启用 |
+| `use_proxy` | bool | 否 | False | 拉取是否走代理;`true` 时该 tracker 的请求以 per-request `proxy=` 走 `core.github.proxy` 配置的代理(与 GitHub 客户端同一代理配置源)。默认 `false` 直连,不受全局代理影响 |
 
 配置类 `extra="forbid"`:出现未定义字段时报错。TOML 中 `trackers` 接受 list 或以数字字符串为键的 dict(dict 会被按数字键排序后转成 list)。
 
@@ -101,7 +103,7 @@ changelog integration 周期性地从配置的远程 URL 拉取变更日志页�
 1. 计算期望的 URL 集合(来自 config 的所有 tracker URL)。
 2. 对每个 config tracker:
    - 若 DB 中不存在该 URL → 创建新行(水位和检查时间戳都初始化为 None),计入"新增"。
-   - 若 DB 中已存在 → 比较 `name`/`parser_type`/`enabled`(**不**比较 url,它是查找键);任一变化则更新字段,计入"更新"。
+   - 若 DB 中已存在 → 比较 `name`/`parser_type`/`enabled`/`use_proxy`(**不**比较 url,它是查找键);任一变化则更新字段,计入"更新"。
 3. **GC**:DB 中存在但不在期望 URL 集合中的行 → 删除,计入"删除"。GC 基于 URL 集合,与 `enabled` 无关——禁用的 tracker 只要还在 config 里就保留。
 
 **sync 的触发时机**:只在 `run` 流程开始时执行(`core.py` 里 `setup → sync → run` 的固定顺序)。`PUT /api/v1/config/changelog` 成功后只写 DB config 表,**不**调用 sync。这是有意的设计——状态表是程序内部 checkpoint,不对用户暴露(详见 spec 06)。
@@ -143,12 +145,13 @@ changelog integration 周期性地从配置的远程 URL 拉取变更日志页�
 ### 5.2 检查流程
 
 1. **禁用检查**:若 tracker 被禁用,直接返回 `skipped` 结果,不更新任何字段。
-2. **拉取页面**:从 URL 拉取 changelog 内容(详见 §9)。拉取失败(HTTP 错误、网络错误、超时)→ 返回 `failed`,错误信息含异常详情。
-3. **解析版本**:用与 `parser_type` 匹配的解析器解析内容(详见 §8)。解析失败(无版本头、HTML 无法解析、未知 parser_type)→ 返回 `failed`。
-4. **空结果防御**:若解析返回空列表 → 返回 `failed`(错误信息 "No version entries found")。
-5. **识别新增版本**:调用 `_detect_new_entries`(详见 §5.3),返回 `(新增版本列表, 警告信息)`。
-6. **无新增版本**:盖戳检查时间戳,返回 `no_new_version`(携带最新版本号供日志展示)。
-7. **有新增版本**:推进水位到新增版本列表的第一个(最新的),盖戳检查时间戳,返回 `success`(携带新增版本列表;若 `_detect_new_entries` 返回了警告信息,则塞进结果的 `error` 字段传递)。
+2. **代理解析**:若 tracker 开启 `use_proxy` 且 `core.github.proxy` 为空 → 直接返回 `failed`(错误信息指明缺少代理配置,不发起请求);开启且已配置 → 该 tracker 的拉取请求走代理(详见 §9)。
+3. **拉取页面**:从 URL 拉取 changelog 内容(详见 §9)。拉取失败(HTTP 错误、网络错误、超时)→ 返回 `failed`,错误信息含异常详情。
+4. **解析版本**:用与 `parser_type` 匹配的解析器解析内容(详见 §8)。解析失败(无版本头、HTML 无法解析、未知 parser_type)→ 返回 `failed`。
+5. **空结果防御**:若解析返回空列表 → 返回 `failed`(错误信息 "No version entries found")。
+6. **识别新增版本**:调用 `_detect_new_entries`(详见 §5.3),返回 `(新增版本列表, 警告信息)`。
+7. **无新增版本**:盖戳检查时间戳,返回 `no_new_version`(携带最新版本号供日志展示)。
+8. **有新增版本**:推进水位到新增版本列表的第一个(最新的),盖戳检查时间戳,返回 `success`(携带新增版本列表;若 `_detect_new_entries` 返回了警告信息,则塞进结果的 `error` 字段传递)。
 
 ### 5.3 `_detect_new_entries` —— 识别新增版本的核心业务逻辑
 
@@ -328,7 +331,7 @@ changelog 通知的 summary 是固定拼接的字符串:
 - **网络错误处理**:`aiohttp.ClientError`(含连接错误、响应错误等)包装为业务异常。
 - **超时处理**:`asyncio.TimeoutError` **不**被拉取逻辑内部捕获,会冒泡到检查逻辑的异常处理 → 检查结果为 `failed`。这是预期行为。
 - **重试**:**无**——单次拉取,失败即检查失败。
-- **代理**:依赖共享 ClientSession 的环境变量配置,无显式代理参数。
+- **代理**:per-tracker 选择启用。`use_proxy = true` 的 tracker,其拉取请求以 per-request `proxy=` 参数走 `core.github.proxy` 配置的代理(与 GitHub 客户端、v2ex 同一单一代理配置源);`use_proxy = false`(默认)直连,即使全局配置了代理也不受影响。共享 ClientSession 以 `trust_env=False` 创建,**不**读取 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量。开启 `use_proxy` 但 `core.github.proxy` 为空 → 检查直接 `failed`(错误信息指明缺少代理配置,不发起请求)。
 
 ### 字符集解码(技术细节)
 
@@ -354,6 +357,7 @@ changelog 通知的 summary 是固定拼接的字符串:
 | HTTP 404 / 500 | 拉取异常 → `failed` |
 | HTTP 超时 | 超时异常冒泡 → `failed` |
 | 网络错误(ClientError) | 包装为业务异常 → `failed` |
+| 开启 `use_proxy` 但 `core.github.proxy` 为空 | 检查直接 `failed`,错误信息指明缺少代理配置 |
 | 空 changelog(无任何版本头) | 解析异常 → `failed` |
 | 解析后版本列表为空 | 防御性异常 → `failed` |
 | 禁用 tracker | 返回 `skipped`,不盖戳检查时间戳 |
