@@ -300,6 +300,24 @@ class TestPutSection:
         )
         assert resp.status_code == 422
 
+    async def test_feed_schedule_cron_rejected_on_put(self, client) -> None:
+        resp = await client.put(
+            "/api/v1/config/feed",
+            json={"data": {"base_url": "https://miniflux.example.com", "schedule_cron": "every 4 hours"}},
+        )
+        assert resp.status_code == 422
+        stored = await get_config("feed")
+        assert stored is None or "schedule_cron" not in stored
+
+    async def test_feed_schedule_cron_round_trips(self, client) -> None:
+        resp = await client.put(
+            "/api/v1/config/feed",
+            json={"data": {"base_url": "https://miniflux.example.com", "schedule_cron": "0 */4 * * *"}},
+        )
+        assert resp.status_code == 200
+        stored = await get_config("feed")
+        assert stored["schedule_cron"] == "0 */4 * * *"
+
     async def test_put_refreshes_app_state_cfg(self, app_client) -> None:
         """PUT /config/core must refresh app.state.cfg so downstream consumers
         (notification test, report pipeline) see the new values immediately."""

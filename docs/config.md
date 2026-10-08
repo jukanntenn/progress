@@ -114,6 +114,7 @@ cron = "0 6 * * *"   # daily at 06:00 local time; empty disables scheduled runs
 - The cron expression is evaluated by the `scheduled-run` row on the serve tree via `ctx.scheduler` (croniter): local time, per-entry mutex (a trigger while the previous run is still active is skipped with a warning), no catch-up of missed fires.
 - Changes are live: writing the section through the API reloads the schedule without a restart (L0).
 - The container's `PROGRESS_SCHEDULE_CRON` environment variable is a compatibility fallback used when `schedule.cron` is empty; scheduling runs in-process.
+- Integrations whose config schema declares a `schedule_cron` field can leave this global cadence: a non-empty stored value arms a dedicated scheduler entry running only that integration, and the integration is excluded from the global group — an override replaces the global cadence, never stacks on it. Empty inherits the global schedule; an invalid stored value degrades to inherit-global with a warning. The first adopter is `feed` (see below).
 
 ## Zero configuration
 
@@ -195,6 +196,9 @@ Miniflux RSS reader connection. Empty `base_url` → feed integration disabled +
 [feed]
 base_url = "https://miniflux.example.org"   # empty → disabled
 api_key = "MF-api-key-xxxx"                  # SecretStr; base_url set but empty → disabled
+schedule_cron = "0 */4 * * *"                # optional: schedule only feed on its own cron; empty → global schedule
 ```
 
 Which feeds to track is **data-source driven** (decided entirely by what Miniflux is subscribed to), so this section carries only the Miniflux credentials — no feed list. Per-feed dedup water marks live in the `feed_trackers` state table, advanced inside `run`.
+
+`schedule_cron` overrides the global schedule for this integration alone (see [Scheduling](#scheduling)); an invalid value is rejected on write with 422.

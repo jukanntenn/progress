@@ -31,7 +31,7 @@ endpoint 设置后：
 - **追踪/指标**经 OTLP HTTP 导出（指标每 60 秒一次，span 批量发送）。本地不再写 JSONL。
 - **日志**由 `OtelLogHandler` 桥接：一个标准库 handler，把每条记录恰好转发一次——level 映射 severity，事件名作 body，其余标量字段作属性，并原生附带实时追踪上下文（VictoriaLogs 把 `trace_id` 暴露为 Jaeger 链接字段）。DEBUG 只进文件；无论 collector 是否中断，轮转文件保留全部内容。
 - **运行时指标**来自 `opentelemetry-instrumentation-system-metrics`（进程内存/CPU/线程、系统 gauge），提供常在的锚点序列（anchor series），「遥测断流」告警盯住它，用于捕捉应用→collector→存储链路的断裂。
-- **调度器 gauge** 导出运行节奏：`progress.schedule.expected_max_gap_seconds`（布防（arm）时由 cron 算出）与 `progress.pipeline.last_success_epoch`。告警窗口以导出的间隔为除数，因此修改 `schedule.cron` 会自动重调告警，不预设运行次数。
+- **调度器 gauge** 按调度组导出运行节奏（属性：组的 cron 与成员集成）：`progress.schedule.expected_max_gap_seconds`（布防（arm）时由各组 cron 算出）与 `progress.pipeline.last_success_epoch`。告警窗口以导出的间隔为除数，因此修改 `schedule.cron`——或某个集成的 `schedule_cron` 覆盖——会自动重调告警；请按组属性查询，不要假设单一管道节奏。
 - `PROGRESS_KUMA_PUSH_URL`（可选）让进程内调度器把每次运行的判定结果推送到一个 Uptime Kuma push monitor，每次推送的保留期由预期间隔推导。留空即不推送；推送失败只记日志并吞掉（kuma 的静默检测是兜底）。
 
 ## 文件模式（默认/回退）
