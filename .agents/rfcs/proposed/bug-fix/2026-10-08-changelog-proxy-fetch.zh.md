@@ -22,6 +22,8 @@ Changelog tracker 通过共享的 aiohttp session 拉取任意 URL。[spec 07 �
 
 设置界面从 section schema 自动渲染该字段；`sync` 像 `enabled`/`parser_type` 一样把它镜像到行上；一个迁移增加一列 varchar；per-request 代理是 aiohttp 3.10 的既定模式（`ProxiedGitHubAPI`、`V2exClient`），共享 session 保持 `trust_env=False`，Feishu/MarkPost/AI/Miniflux 流量继续直连。
 
+该迁移为列声明 `db_default=""`，而不只是 python 侧的 `default`：tortoise 只把 `db_default` 渲染进 DDL，而 SQLite 拒绝没有数据库级默认值的 `ADD COLUMN ... NOT NULL`——该失败会被「迁移永不崩溃」策略吞掉，新代码就带着旧 schema 继续运行。更早的、仅带 python 默认值的 `AddField` 迁移（如 `0002` 的 `rule_success_count`）在已部署数据库上只走过 bootstrap duplicate-column 假应用路径，因此这个非法 DDL 形态直到本迁移第一次真正执行才暴露。
+
 ## 已考虑的替代方案
 
 **通过 per-tracker `use_proxy` 布尔复用 `core.github.proxy`。** v2ex 先例让「单一共享配置项」看似足够，但 v2ex 的流量是单一被整体封锁的站点，而 changelog 列表是任意主机：把 changelog 拉取耦合到 GitHub 代理，会让 GitHub 的配置项对外来 URL 承担载荷，GitHub 代理的改动也会波及 changelog 行为。评审中因该耦合被否决。
