@@ -6,13 +6,13 @@ Status: proposed
 
 ## Problem
 
-调度目前只有一条全局节奏。`core.schedule.cron` 只挂载一个 `scheduled-run` 触发器,触发时 `runner.run_once()` 一次性跑完所有已挂载的集成,因此设置 UI 能表达的最细节奏就是"整条管道每天 N 次"——数据天然变化更快的集成(feed 轮询)或更慢的集成(repo release 同步)都无法拥有自己的节奏,除非拖着其余管道一起变速。内核 RFC 在进程内调度器落地时就点名了这个缺口——"没有集成能声明自己的节奏(feed 轮询快于 repo 同步是无法表达的")——而它为此预留的部件如今全部就位(按条目 `every(cron, fn)` 的调度器、重启 scheduled-run fiber 的 L0 reload、免费渲染任意插件配置字段的 schema 驱动设置编辑器),缺的只是集成粒度本身。具体驱动:`feed` 目前跟随全局节奏每天跑两次,它应当每四小时跑一次。
+调度目前只有一条全局节奏。`core.schedule.cron` 只挂载一个 `scheduled-run` 触发器,触发时 `runner.run_once()` 一次性跑完所有已挂载的集成,因此设置 UI 能表达的最细节奏就是"整条管道每天 N 次"——数据天然变化更快的集成(feed 轮询)或更慢的集成(repo release 同步)都无法拥有自己的节奏,除非拖着其余管道一起变速。这个缺口在进程内调度器落地时就被点名——没有集成能声明自己的节奏,feed 轮询快于 repo 同步是无法表达的——而为此预留的部件如今全部就位(按条目 `every(cron, fn)` 的调度器、重启 scheduled-run fiber 的 L0 reload、免费渲染任意插件配置字段的 schema 驱动设置编辑器),缺的只是集成粒度本身。具体驱动:`feed` 目前跟随全局节奏每天跑两次,它应当每四小时跑一次。
 
 ## Proposal
 
 ### 能力就是一个约定配置字段
 
-集成声明调度能力的方式,是在自己的 `config_schema` 模型上声明一个 `schedule_cron: str = ""` 字段——仅此而已。字段出现在 `model_fields` 中即等于能力存在:设置编辑器从 section schema 自动渲染该字段,`PUT /api/v1/config/{section}` 校验后存入集成自己的 DB section,而从未声明该字段的 schema 会在写入时拒绝这个键(`extra="forbid"`),因此未声明能力的集成零代码继承全局节奏,也不会漂移到半配置状态。五钩子 `Integration` 协议(spec 06)不受影响:第三方集成照常加载,接入能力只是在自己配置模型里加一个字段——正是插件布局早已承诺的自包含自治。
+集成声明调度能力的方式,是在自己的 `config_schema` 模型上声明一个 `schedule_cron: str = ""` 字段——仅此而已。字段出现在 `model_fields` 中即等于能力存在:设置编辑器从 section schema 自动渲染该字段,`PUT /api/v1/config/{section}` 校验后存入集成自己的 DB section,而从未声明该字段的 schema 会在写入时拒绝这个键(`extra="forbid"`),因此未声明能力的集成零代码继承全局节奏,也不会漂移到半配置状态。五钩子 `Integration` 协议不受影响:第三方集成照常加载,接入能力只是在自己配置模型里加一个字段——正是插件布局早已承诺的自包含自治。
 
 ### 统一的 cron 校验
 
@@ -46,7 +46,7 @@ Status: proposed
 
 **每个集成在 `setup` 里自己注册 `every(cron, ...)`。** 调度所有权散入各集成代码,没有任何一处能看见全部节奏——"全局排除已覆盖者"的分组、按组的观测、reload 重新 arm,都需要一个在 arm 时解析完整映射的消费者。
 
-**core 配置里的集中式集成调度表。** core 将不得不了解插件名及其 schema 字段,违背 section 归插件自有的模型(spec 02/06),也把能力藏到 schema 编辑器已经渲染的按集成设置面之外。
+**core 配置里的集中式集成调度表。** core 将不得不了解插件名及其 schema 字段,违背 section 归插件自有的模型,也把能力藏到 schema 编辑器已经渲染的按集成设置面之外。
 
 **多个全局 cron(`schedule.crons`)。** 仍是全管道语义:表达的是"所有东西跑得更勤",而非"feed 比 repo 同步跑得快"。
 

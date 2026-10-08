@@ -6,13 +6,13 @@ English | [中文](2026-10-08-per-integration-schedule-overrides.zh.md)
 
 ## Problem
 
-Scheduling is one global cadence. `core.schedule.cron` arms a single `scheduled-run` trigger that fires `runner.run_once()` over every mounted integration together, so the finest cadence the settings UI can express is "the whole pipeline, N times a day" — an integration whose data naturally moves faster (feed polling) or slower (repo release sync) cannot get its own rhythm without dragging everything else along. The kernel RFC named this gap when the in-process scheduler landed — "no integration can declare its own cadence (feed polling faster than repo sync is impossible to express)" — and the pieces it shipped to close it are all in place (the per-entry `every(cron, fn)` scheduler, the L0 reload that restarts the scheduled-run fiber, the schema-driven settings editor that renders any plugin config field for free); only the per-integration granularity itself is missing. The concrete driver: `feed` runs twice a day with everything else and should run every four hours.
+Scheduling is one global cadence. `core.schedule.cron` arms a single `scheduled-run` trigger that fires `runner.run_once()` over every mounted integration together, so the finest cadence the settings UI can express is "the whole pipeline, N times a day" — an integration whose data naturally moves faster (feed polling) or slower (repo release sync) cannot get its own rhythm without dragging everything else along. This gap was already named when the in-process scheduler landed — no integration can declare its own cadence, feed polling faster than repo sync was impossible to express — and the pieces shipped to close it are all in place (the per-entry `every(cron, fn)` scheduler, the L0 reload that restarts the scheduled-run fiber, the schema-driven settings editor that renders any plugin config field for free); only the per-integration granularity itself is missing. The concrete driver: `feed` runs twice a day with everything else and should run every four hours.
 
 ## Proposal
 
 ### The capability is a convention config field
 
-An integration declares schedule capability by declaring a `schedule_cron: str = ""` field on its own `config_schema` model — nothing else. Presence of the field in `model_fields` *is* the capability: the settings editor renders it automatically from the section schema, `PUT /api/v1/config/{section}` validates and stores it in the integration's own DB section, and a schema that never declared the field rejects the key on write (`extra="forbid"`), so an undeclared integration inherits the global cadence with zero code and cannot drift into a half-configured state. The five-hook `Integration` protocol (spec 06) is untouched: third-party integrations load unchanged, and opting in is one field in the integration's own config model — the self-contained autonomy the plugin layout already promises.
+An integration declares schedule capability by declaring a `schedule_cron: str = ""` field on its own `config_schema` model — nothing else. Presence of the field in `model_fields` *is* the capability: the settings editor renders it automatically from the section schema, `PUT /api/v1/config/{section}` validates and stores it in the integration's own DB section, and a schema that never declared the field rejects the key on write (`extra="forbid"`), so an undeclared integration inherits the global cadence with zero code and cannot drift into a half-configured state. The five-hook `Integration` protocol is untouched: third-party integrations load unchanged, and opting in is one field in the integration's own config model — the self-contained autonomy the plugin layout already promises.
 
 ### Unified cron validation
 
@@ -46,7 +46,7 @@ No new reload machinery. The `scheduled-run` row already injects `config`, so an
 
 **Each integration registers its own `every(cron, ...)` inside `setup`.** Scheduling ownership disperses into per-integration code with no single place that sees every cadence — the global-excludes-overridden grouping, the per-group observability, and the reload re-arm all need one consumer that resolves the full map at arm time.
 
-**A central per-integration schedule map in core config.** Core would have to know plugin names and their schema fields, violating the owns-its-own-section model (spec 02/06) and hiding the capability from the per-integration settings surface the schema editor already renders.
+**A central per-integration schedule map in core config.** Core would have to know plugin names and their schema fields, violating the model where each integration owns its own config section and schema, and hiding the capability from the per-integration settings surface the schema editor already renders.
 
 **Multiple global crons (`schedule.crons`).** Still pipeline-wide: it expresses "run everything more often", not "run feed faster than repo sync".
 

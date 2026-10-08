@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record .agents/rfcs/proposed/feature/2026-10-08-per-integration-schedule-overrides.md
-2026-10-08-per-integration-schedule-overrides.md: df2d6ce57e2e2b8e74b983407e0151b245e747b7
-2026-10-08-per-integration-schedule-overrides.zh.md: f519878ba120055b0f1b333a810c3556c6b5a9b7
+2026-10-08-per-integration-schedule-overrides.md: 2780335379cdbf01e775c218be58385f4db29e31
+2026-10-08-per-integration-schedule-overrides.zh.md: b52860f69b5fd0321fea88ee0a035ce4515560a5
