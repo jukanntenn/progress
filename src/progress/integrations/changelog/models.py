@@ -27,7 +27,9 @@ class ChangelogTracker(BaseModel):
     url = fields.CharField(max_length=1024, unique=True)
     parser_type = fields.CharField(max_length=64, default="auto")
     enabled = fields.BooleanField(default=True)
-    proxy = fields.CharField(max_length=1024, default="")
+    # db_default is required for the ADD COLUMN DDL: SQLite rejects a NOT NULL
+    # column without a database-level default (migration 0003).
+    proxy = fields.CharField(max_length=1024, default="", db_default="")
     last_seen_version = fields.CharField(max_length=255, null=True)
     last_check_time = fields.DatetimeField(null=True)
     # Feature 6: a deterministic ChangelogRule (JSON) learned from the AI

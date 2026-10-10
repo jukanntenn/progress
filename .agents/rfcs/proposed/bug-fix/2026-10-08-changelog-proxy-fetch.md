@@ -22,6 +22,8 @@ A non-empty `proxy` must start with `http://` or `https://`; anything else (a ba
 
 The settings editor renders the field from the section schema; `sync` mirrors it onto the row like `enabled`/`parser_type`; one migration adds a varchar column; per-request proxying is the established aiohttp 3.10 pattern (`ProxiedGitHubAPI`, `V2exClient`), so the shared session stays `trust_env=False` and Feishu/MarkPost/AI/Miniflux traffic stays direct.
 
+The migration declares the column with `db_default=""`, not only a python-side `default`: tortoise renders only `db_default` into the DDL, and SQLite rejects `ADD COLUMN ... NOT NULL` without a database-level default — the failure is swallowed by the never-crash migration policy, leaving the new code running against the old schema. Earlier `AddField` migrations with python-only defaults (e.g. `0002`'s `rule_success_count`) only ever took the bootstrap duplicate-column fake-apply path on deployed databases, so the invalid DDL shape went unnoticed until this migration had to run for real.
+
 ## Alternatives considered
 
 **Reuse `core.github.proxy` via a per-tracker `use_proxy` boolean.** The v2ex precedent makes one shared knob look sufficient, but v2ex's traffic is a single uniformly blocked site while a changelog list is arbitrary hosts: coupling changelog fetches to the GitHub proxy makes the GitHub setting load-bearing for unrelated URLs and makes GitHub-proxy edits risk changelog behavior. Rejected in review for this coupling.
