@@ -28,7 +28,7 @@ Status: implemented
 
 ### 热更新沿用 L0
 
-不新增任何 reload 机制。`scheduled-run` 行本来就注入 `config`,因此任意 section PUT(全局或插件)都会触发 `composer.reload_config()` 重启该 fiber;重启时重读所有 section 并重新 arm 分组。在设置 UI 里编辑 `feed.schedule_cron` 于下一次 arm 生效,无需重启进程,与编辑全局 cron 的行为完全一致。
+不新增任何 reload 机制。`scheduled-run` 行本来就注入 `config`,因此任意 section PUT(全局或插件)都会触发 `composer.reload_config()` 重启该 fiber;重启时重读所有 section 并重新 arm 分组。在设置 UI 里编辑 `feed.schedule_cron` 于下一次 arm 生效,无需重启进程,与编辑全局 cron 的行为完全一致。Registry 成员是第二个 re-arm 触发器:shim 在每次实例 add/remove 时发出 `integration/registry-changed`(boot 的第二轮 settle pass、L3 安装、fiber 重启),该行在每个事件上重新 arm 分组——这是 [scheduled-run registry re-arm](../bug-fix/2026-10-10-scheduled-run-registry-rearm.zh.md) 记录的 boot 顺序缺陷的修复:arm 时刻的快照曾早于填充 registry 的那一轮 pass。
 
 ### 调度级观测
 
@@ -40,7 +40,7 @@ Status: implemented
 
 ## Testing
 
-`tests/unit/test_cron_validator.py` 钉住方言:空值通过,五字段表达式通过,四字段/六字段、越界分钟与乱串拒绝,annotated type 在模型内拒绝非法值。`tests/unit/runtime/test_scheduled_run.py` 钉住分组:纯函数 `resolve_schedule_groups`(全局组成员、覆盖排除、同表达式合并、全局为空时无组且仅保留覆盖组),boot 级布防(空转行、全局 cron、env 回退、覆盖布防独立 `scheduled-run[<cron>]` 条目且全局条目排除该集成、覆盖等于全局时并入、无效存储值降级),以及先前的节奏数学与 kuma URL 构造。`tests/component/test_core_orchestration.py` 钉住 runner 子集(`only` 只跑指定集成;未知名字被忽略),`tests/component/test_config.py` 钉住写入路径(`PUT /api/v1/config/feed` 非法 cron 返回 422 且不落库;合法 cron 经 section 往返)。
+`tests/unit/test_cron_validator.py` 钉住方言:空值通过,五字段表达式通过,四字段/六字段、越界分钟与乱串拒绝,annotated type 在模型内拒绝非法值。`tests/unit/runtime/test_scheduled_run.py` 钉住分组:纯函数 `resolve_schedule_groups`(全局组成员、覆盖排除、同表达式合并、全局为空时无组且仅保留覆盖组),boot 级布防(空转行、全局 cron、env 回退、覆盖布防独立 `scheduled-run[<cron>]` 条目且全局条目排除该集成、覆盖等于全局时并入、无效存储值降级),registry 驱动的 re-arm 与覆盖 drift 判定(见 [registry re-arm RFC](../bug-fix/2026-10-10-scheduled-run-registry-rearm.zh.md)),以及先前的节奏数学与 kuma URL 构造。`tests/component/test_core_orchestration.py` 钉住 runner 子集(`only` 只跑指定集成;未知名字被忽略),`tests/component/test_scheduled_run_arming.py` boot 真实 shim 树并钉住已 arm 的 trigger 会运行已挂载的集成,`tests/component/test_config.py` 钉住写入路径(`PUT /api/v1/config/feed` 非法 cron 返回 422 且不落库;合法 cron 经 section 往返)。
 
 ## Alternatives considered
 
