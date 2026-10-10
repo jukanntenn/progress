@@ -31,6 +31,7 @@ def declare_catalog() -> None:
     declare_event("run/started", mode="emit", replace=True)
     declare_event("integration/pre-run", mode="waterfall", replace=True)
     declare_event("integration/post-run", mode="parallel", replace=True)
+    declare_event("integration/registry-changed", mode="emit", replace=True)
     declare_event("report/assemble", mode="waterfall", replace=True)
     declare_event("report/generated", mode="emit", replace=True)
     declare_event("notification/build", mode="serial", replace=True)
@@ -54,6 +55,13 @@ class PreRunPayload:
     name: str
     vetoed: bool = False
     reason: str = ""
+
+
+@dataclass
+class RegistryChangedPayload:
+    """Registry membership after an add/remove; consumers re-derive state."""
+
+    names: list[str]
 
 
 @dataclass
@@ -103,6 +111,7 @@ __all__ = [
     "BuildPayload",
     "PostRunPayload",
     "PreRunPayload",
+    "RegistryChangedPayload",
     "ReportGeneratedPayload",
     "RunCompletedPayload",
     "RunStartedPayload",

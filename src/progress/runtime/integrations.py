@@ -15,6 +15,7 @@ from typing import Any
 from progress.integrations.base import Components, Integration
 from progress.integrations.registry import discover_integrations
 from progress.kernel import Definition, Entry
+from progress.runtime.catalog import RegistryChangedPayload
 
 
 class IntegrationsService(Definition):
@@ -49,10 +50,12 @@ def make_integration_plugin(cls: Any) -> Any:
         await instance.setup(Components(cfg=ctx.config, session=ctx.http, ai=ctx.get("ai")))
         registry = ctx.integrations
         registry.add(instance)
+        await ctx.emit("integration/registry-changed", RegistryChangedPayload(names=list(registry.names)))
 
         async def _teardown() -> None:
             registry.remove(instance)
             await instance.teardown()
+            await ctx.emit("integration/registry-changed", RegistryChangedPayload(names=list(registry.names)))
 
         ctx.effect(_teardown)
 
