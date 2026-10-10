@@ -1,16 +1,20 @@
-"""scheduled-run consumer (PRFC phase 4c): arming, idling, env fallback, cadence math, override grouping."""
+"""scheduled-run consumer (PRFC phase 4c): arming, idling, env fallback, cadence math, override grouping, registry re-arm, coverage drift."""
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
 
+from progress.cli.outcome import RunOutcome
 from progress.config.root import CoreConfig
 from progress.integrations.feed.config import FeedIntegrationConfig
 from progress.kernel import Entry, boot
+from progress.runtime.catalog import RegistryChangedPayload
 from progress.runtime.scheduled_run import (
     KUMA_PUSH_MAX_RETENTION,
+    KUMA_PUSH_URL_ENV,
     SCHEDULE_CRON_ENV,
     ScheduleGroup,
     build_kuma_push_url,
@@ -30,18 +34,28 @@ class _FakeIntegration:
         self.config_schema = config_schema
 
 
-def _tree(cfg: CoreConfig, instances: list[Any] | None = None) -> list[Entry]:
+class _FakeRegistry:
+    """Registry whose ``names`` reflects live instance membership."""
+
+    def __init__(self, instances: list[Any]) -> None:
+        self.instances = instances
+
+    @property
+    def names(self) -> list[str]:
+        return [i.name for i in self.instances]
+
+
+def _tree(cfg: CoreConfig, instances: list[Any] | None = None, run: Any = None) -> list[Entry]:
     mounted = instances if instances is not None else []
 
     async def config_entry(ctx: Any, config: Any) -> None:
         ctx.provide("config", cfg)
 
     async def integrations_entry(ctx: Any, config: Any) -> None:
-        registry = type("Registry", (), {"instances": mounted, "names": [i.name for i in mounted]})
-        ctx.provide("integrations", registry())
+        ctx.provide("integrations", _FakeRegistry(mounted))
 
     async def runner_entry(ctx: Any, config: Any) -> None:
-        handle = type("Handle", (), {"run_once": staticmethod(_noop_run)})()
+        handle = type("Handle", (), {"run_once": staticmethod(run or _noop_run)})()
         ctx.provide("runner", handle)
 
     async def scheduler_entry(ctx: Any, config: Any) -> None:
@@ -61,8 +75,13 @@ def _tree(cfg: CoreConfig, instances: list[Any] | None = None) -> list[Entry]:
     ]
 
 
-async def _noop_run(**kwargs: Any) -> None:
-    return None
+async def _noop_run(**kwargs: Any) -> RunOutcome:
+    return RunOutcome()
+
+
+async def _drain_emit() -> None:
+    for _ in range(10):
+        await asyncio.sleep(0)
 
 
 async def test_empty_cron_leaves_row_idle(tmp_state_home: str):
@@ -174,6 +193,79 @@ async def test_resolve_schedule_overrides_reads_only_capable_schemas(
         [_FakeIntegration("feed", FeedIntegrationConfig), _FakeIntegration("repo"), _FakeIntegration("v2ex")]
     )
     assert overrides == {"feed": "0 */4 * * *"}
+
+
+async def test_registry_changed_re_arms_with_new_members(tmp_state_home: str):
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    mounted: list[Any] = []
+    subsets: list[frozenset[str]] = []
+
+    async def recording_run(*, only: Any = None, **kwargs: Any) -> RunOutcome:
+        subsets.append(frozenset(only or ()))
+        return RunOutcome()
+
+    async with boot(_tree(cfg, mounted, run=recording_run) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        mounted.append(_FakeIntegration("repo"))
+        await ctx.emit("integration/registry-changed", RegistryChangedPayload(names=["repo"]))
+        await _drain_emit()
+        await ctx.scheduler.schedules["scheduled-run"].callback()
+    assert subsets[-1] == frozenset({"repo"})
+
+
+async def test_fire_with_mounted_but_unscheduled_integration_reports_drift(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(KUMA_PUSH_URL_ENV, "http://kuma/push/KEY")
+    verdicts: list[bool] = []
+    events: list[tuple[str, dict[str, str]]] = []
+
+    async def fake_push(_url: str, *, success: bool, message: str, retention: int) -> bool:
+        verdicts.append(success)
+        return True
+
+    def fake_event(name: str, *, value: float = 1, attributes: dict[str, str] | None = None) -> None:
+        events.append((name, dict(attributes or {})))
+
+    monkeypatch.setattr("progress.runtime.scheduled_run.push_run_verdict", fake_push)
+    monkeypatch.setattr("progress.runtime.scheduled_run.record_business_event", fake_event)
+
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    mounted: list[Any] = []
+    async with boot(_tree(cfg, mounted) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        mounted.append(_FakeIntegration("repo"))
+        await ctx.scheduler.schedules["scheduled-run"].callback()
+    assert events == [("progress.schedule.coverage_drift", {"integrations": "repo", "firing": "0 6 * * *"})]
+    assert verdicts == [False]
+
+
+async def test_fire_without_drift_pushes_success(
+    tmp_state_home: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(KUMA_PUSH_URL_ENV, "http://kuma/push/KEY")
+    verdicts: list[bool] = []
+    events: list[tuple[str, dict[str, str]]] = []
+
+    async def fake_push(_url: str, *, success: bool, message: str, retention: int) -> bool:
+        verdicts.append(success)
+        return True
+
+    def fake_event(name: str, *, value: float = 1, attributes: dict[str, str] | None = None) -> None:
+        events.append((name, dict(attributes or {})))
+
+    monkeypatch.setattr("progress.runtime.scheduled_run.push_run_verdict", fake_push)
+    monkeypatch.setattr("progress.runtime.scheduled_run.record_business_event", fake_event)
+
+    cfg = CoreConfig(state_home=tmp_state_home)
+    cfg.schedule = type(cfg.schedule)(cron="0 6 * * *")
+    mounted = [_FakeIntegration("repo")]
+    async with boot(_tree(cfg, mounted) + [make_scheduled_run_entry()]) as ctx:  # noqa: RUF005
+        await ctx.scheduler.schedules["scheduled-run"].callback()
+    assert [name for name, _ in events] == []
+    assert verdicts == [True]
 
 
 def test_resolve_schedule_groups_pure_function():
